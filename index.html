@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lingonect</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+
+  /* Layout */
+  --text-col:520px;
+
+  /* Logo */
+  --logo-size:240px;
+  --logo-opacity:0.9;
+}
+
+html,body{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  font-family:"Special Elite","Courier New",monospace;
+}
+
+/* === CENTERED TEXT STAGE === */
+.stage{
+  position:fixed;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:var(--text-col);
+  height:70vh;
+  overflow:hidden;
+  z-index:2;
+}
+
+.content{
+  position:absolute;
+  width:100%;
+  transform:translateY(0);
+  will-change:transform;
+}
+
+#typed{
+  font-size:20px;
+  line-height:1.75;
+  text-align:justify;
+  white-space:pre-wrap;
+}
+
+#typed strong{
+  font-weight:800;
+  letter-spacing:.2px;
+}
+
+.caret{
+  animation:blink 1s steps(1) infinite;
+  margin-left:6px;
+}
+@keyframes blink{50%{opacity:0}}
+
+/* === LOGO === */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - (var(--text-col) / 2));
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+  pointer-events:none;
+}
+
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+
+/* === LANGUAGE SWITCHER === */
+.language-switcher{
+  position:fixed;
+  bottom:28px;
+  width:100%;
+  display:flex;
+  justify-content:center;
+  gap:28px;
+  z-index:3;
+}
+
+.lang-btn{
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  color:#000;
+  user-select:none;
+  transition:color 0.2s ease;
+
+  /* Fix mixed-script baseline differences (Latin vs CJK) */
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1;
+}
+
+.lang-btn.active{
+  color:var(--cobalt);
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGO -->
+<div class="logo-rail" aria-hidden="true">
+  <img class="logo" src="logo.png" alt="">
+</div>
+
+<!-- CENTERED TYPING STAGE -->
+<section class="stage" aria-label="Lingonect statement">
+  <div class="content" id="content">
+    <div id="typed"></div><span class="caret">▌</span>
+  </div>
+</section>
+
+<!-- LANGUAGE SWITCHER -->
+<div class="language-switcher" aria-label="Language selector">
+  <div class="lang-btn active" data-lang="en">English (UK)</div>
+  <div class="lang-btn" data-lang="zh">中文（简体）</div>
+  <div class="lang-btn" data-lang="de">Deutsch</div>
+  <div class="lang-btn" data-lang="es">Español (España)</div>
+</div>
+
+<script>
+/* =========================
+   TEXT CONTENT
+========================= */
+const TEXTS = {
+
+  en: [
+    [{t:"Language",b:true},{t:" and "},{t:"culture",b:true},{t:" are uniquely human."}],
+    [{t:"Unlike artificial intelligence, humans generate language from within. It emerges through emotion, experience, joy, trauma, pain, and memory."}],
+    [{t:"We do not speak by calculating grammatical rules or assembling dictionary definitions. We speak because we feel, because we live, and because we have intention."}],
+    [{t:"Natural language and culture are unpredictable, constantly evolving, sometimes irrational, and often surprising. Meaning is not merely informational. It is relational, contextual, and profoundly human."}],
+    [{t:"Today, we can draw on ever-advancing "},{t:"AI models",b:true},{t:" to help us create, translate, govern, and safeguard languages at scale."}],
+    [{t:"But AI does not "},{t:"experience",b:true},{t:" language."}],
+    [{t:"For a model, words are symbols in high-dimensional space. Meaning is learned through patterns and relationships, not through lived experience."}],
+    [{t:"Humans experience language and culture from the "},{t:"inside",b:true},{t:"."}],
+    [{t:"AI reproduces them from the "},{t:"outside",b:true},{t:"."}],
+    [{t:"That is where "},{t:"Lingonect",b:true},{t:" comes in."}],
+    [{t:"Lingonect brings together truly multilingual humans and uses AI to practise, refine, and responsibly share linguistic and cultural knowledge."}]
+  ],
+
+  zh: [
+    [{t:"语言与文化，是唯有人类才能绽放的独特光芒。",b:true}],
+    [{t:"与人工智能不同，人类的语言从内心生长而出——它流淌着情感的脉搏，烙印着经验的刻痕，交织着欢欣、创伤、痛楚与记忆的温度。我们说话，并非依靠语法规则的精密计算，亦非堆砌词典中的冰冷定义。我们言说，是因为我们感知，因为我们活着，因为我们心有所向。"}],
+    [{t:"自然语言与文化充满不可预测的灵动，始终处于流动变迁之中。它们时而非理性，常常出人意料。意义不止于信息传递，更承载着关系、语境，以及人性深处的共鸣。"}],
+    [{t:"今天，我们可以借助日益精进的人工智能模型，大规模地协助创造、翻译、治理与守护语言。"}],
+    [{t:"但人工智能从未真正“体验”语言。"}],
+    [{t:"对模型而言，词语只是高维空间中的符号；意义通过模式与关联习得，而非源于真实鲜活的生命经历。人类从内而外地沉浸于语言与文化，人工智能则从外部重现它们。"}],
+    [{t:"这正是「语联」存在的意义。"}],
+    [{t:"语联汇聚真正掌握多门语言的人类，借助人工智能辅助练习、修正并负责任地分享语言知识。在这里，科技与人性相遇，让跨越文化的理解，生根于真实的生命体验之中。"}]
+  ],
+
+  de: [
+    [{t:"Sprache",b:true},{t:" und "},{t:"Kultur",b:true},{t:" sind zutiefst menschlich."}],
+    [{t:"Im Gegensatz zu KI entsteht Sprache beim Menschen von innen heraus, durch Emotionen, Erfahrungen, Freude, Trauma, Schmerz und Erinnerung."}],
+    [{t:"Wir sprechen nicht durch das Berechnen von Grammatikregeln oder das Zusammensetzen von Wörterbuchdefinitionen. Wir sprechen, weil wir fühlen, leben und etwas beabsichtigen."}],
+    [{t:"Natürliche Sprache und Kultur sind unvorhersehbar, im ständigen Wandel, manchmal irrational und oft überraschend. Bedeutung ist nicht nur informativ, sondern relational, kontextabhängig und menschlich."}],
+    [{t:"Heute können wir immer leistungsfähigere KI-Modelle nutzen, um Sprachen im grossen Massstab zu erstellen, zu übersetzen, zu steuern und zu schützen."}],
+    [{t:"Doch KI erlebt Sprache nicht."}],
+    [{t:"Für ein Modell sind Wörter Symbole in hochdimensionalen Räumen. Bedeutung entsteht durch Muster und Beziehungen, nicht durch Erfahrung."}],
+    [{t:"Menschen erleben Sprache und Kultur von innen."}],
+    [{t:"KI reproduziert sie von aussen."}],
+    [{t:"Hier setzt Lingonect an."}],
+    [{t:"Lingonect verbindet wirklich mehrsprachige Menschen und nutzt KI, um dieses Wissen verantwortungsvoll zu üben, zu korrigieren und weiterzugeben."}]
+  ],
+
+  es: [
+    [{t:"El lenguaje",b:true},{t:" y la "},{t:"cultura",b:true},{t:" son exclusivamente humanos."}],
+    [{t:"A diferencia de la inteligencia artificial, los seres humanos generamos el lenguaje desde dentro. Surge a partir de la emoción, la experiencia, la alegría, el trauma, el dolor y la memoria."}],
+    [{t:"No hablamos calculando reglas gramaticales ni ensamblando definiciones de diccionario. Hablamos porque sentimos, porque vivimos y porque tenemos intención."}],
+    [{t:"El lenguaje natural y la cultura son impredecibles, están en constante evolución, a veces son irracionales y, con frecuencia, sorprendentes. El significado no es únicamente informativo. Es relacional, contextual y profundamente humano."}],
+    [{t:"Hoy podemos apoyarnos en modelos de inteligencia artificial cada vez más avanzados para crear, traducir, gobernar y salvaguardar lenguas a gran escala."}],
+    [{t:"Pero la inteligencia artificial no experimenta el lenguaje."}],
+    [{t:"Para un modelo, las palabras son símbolos en espacios de alta dimensión. El significado se aprende a través de patrones y relaciones, no mediante la experiencia vivida."}],
+    [{t:"Los seres humanos experimentan el lenguaje y la cultura desde dentro."}],
+    [{t:"La inteligencia artificial los reproduce desde fuera."}],
+    [{t:"Ahí es donde entra Lingonect."}],
+    [{t:"Lingonect reúne a personas verdaderamente multilingües y utiliza la inteligencia artificial para practicar, perfeccionar y compartir de forma responsable el conocimiento lingüístico y cultural."}]
+  ]
+};
+
+/* =========================
+   TYPEWRITER ENGINE (instant switch)
+========================= */
+let currentLang = "en";
+let runId = 0;
+
+const TYPE_MIN=35, TYPE_MAX=75, PARA_PAUSE=400;
+const typed = document.getElementById("typed");
+const content = document.getElementById("content");
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function recenter(){
+  const caret = document.querySelector(".caret");
+  const box = caret.getBoundingClientRect();
+  const mid = window.innerHeight/2;
+  const dy = mid - box.top;
+  const current = new DOMMatrix(getComputedStyle(content).transform).m42;
+  content.style.transform = `translateY(${current + dy}px)`;
+}
+
+async function typeText(lang){
+  const myRun = ++runId;  // cancels any previous run immediately
+  typed.innerHTML = "";
+  content.style.transform = "translateY(0)";
+  recenter();
+
+  for(const p of TEXTS[lang]){
+    if(myRun !== runId) return;
+    for(const part of p){
+      if(myRun !== runId) return;
+      const node = document.createElement(part.b ? "strong" : "span");
+      typed.appendChild(node);
+      for(const ch of part.t){
+        if(myRun !== runId) return;
+        node.textContent += ch;
+        recenter();
+        await sleep(TYPE_MIN + Math.random()*(TYPE_MAX - TYPE_MIN));
+      }
+    }
+    typed.append("\n\n");
+    await sleep(PARA_PAUSE);
+  }
+}
+
+/* =========================
+   LANGUAGE SWITCHER
+========================= */
+document.querySelectorAll(".lang-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const lang = btn.dataset.lang;
+    if(lang === currentLang) return;
+
+    document.querySelectorAll(".lang-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+
+    currentLang = lang;
+    typeText(lang);
+  });
+});
+
+/* Start */
+typeText("en");
+</script>
+
+</body>
+</html>
