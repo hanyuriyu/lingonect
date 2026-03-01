@@ -687,20 +687,15 @@ modalSave.addEventListener("click", () => {
   settingsModal.classList.remove("open");
 });
 
-// ── Jais (HuggingFace Inference Endpoint) ──
-// Token is stored in localStorage — click "API Keys" at the bottom to set it.
-// Swap JAIS_ENDPOINT for your dedicated HF Endpoint URL if needed.
-const JAIS_ENDPOINT = "https://api-inference.huggingface.co/models/core42/jais-13b-chat";
+// ── Jais-2 (HuggingFace serverless inference — OpenAI-compatible chat format) ──
+// Uses inceptionai/Jais-2-8B-Chat which works without trust_remote_code.
+// Token is stored in localStorage — click the logo to open API Keys.
+const JAIS_ENDPOINT =
+  "https://api-inference.huggingface.co/models/inceptionai/Jais-2-8B-Chat/v1/chat/completions";
 
 async function translateWithJais(text) {
   const token = localStorage.getItem("jais_hf_token");
-  if (!token) throw new Error("HuggingFace token not set — click \"API Keys\" below to add it.");
-
-  const prompt =
-    `### Instruction: You are a professional translator. ` +
-    `Detect the source language and translate the text to ${targetLang}. ` +
-    `Return only the translated text — no explanations, labels, or extra commentary.\n` +
-    `${text}\n### Response:`;
+  if (!token) throw new Error("HuggingFace token not set — click the logo to add it.");
 
   const res = await fetch(JAIS_ENDPOINT, {
     method: "POST",
@@ -709,22 +704,24 @@ async function translateWithJais(text) {
       "Authorization": `Bearer ${token}`
     },
     body: JSON.stringify({
-      inputs: prompt,
-      parameters: {
-        max_new_tokens:   300,
-        temperature:      0.3,
-        top_p:            0.9,
-        do_sample:        true,
-        return_full_text: false
-      }
+      model: "inceptionai/Jais-2-8B-Chat",
+      messages: [
+        {
+          role: "system",
+          content: `You are a professional translator. Detect the source language and translate the text to ${targetLang}. Return only the translated text — no explanations, labels, or extra commentary.`
+        },
+        { role: "user", content: text }
+      ],
+      max_tokens:  300,
+      temperature: 0.3
     })
   });
-  if (!res.ok) throw new Error(`Jais ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Jais ${res.status}`);
+  }
   const data = await res.json();
-  // Serverless inference API returns [{generated_text:"..."}]
-  // Dedicated endpoints may return {generated_text:"..."} directly
-  const raw = Array.isArray(data) ? data[0].generated_text : data.generated_text;
-  return raw.trim();
+  return data.choices[0].message.content.trim();
 }
 
 // ── Engine registry (add future engines here) ──
@@ -793,7 +790,7 @@ submitEl.addEventListener("click", async () => {
       el.textContent = translation;
       el.classList.remove("loading");
     } catch (err) {
-      el.textContent = "Translation failed. Please try again.";
+      el.textContent = err.message || "Translation failed.";
       el.classList.remove("loading");
       console.error(engine.name, err);
     }
