@@ -176,10 +176,11 @@ html,body{
 
   .stage{
     left:50%;
-    top:52%;
-    transform:translate(-50%,-50%);
+    top:240px;
+    transform:translateX(-50%);
     width:min(92vw, 560px);
-    height:60vh;
+    height:calc(100dvh - 300px);
+    height:calc(100vh - 300px);
   }
 
   #typed{
@@ -200,7 +201,9 @@ html,body{
 @media (max-width: 420px){
   .stage{
     width:92vw;
-    height:58vh;
+    top:220px;
+    height:calc(100dvh - 280px);
+    height:calc(100vh - 280px);
   }
   #typed{ font-size:17px; }
   .logo{ width:140px; height:140px; }
