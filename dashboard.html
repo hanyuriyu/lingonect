@@ -579,7 +579,9 @@ async function translateWithJais(text) {
     throw new Error(err.error || `Jais ${res.status}`);
   }
   const data = await res.json();
-  const raw = Array.isArray(data) ? data[0].generated_text : data.generated_text;
+  if (data.error) throw new Error(`Jais: ${data.error}`);
+  const raw = Array.isArray(data) ? data[0]?.generated_text : data.generated_text;
+  if (!raw) throw new Error(`Jais: unexpected response: ${JSON.stringify(data)}`);
   return raw.trim();
 }
 
