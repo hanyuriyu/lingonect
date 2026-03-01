@@ -286,6 +286,7 @@ body{
   letter-spacing:-.5px;
 }
 .engine-logo-badge.mistral{ background:#f0501a; }
+.engine-logo-badge.jais   { background:#006c52; }
 
 .result-content{
   width:100%;
@@ -548,15 +549,63 @@ async function translateWithMistral(text) {
   return data.choices[0].message.content.trim();
 }
 
+// ── Jais (HuggingFace Inference Endpoint) ──
+// Replace JAIS_HF_TOKEN with your HuggingFace token.
+// JAIS_ENDPOINT defaults to the serverless inference API; swap for your
+// dedicated endpoint URL (e.g. https://xyz.us-east-1.aws.endpoints.huggingface.cloud)
+// if you've deployed core42/jais-13b-chat as a dedicated HF Endpoint.
+const JAIS_HF_TOKEN = "YOUR_HUGGINGFACE_TOKEN";
+const JAIS_ENDPOINT = "https://api-inference.huggingface.co/models/core42/jais-13b-chat";
+
+async function translateWithJais(text) {
+  const prompt =
+    `### Instruction: You are a professional translator. ` +
+    `Detect the source language and translate the text to ${targetLang}. ` +
+    `Return only the translated text — no explanations, labels, or extra commentary.\n` +
+    `${text}\n### Response:`;
+
+  const res = await fetch(JAIS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${JAIS_HF_TOKEN}`
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        max_new_tokens:     300,
+        temperature:        0.3,
+        top_p:              0.9,
+        do_sample:          true,
+        return_full_text:   false
+      }
+    })
+  });
+  if (!res.ok) throw new Error(`Jais ${res.status}`);
+  const data = await res.json();
+  // Serverless inference API returns [{generated_text:"..."}]
+  // Dedicated endpoints may return {generated_text:"..."} directly
+  const raw = Array.isArray(data) ? data[0].generated_text : data.generated_text;
+  return raw.trim();
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
-    id:       "mistral",
-    name:     "Mistral AI",
-    logoUrl:  "https://mistral.ai/favicon.ico",
+    id:         "mistral",
+    name:       "Mistral AI",
+    logoUrl:    "https://mistral.ai/favicon.ico",
     badgeClass: "mistral",
     badgeText:  "M",
-    translate: translateWithMistral
+    translate:  translateWithMistral
+  },
+  {
+    id:         "jais",
+    name:       "Jais",
+    logoUrl:    "https://jaischat.ai/favicon.ico",
+    badgeClass: "jais",
+    badgeText:  "J",
+    translate:  translateWithJais
   }
 ];
 
