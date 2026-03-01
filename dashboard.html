@@ -570,7 +570,9 @@ async function translateWithJais(text) {
   });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data));
-  return data.choices[0].message.content.trim();
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== "string") throw new Error(`Jais raw: ${JSON.stringify(data)}`);
+  return content.trim();
 }
 
 // ── Engine registry (add future engines here) ──
