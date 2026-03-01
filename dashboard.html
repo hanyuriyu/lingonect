@@ -569,7 +569,7 @@ async function translateWithJais(text) {
     })
   });
   const data = await res.json();
-  if (!res.ok || data.error) throw new Error(data.error || `Jais ${res.status}`);
+  if (!res.ok || data.error) throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data));
   return data.choices[0].message.content.trim();
 }
 
