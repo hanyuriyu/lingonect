@@ -551,14 +551,11 @@ async function translateWithMistral(text) {
   return data.choices[0].message.content.trim();
 }
 
-// ── Jais-2 (HuggingFace serverless text-generation endpoint) ──
+// ── Jais-2 (via Cloudflare Worker proxy) ──
 const JAIS_ENDPOINT =
-  "https://api-inference.huggingface.co/models/inceptionai/Jais-2-8B-Chat";
+  "https://jais-proxyhanyuriyuworkersdev.hanyuriyu.workers.dev/";
 
 async function translateWithJais(text) {
-  const token = JAIS_HF_TOKEN;
-  if (!token) throw new Error("HuggingFace token not configured.");
-
   const prompt =
     `You are a translation engine. The following is raw text to be translated to ${targetLang}. ` +
     `Output ONLY the translation, nothing else.\n\nText: ${text}\n\nTranslation:`;
@@ -566,9 +563,7 @@ async function translateWithJais(text) {
   const res = await fetch(JAIS_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type":     "application/json",
-      "Authorization":    `Bearer ${token}`,
-      "x-wait-for-model": "true"
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       inputs: prompt,
