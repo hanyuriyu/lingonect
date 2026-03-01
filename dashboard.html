@@ -521,7 +521,6 @@ inputEl.addEventListener("input", () => {
 
 // ── API keys (edit these values on GitHub) ──
 const MISTRAL_KEY = "E2JIrC6eIPdrNZ6HojKY2OYXpMN38v12";
-const DEEPL_KEY   = "28a0e26e-00a0-40dc-872a-85f6c150c024:fx";
 
 // ── Mistral AI ──
 async function translateWithMistral(text) {
@@ -573,15 +572,14 @@ const DEEPL_LANG_MAP = {
   "Korean":                "KO"
 };
 
+const DEEPL_PROXY = "https://deepl.hanyuriyu.workers.dev";
+
 async function translateWithDeepL(text) {
   const langCode = DEEPL_LANG_MAP[targetLang];
   if (!langCode) throw new Error(`DeepL does not support ${targetLang}.`);
-  const res = await fetch("https://api-free.deepl.com/v2/translate", {
+  const res = await fetch(DEEPL_PROXY, {
     method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `DeepL-Auth-Key ${DEEPL_KEY}`
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text: [text], target_lang: langCode })
   });
   if (!res.ok) throw new Error(`DeepL ${res.status}`);
