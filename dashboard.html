@@ -124,19 +124,110 @@ body{
   color:#bbb;
 }
 
+/* ── ACTIONS COLUMN (lang + submit) ── */
+.input-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  flex-shrink:0;
+}
+
+/* Language selector */
+.lang-select-wrap{
+  position:relative;
+}
+
+.lang-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  background:#fff;
+  color:var(--cobalt);
+  border:2px solid var(--cobalt);
+  border-radius:6px;
+  padding:10px 14px;
+  cursor:pointer;
+  white-space:nowrap;
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  transition:background .15s;
+  box-sizing:border-box;
+}
+
+.lang-btn:hover{
+  background:rgba(0,71,255,.06);
+}
+
+.lang-arrow{
+  font-size:10px;
+  opacity:.7;
+  transition:transform .15s;
+}
+
+.lang-select-wrap.open .lang-arrow{
+  transform:rotate(180deg);
+}
+
+.lang-dropdown{
+  display:none;
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  background:#fff;
+  border:2px solid var(--cobalt);
+  border-radius:6px;
+  z-index:200;
+  min-width:160px;
+  max-height:280px;
+  overflow-y:auto;
+  box-shadow:0 6px 24px rgba(0,0,0,.11);
+}
+
+.lang-select-wrap.open .lang-dropdown{
+  display:block;
+}
+
+.lang-option{
+  display:block;
+  width:100%;
+  padding:10px 16px;
+  text-align:left;
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:#111;
+  box-sizing:border-box;
+  transition:background .1s, color .1s;
+}
+
+.lang-option:hover{
+  background:rgba(0,71,255,.07);
+  color:var(--cobalt);
+}
+
+.lang-option.active{
+  color:var(--cobalt);
+  font-weight:800;
+}
+
 .submit-btn{
   font-family:"Special Elite","Courier New",monospace;
   font-size:14px;
   font-weight:800;
   background:var(--cobalt);
   color:#fff;
-  border:none;
+  border:2px solid var(--cobalt);
   border-radius:6px;
-  padding:13px 22px;
+  padding:11px 22px;
   cursor:pointer;
   white-space:nowrap;
   transition:opacity .2s;
-  flex-shrink:0;
+  width:100%;
 }
 
 .submit-btn:hover:not(:disabled){ opacity:.85; }
@@ -306,7 +397,42 @@ body{
         rows="3"
         spellcheck="false"
       ></textarea>
-      <button class="submit-btn" id="submitBtn" type="button" disabled>Submit</button>
+
+      <div class="input-actions">
+        <!-- Language selector -->
+        <div class="lang-select-wrap" id="langSelectWrap">
+          <button class="lang-btn" id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="langLabel">English</span>
+            <span class="lang-arrow">▾</span>
+          </button>
+          <div class="lang-dropdown" id="langDropdown" role="listbox">
+            <button class="lang-option active" data-lang="English">English</button>
+            <button class="lang-option" data-lang="Spanish">Spanish</button>
+            <button class="lang-option" data-lang="French">French</button>
+            <button class="lang-option" data-lang="German">German</button>
+            <button class="lang-option" data-lang="Italian">Italian</button>
+            <button class="lang-option" data-lang="Portuguese">Portuguese</button>
+            <button class="lang-option" data-lang="Swedish">Swedish</button>
+            <button class="lang-option" data-lang="Norwegian">Norwegian</button>
+            <button class="lang-option" data-lang="Danish">Danish</button>
+            <button class="lang-option" data-lang="Finnish">Finnish</button>
+            <button class="lang-option" data-lang="Dutch">Dutch</button>
+            <button class="lang-option" data-lang="Polish">Polish</button>
+            <button class="lang-option" data-lang="Russian">Russian</button>
+            <button class="lang-option" data-lang="Ukrainian">Ukrainian</button>
+            <button class="lang-option" data-lang="Turkish">Turkish</button>
+            <button class="lang-option" data-lang="Arabic">Arabic</button>
+            <button class="lang-option" data-lang="Hebrew">Hebrew</button>
+            <button class="lang-option" data-lang="Japanese">Japanese</button>
+            <button class="lang-option" data-lang="Chinese (Simplified)">Chinese (Simplified)</button>
+            <button class="lang-option" data-lang="Chinese (Traditional)">Chinese (Traditional)</button>
+            <button class="lang-option" data-lang="Korean">Korean</button>
+            <button class="lang-option" data-lang="Hindi">Hindi</button>
+          </div>
+        </div>
+
+        <button class="submit-btn" id="submitBtn" type="button" disabled>Submit</button>
+      </div>
     </div>
     <div class="word-count" id="wordCount">0 / 50 words</div>
 
@@ -351,6 +477,34 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
 });
 
+// ── Language selector ──
+let targetLang = "English";
+const langWrap     = document.getElementById("langSelectWrap");
+const langBtn      = document.getElementById("langBtn");
+const langLabel    = document.getElementById("langLabel");
+const langDropdown = document.getElementById("langDropdown");
+
+langBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  const isOpen = langWrap.classList.toggle("open");
+  langBtn.setAttribute("aria-expanded", isOpen);
+});
+
+langDropdown.addEventListener("click", e => {
+  const opt = e.target.closest(".lang-option");
+  if (!opt) return;
+  targetLang = opt.dataset.lang;
+  langLabel.textContent = opt.dataset.lang;
+  langDropdown.querySelectorAll(".lang-option").forEach(o => o.classList.toggle("active", o === opt));
+  langWrap.classList.remove("open");
+  langBtn.setAttribute("aria-expanded", "false");
+});
+
+document.addEventListener("click", () => {
+  langWrap.classList.remove("open");
+  langBtn.setAttribute("aria-expanded", "false");
+});
+
 // ── Word counter ──
 const inputEl  = document.getElementById("inputText");
 const countEl  = document.getElementById("wordCount");
@@ -383,7 +537,7 @@ async function translateWithMistral(text) {
       messages: [
         {
           role: "system",
-          content: "You are a professional translator. Detect the source language of the text and translate it to English. Return only the translated text — no explanations, no labels, no extra commentary."
+          content: `You are a professional translator. Detect the source language of the text and translate it to ${targetLang}. Return only the translated text — no explanations, no labels, no extra commentary.`
         },
         { role: "user", content: text }
       ]
