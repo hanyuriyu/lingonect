@@ -14,27 +14,26 @@
   --bg:#ffffff;
   --text:#111;
   --cobalt:#0047FF;
-  --text-col:520px;
+  --text-col:660px;
   --logo-size:240px;
   --logo-opacity:0.9;
-  --mobile-logo:150px;
+  --mobile-logo:130px;
 }
 
-@supports (height: 100dvh){
-  html,body{ height:100dvh; }
-}
-html,body{
+html{
   height:100%;
+}
+body{
   margin:0;
+  min-height:100%;
   background:var(--bg);
   color:var(--text);
-  overflow:hidden;
   font-family:"Special Elite","Courier New",monospace;
-  /* Hidden until auth check passes */
   visibility:hidden;
+  overflow-y:auto;
 }
 
-/* === LOGO RAIL (identical to homepage) === */
+/* ── LOGO RAIL (fixed left column, desktop) ── */
 .logo-rail{
   position:fixed;
   top:50%;
@@ -55,13 +54,22 @@ html,body{
   opacity:var(--logo-opacity);
 }
 
-/* === CENTER STAGE === */
+/* ── PAGE WRAPPER ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:60px 20px 100px;
+  box-sizing:border-box;
+}
+
+/* ── STAGE ── */
 .stage{
-  position:fixed;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
   width:var(--text-col);
+  max-width:92vw;
+  position:relative;
   z-index:2;
 }
 
@@ -69,19 +77,149 @@ html,body{
   font-size:22px;
   font-weight:800;
   line-height:1.55;
-  margin:0 0 18px;
+  margin:0 0 10px;
   letter-spacing:.2px;
+  white-space:nowrap;
+  text-align:center;
 }
 
 .hero-sub{
   font-size:18px;
   font-weight:400;
   line-height:1.6;
+  margin:0 0 28px;
+  color:#111;
+  text-align:center;
+}
+
+/* ── INPUT AREA ── */
+.input-wrap{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+}
+
+.text-input{
+  flex:1;
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:15px;
+  padding:12px 14px;
+  border:2px solid var(--cobalt);
+  border-radius:6px;
+  outline:none;
+  resize:vertical;
+  min-height:60px;
+  color:#111;
+  background:#fff;
+  box-sizing:border-box;
+  line-height:1.5;
+}
+
+.text-input:focus{
+  box-shadow:0 0 0 3px rgba(0,71,255,.15);
+}
+
+.text-input::placeholder{
+  color:#bbb;
+}
+
+.submit-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  background:var(--cobalt);
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  padding:13px 22px;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:opacity .2s;
+  flex-shrink:0;
+}
+
+.submit-btn:hover:not(:disabled){ opacity:.85; }
+.submit-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+.word-count{
+  font-size:12px;
+  color:#999;
+  margin-top:6px;
+  text-align:right;
+}
+.word-count.over{ color:#cc0000; }
+
+/* ── RESULTS ── */
+.results-area{
+  margin-top:28px;
+}
+
+.result-card{
+  display:flex;
+  align-items:flex-start;
+  gap:16px;
+  padding:18px 0;
+  border-top:1px solid #e8e8e8;
+}
+
+/* Logo container */
+.engine-logo-wrap{
+  flex-shrink:0;
+  width:40px;
+  height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.engine-logo-img{
+  width:40px;
+  height:40px;
+  border-radius:8px;
+  object-fit:contain;
+}
+
+/* Fallback text badge when img fails */
+.engine-logo-badge{
+  width:40px;
+  height:40px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:17px;
+  font-weight:900;
+  color:#fff;
+  letter-spacing:-.5px;
+}
+.engine-logo-badge.mistral{ background:#f0501a; }
+
+.result-content{
+  flex:1;
+}
+
+.engine-name{
+  font-size:11px;
+  font-weight:800;
+  color:#999;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+  margin:0 0 7px;
+}
+
+.translation-text{
+  font-size:16px;
+  line-height:1.65;
   margin:0;
   color:#111;
 }
 
-/* Logout link — bottom center, styled like language switcher */
+.translation-text.loading{
+  color:#aaa;
+  font-style:italic;
+}
+
+/* ── LOGOUT ── */
 .logout-wrap{
   position:fixed;
   bottom:28px;
@@ -104,58 +242,70 @@ html,body{
 }
 .logout-btn:hover{ color:var(--cobalt); }
 
-/* === MOBILE === */
-@media (max-width: 820px){
-  body{ overflow:hidden; }
-
+/* ── MOBILE ── */
+@media (max-width:820px){
   .logo-rail{
-    top:18px;
-    left:50%;
-    transform:translateX(-50%);
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
     width:auto;
-    height:auto;
     justify-content:center;
-    align-items:center;
-    z-index:2;
+    padding:32px 0 4px;
+    margin-bottom:10px;
   }
-  .logo{
-    width:var(--mobile-logo);
-    height:var(--mobile-logo);
-  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
 
-  .stage{
-    left:50%;
-    top:58%;
-    transform:translate(-50%,-50%);
-    width:min(92vw, 520px);
+  .page-wrap{
+    justify-content:flex-start;
+    padding:0 16px 100px;
   }
 
-  .hero-headline{ font-size:19px; }
-  .hero-sub{ font-size:16px; }
-
-  .logout-wrap{ bottom:18px; }
+  .hero-headline{
+    font-size:16px;
+    white-space:normal;
+  }
+  .hero-sub{ font-size:15px; }
 }
 
-@media (max-width: 420px){
-  .logo{ width:120px; height:120px; }
-  .hero-headline{ font-size:17px; }
-  .hero-sub{ font-size:15px; }
+@media (max-width:420px){
+  .logo{ width:110px; height:110px; }
+  .hero-headline{ font-size:14px; }
 }
 </style>
 </head>
 
 <body>
 
-<!-- LOGO (same position as homepage) -->
+<!-- LOGO — fixed left rail on desktop, top-center on mobile -->
 <div class="logo-rail" aria-hidden="true">
   <img class="logo" src="logo.png" alt="">
 </div>
 
-<!-- CENTER CONTENT -->
-<main class="stage">
-  <p class="hero-headline">Translate. Transcreate. Localize. Culturalize.</p>
-  <p class="hero-sub">The speed of AI + The cultural insight of Humans</p>
-</main>
+<div class="page-wrap">
+  <main class="stage">
+
+    <p class="hero-headline">Translate. Transcreate. Localize. Culturalize.</p>
+    <p class="hero-sub">The speed of AI + The cultural insight of Humans</p>
+
+    <!-- INPUT -->
+    <div class="input-wrap">
+      <textarea
+        class="text-input"
+        id="inputText"
+        placeholder="Enter text in any language…"
+        rows="3"
+        spellcheck="false"
+      ></textarea>
+      <button class="submit-btn" id="submitBtn" type="button" disabled>Submit</button>
+    </div>
+    <div class="word-count" id="wordCount">0 / 50 words</div>
+
+    <!-- RESULTS -->
+    <div class="results-area" id="resultsArea"></div>
+
+  </main>
+</div>
 
 <!-- Logout -->
 <div class="logout-wrap">
@@ -167,9 +317,7 @@ html,body{
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
-// SETUP: Same Firebase config as login.html and register.html.
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Firebase auth ──
 const firebaseConfig = {
   apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
   authDomain:        "lingonect-4db51.firebaseapp.com",
@@ -178,23 +326,130 @@ const firebaseConfig = {
   messagingSenderId: "97117277218",
   appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
-// Guard: only show page to verified, authenticated users
 auth.onAuthStateChanged(user => {
   if (!user || !user.emailVerified) {
     window.location.href = "login.html";
     return;
   }
-  // Reveal the page
   document.body.style.visibility = "visible";
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+// ── Word counter ──
+const inputEl  = document.getElementById("inputText");
+const countEl  = document.getElementById("wordCount");
+const submitEl = document.getElementById("submitBtn");
+
+function countWords(text) {
+  const trimmed = text.trim();
+  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}
+
+inputEl.addEventListener("input", () => {
+  const n = countWords(inputEl.value);
+  countEl.textContent = `${n} / 50 words`;
+  countEl.classList.toggle("over", n > 50);
+  submitEl.disabled = n === 0 || n > 50;
+});
+
+// ── Mistral AI ──
+const MISTRAL_KEY = "0WbTIgdTWJ5EluNfCvnVnSNiF8y5DZwu";
+
+async function translateWithMistral(text) {
+  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${MISTRAL_KEY}`
+    },
+    body: JSON.stringify({
+      model: "mistral-small-latest",
+      messages: [
+        {
+          role: "system",
+          content: "You are a professional translator. Detect the source language of the text and translate it to English. Return only the translated text — no explanations, no labels, no extra commentary."
+        },
+        { role: "user", content: text }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Mistral ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+// ── Engine registry (add future engines here) ──
+const engines = [
+  {
+    id:       "mistral",
+    name:     "Mistral AI",
+    logoUrl:  "https://mistral.ai/favicon.ico",
+    badgeClass: "mistral",
+    badgeText:  "M",
+    translate: translateWithMistral
+  }
+];
+
+// ── Build a result card ──
+function buildCard(engine) {
+  const card = document.createElement("div");
+  card.className = "result-card";
+
+  const logoHtml = `
+    <div class="engine-logo-wrap">
+      <img
+        class="engine-logo-img"
+        src="${engine.logoUrl}"
+        alt="${engine.name}"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+      >
+      <div class="engine-logo-badge ${engine.badgeClass}" style="display:none">${engine.badgeText}</div>
+    </div>`;
+
+  card.innerHTML = `
+    ${logoHtml}
+    <div class="result-content">
+      <p class="engine-name">${engine.name}</p>
+      <p class="translation-text loading" id="result-${engine.id}">Translating…</p>
+    </div>`;
+
+  return card;
+}
+
+// ── Submit ──
+submitEl.addEventListener("click", async () => {
+  const text = inputEl.value.trim();
+  if (!text || countWords(text) > 50) return;
+
+  const resultsArea = document.getElementById("resultsArea");
+  resultsArea.innerHTML = "";
+  submitEl.disabled = true;
+
+  // Render all engine cards immediately (shows "Translating…")
+  engines.forEach(engine => resultsArea.appendChild(buildCard(engine)));
+
+  // Fire all translations in parallel
+  engines.forEach(async engine => {
+    const el = document.getElementById(`result-${engine.id}`);
+    try {
+      const translation = await engine.translate(text);
+      el.textContent = translation;
+      el.classList.remove("loading");
+    } catch (err) {
+      el.textContent = "Translation failed. Please try again.";
+      el.classList.remove("loading");
+      console.error(engine.name, err);
+    }
+  });
+
+  submitEl.disabled = false;
 });
 </script>
 </body>
