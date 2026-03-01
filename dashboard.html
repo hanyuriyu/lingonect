@@ -44,8 +44,9 @@ body{
   align-items:center;
   justify-content:center;
   z-index:1;
-  pointer-events:none;
 }
+
+.logo{ cursor:pointer; }
 
 .logo{
   width:var(--logo-size);
@@ -324,11 +325,9 @@ body{
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:16px;
   z-index:3;
 }
-.logout-btn,
-.settings-btn{
+.logout-btn{
   font-family:"Special Elite","Courier New",monospace;
   font-size:14px;
   font-weight:800;
@@ -339,9 +338,7 @@ body{
   padding:0;
   transition:color .2s;
 }
-.logout-btn:hover,
-.settings-btn:hover{ color:var(--cobalt); }
-.bottom-sep{ color:#ccc; user-select:none; }
+.logout-btn:hover{ color:var(--cobalt); }
 
 /* ── API KEYS MODAL ── */
 .modal-overlay{
@@ -473,8 +470,8 @@ body{
 <body>
 
 <!-- LOGO — fixed left rail on desktop, top-center on mobile -->
-<div class="logo-rail" aria-hidden="true">
-  <img class="logo" src="logo.png" alt="">
+<div class="logo-rail">
+  <img class="logo" src="logo.png" alt="Lingonect" id="logoImg" title="Settings">
 </div>
 
 <div class="page-wrap">
@@ -539,8 +536,6 @@ body{
 
 <!-- Bottom bar -->
 <div class="logout-wrap">
-  <button class="settings-btn" id="settingsBtn" type="button">API Keys</button>
-  <span class="bottom-sep">·</span>
   <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
 </div>
 
@@ -666,16 +661,14 @@ async function translateWithMistral(text) {
   return data.choices[0].message.content.trim();
 }
 
-// ── API Keys modal ──
-const settingsBtn  = document.getElementById("settingsBtn");
-const settingsModal= document.getElementById("settingsModal");
-const hfTokenInput = document.getElementById("hfTokenInput");
-const modalCancel  = document.getElementById("modalCancel");
-const modalSave    = document.getElementById("modalSave");
-
+// ── API Keys modal (triggered by clicking the logo) ──
+const settingsModal   = document.getElementById("settingsModal");
+const hfTokenInput    = document.getElementById("hfTokenInput");
+const modalCancel     = document.getElementById("modalCancel");
+const modalSave       = document.getElementById("modalSave");
 const mistralKeyInput = document.getElementById("mistralKeyInput");
 
-settingsBtn.addEventListener("click", () => {
+document.getElementById("logoImg").addEventListener("click", () => {
   mistralKeyInput.value = localStorage.getItem("mistral_key") || "";
   hfTokenInput.value    = localStorage.getItem("jais_hf_token") || "";
   settingsModal.classList.add("open");
