@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lingonect</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --text-col:520px;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:150px;
+}
+
+@supports (height: 100dvh){
+  html,body{ height:100dvh; }
+}
+html,body{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  font-family:"Special Elite","Courier New",monospace;
+  /* Hidden until auth check passes */
+  visibility:hidden;
+}
+
+/* === LOGO RAIL (identical to homepage) === */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - (var(--text-col) / 2));
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+  pointer-events:none;
+}
+
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+
+/* === CENTER STAGE === */
+.stage{
+  position:fixed;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:var(--text-col);
+  z-index:2;
+}
+
+.hero-headline{
+  font-size:22px;
+  font-weight:800;
+  line-height:1.55;
+  margin:0 0 18px;
+  letter-spacing:.2px;
+}
+
+.hero-sub{
+  font-size:18px;
+  font-weight:400;
+  line-height:1.6;
+  margin:0;
+  color:#111;
+}
+
+/* Logout link — bottom center, styled like language switcher */
+.logout-wrap{
+  position:fixed;
+  bottom:28px;
+  left:0;
+  right:0;
+  display:flex;
+  justify-content:center;
+  z-index:3;
+}
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#000;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  transition:color .2s;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* === MOBILE === */
+@media (max-width: 820px){
+  body{ overflow:hidden; }
+
+  .logo-rail{
+    top:18px;
+    left:50%;
+    transform:translateX(-50%);
+    width:auto;
+    height:auto;
+    justify-content:center;
+    align-items:center;
+    z-index:2;
+  }
+  .logo{
+    width:var(--mobile-logo);
+    height:var(--mobile-logo);
+  }
+
+  .stage{
+    left:50%;
+    top:58%;
+    transform:translate(-50%,-50%);
+    width:min(92vw, 520px);
+  }
+
+  .hero-headline{ font-size:19px; }
+  .hero-sub{ font-size:16px; }
+
+  .logout-wrap{ bottom:18px; }
+}
+
+@media (max-width: 420px){
+  .logo{ width:120px; height:120px; }
+  .hero-headline{ font-size:17px; }
+  .hero-sub{ font-size:15px; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGO (same position as homepage) -->
+<div class="logo-rail" aria-hidden="true">
+  <img class="logo" src="logo.png" alt="">
+</div>
+
+<!-- CENTER CONTENT -->
+<main class="stage">
+  <p class="hero-headline">Translate. Transcreate. Localize. Culturalize.</p>
+  <p class="hero-sub">The speed of AI + The cultural insight of Humans</p>
+</main>
+
+<!-- Logout -->
+<div class="logout-wrap">
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// SETUP: Same Firebase config as login.html and register.html.
+// ─────────────────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+// Guard: only show page to verified, authenticated users
+auth.onAuthStateChanged(user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  // Reveal the page
+  document.body.style.visibility = "visible";
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+</script>
+</body>
+</html>
