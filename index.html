@@ -14,12 +14,19 @@
   --bg:#ffffff;
   --text:#111;
   --cobalt:#0047FF;
+
+  /* Desktop text column width */
   --text-col:520px;
+
+  /* Logo */
   --logo-size:240px;
   --logo-opacity:0.9;
+
+  /* Mobile sizing */
   --mobile-logo:150px;
 }
 
+/* Use dynamic viewport height where supported (fixes iOS Safari address bar issues) */
 @supports (height: 100dvh){
   html,body{ height:100dvh; }
 }
@@ -32,6 +39,7 @@ html,body{
   font-family:"Special Elite","Courier New",monospace;
 }
 
+/* === CENTERED TEXT STAGE (desktop default) === */
 .stage{
   position:fixed;
   left:50%;
@@ -68,7 +76,7 @@ html,body{
 }
 @keyframes blink{50%{opacity:0}}
 
-/* === LOGO RAIL === */
+/* === LOGO (desktop: left-centred rail) === */
 .logo-rail{
   position:fixed;
   top:50%;
@@ -79,12 +87,14 @@ html,body{
   align-items:center;
   justify-content:center;
   z-index:1;
+  pointer-events:none;
 }
 
 .logo-group{
   display:flex;
   flex-direction:column;
   align-items:center;
+  pointer-events:none;
 }
 
 .logo{
@@ -92,7 +102,6 @@ html,body{
   height:var(--logo-size);
   object-fit:contain;
   opacity:var(--logo-opacity);
-  pointer-events:none;
 }
 
 .auth-nav{
@@ -100,6 +109,7 @@ html,body{
   flex-direction:column;
   align-items:center;
   margin-top:14px;
+  pointer-events:auto;
 }
 
 .auth-link{
@@ -143,7 +153,9 @@ html,body{
 
 .lang-btn.active{ color:var(--cobalt); }
 
-/* === MOBILE === */
+/* =========================
+   MOBILE / SMALL SCREENS
+========================= */
 @media (max-width: 820px){
   body{ overflow:hidden; }
 
@@ -164,10 +176,10 @@ html,body{
 
   .stage{
     left:50%;
-    top:62%;
+    top:52%;
     transform:translate(-50%,-50%);
     width:min(92vw, 560px);
-    height:50vh;
+    height:60vh;
   }
 
   #typed{
@@ -188,11 +200,10 @@ html,body{
 @media (max-width: 420px){
   .stage{
     width:92vw;
-    height:46vh;
+    height:58vh;
   }
   #typed{ font-size:17px; }
-  .logo{ width:120px; height:120px; }
-  .auth-link{ font-size:13px; }
+  .logo{ width:140px; height:140px; }
   .language-switcher{ gap:14px; }
 }
 </style>
@@ -214,16 +225,16 @@ html,body{
 <!-- CENTERED TYPING STAGE -->
 <section class="stage" aria-label="Lingonect statement">
   <div class="content" id="content">
-    <div id="typed"></div><span class="caret">▌</span>
+    <div id="typed"></div><span class="caret">&#x258c;</span>
   </div>
 </section>
 
 <!-- LANGUAGE SWITCHER -->
 <div class="language-switcher" aria-label="Language selector">
   <div class="lang-btn active" data-lang="en">English (UK)</div>
-  <div class="lang-btn" data-lang="zh">中文（简体）</div>
+  <div class="lang-btn" data-lang="zh">&#x4e2d;&#x6587;&#xff08;&#x7b80;&#x4f53;&#xff09;</div>
   <div class="lang-btn" data-lang="de">Deutsch</div>
-  <div class="lang-btn" data-lang="es">Español (España)</div>
+  <div class="lang-btn" data-lang="es">Espa&#x00f1;ol (Espa&#x00f1;a)</div>
 </div>
 
 <script>
@@ -244,42 +255,42 @@ const TEXTS = {
   ],
 
   zh: [
-    [{t:"语言与文化，是唯有人类才能绽放的独特光芒。",b:true}],
-    [{t:"与人工智能不同，人类的语言从内心生长而出——它流淌着情感的脉搏，烙印着经验的刻痕，交织着欢欣、创伤、痛楚与记忆的温度。我们说话，并非依靠语法规则的精密计算，亦非堆砌词典中的冰冷定义。我们言说，是因为我们感知，因为我们活着，因为我们心有所向。"}],
-    [{t:"自然语言与文化充满不可预测的灵动，始终处于流动变迁之中。它们时而非理性，常常出人意料。意义不止于信息传递，更承载着关系、语境，以及人性深处的共鸣。"}],
-    [{t:"今天，我们可以借助日益精进的人工智能模型，大规模地协助创造、翻译、治理与守护语言。"}],
-    [{t:"但人工智能从未真正"体验"语言。"}],
-    [{t:"对模型而言，词语只是高维空间中的符号；意义通过模式与关联习得，而非源于真实鲜活的生命经历。人类从内而外地沉浸于语言与文化，人工智能则从外部重现它们。"}],
-    [{t:"这正是「语联」存在的意义。"}],
-    [{t:"语联汇聚真正掌握多门语言的人类，借助人工智能辅助练习、修正并负责任地分享语言知识。在这里，科技与人性相遇，让跨越文化的理解，生根于真实的生命体验之中。"}]
+    [{t:"\u8bed\u8a00\u4e0e\u6587\u5316\uff0c\u662f\u552f\u6709\u4eba\u7c7b\u624d\u80fd\u7ef3\u653e\u7684\u72ec\u7279\u5149\u8292\u3002",b:true}],
+    [{t:"\u4e0e\u4eba\u5de5\u667a\u80fd\u4e0d\u540c\uff0c\u4eba\u7c7b\u7684\u8bed\u8a00\u4ece\u5185\u5fc3\u751f\u957f\u800c\u51fa\u2014\u2014\u5b83\u6d41\u6de4\u7740\u60c5\u611f\u7684\u8109\u640f\uff0c\u70d9\u5370\u7740\u7ecf\u9a8c\u7684\u523b\u75d5\uff0c\u4ea4\u7ec7\u7740\u6b22\u6b23\u3001\u521b\u4f24\u3001\u75db\u695a\u4e0e\u8bb0\u5fc6\u7684\u6e29\u5ea6\u3002\u6211\u4eec\u8bf4\u8bdd\uff0c\u5e76\u975e\u4f9d\u9760\u8bed\u6cd5\u89c4\u5219\u7684\u7cbe\u5bc6\u8ba1\u7b97\uff0c\u4ea6\u975e\u5806\u7802\u8bcd\u5178\u4e2d\u7684\u51b0\u51b7\u5b9a\u4e49\u3002\u6211\u4eec\u8a00\u8bf4\uff0c\u662f\u56e0\u4e3a\u6211\u4eec\u611f\u77e5\uff0c\u56e0\u4e3a\u6211\u4eec\u6d3b\u7740\uff0c\u56e0\u4e3a\u6211\u4eec\u5fc3\u6709\u6240\u5411\u3002"}],
+    [{t:"\u81ea\u7136\u8bed\u8a00\u4e0e\u6587\u5316\u5145\u6ee1\u4e0d\u53ef\u9884\u6d4b\u7684\u7075\u52a8\uff0c\u59cb\u7ec8\u5904\u4e8e\u6d41\u52a8\u53d8\u8fc1\u4e4b\u4e2d\u3002\u5b83\u4eec\u65f6\u800c\u975e\u7406\u6027\uff0c\u5e38\u5e38\u51fa\u4eba\u610f\u6599\u3002\u610f\u4e49\u4e0d\u6b62\u4e8e\u4fe1\u606f\u4f20\u9012\uff0c\u66f4\u627f\u8f7d\u7740\u5173\u7cfb\u3001\u8bed\u5883\uff0c\u4ee5\u53ca\u4eba\u6027\u6df1\u5904\u7684\u5171\u9e23\u3002"}],
+    [{t:"\u4eca\u5929\uff0c\u6211\u4eec\u53ef\u4ee5\u501f\u52a9\u65e5\u76ca\u7cbe\u8fdb\u7684\u4eba\u5de5\u667a\u80fd\u6a21\u578b\uff0c\u5927\u89c4\u6a21\u5730\u534f\u52a9\u521b\u9020\u3001\u7ffb\u8bd1\u3001\u6cbb\u7406\u4e0e\u5b88\u62a4\u8bed\u8a00\u3002"}],
+    [{t:"\u4f46\u4eba\u5de5\u667a\u80fd\u4ece\u672a\u771f\u6b63\u201c\u4f53\u9a8c\u201d\u8bed\u8a00\u3002"}],
+    [{t:"\u5bf9\u6a21\u578b\u800c\u8a00\uff0c\u8bcd\u8bed\u53ea\u662f\u9ad8\u7ef4\u7a7a\u95f4\u4e2d\u7684\u7b26\u53f7\uff1b\u610f\u4e49\u901a\u8fc7\u6a21\u5f0f\u4e0e\u5173\u8054\u4e60\u5f97\uff0c\u800c\u975e\u6e90\u4e8e\u771f\u5b9e\u9c9c\u6d3b\u7684\u751f\u547d\u7ecf\u5386\u3002\u4eba\u7c7b\u4ece\u5185\u800c\u5916\u5730\u6c89\u6d78\u4e8e\u8bed\u8a00\u4e0e\u6587\u5316\uff0c\u4eba\u5de5\u667a\u80fd\u5219\u4ece\u5916\u90e8\u91cd\u73b0\u5b83\u4eec\u3002"}],
+    [{t:"\u8fd9\u6b63\u662f\u300cLingonect (\u8bed\u8054)\u300d\u5b58\u5728\u7684\u610f\u4e49\u3002"}],
+    [{t:"\u8bed\u8054\u6c47\u805a\u771f\u6b63\u638c\u63e1\u591a\u95e8\u8bed\u8a00\u7684\u4eba\u7c7b\uff0c\u501f\u52a9\u4eba\u5de5\u667a\u80fd\u8f85\u52a9\u7ec3\u4e60\u3001\u4fee\u6b63\u5e76\u8d1f\u8d23\u4efb\u5730\u5206\u4eab\u8bed\u8a00\u77e5\u8bc6\u3002\u5728\u8fd9\u91cc\uff0c\u79d1\u6280\u4e0e\u4eba\u6027\u76f8\u9047\uff0c\u8ba9\u8de8\u8d8a\u6587\u5316\u7684\u7406\u89e3\uff0c\u751f\u6839\u4e8e\u771f\u5b9e\u7684\u751f\u547d\u4f53\u9a8c\u4e4b\u4e2d\u3002"}]
   ],
 
   de: [
     [{t:"Sprache",b:true},{t:" und "},{t:"Kultur",b:true},{t:" sind zutiefst menschlich."}],
     [{t:"Im Gegensatz zu KI entsteht Sprache beim Menschen von innen heraus, durch Emotionen, Erfahrungen, Freude, Trauma, Schmerz und Erinnerung."}],
-    [{t:"Wir sprechen nicht durch das Berechnen von Grammatikregeln oder das Zusammensetzen von Wörterbuchdefinitionen. Wir sprechen, weil wir fühlen, leben und etwas beabsichtigen."}],
-    [{t:"Natürliche Sprache und Kultur sind unvorhersehbar, im ständigen Wandel, manchmal irrational und oft überraschend. Bedeutung ist nicht nur informativ, sondern relational, kontextabhängig und menschlich."}],
-    [{t:"Heute können wir immer leistungsfähigere KI-Modelle nutzen, um Sprachen im grossen Massstab zu erstellen, zu übersetzen, zu steuern und zu schützen."}],
+    [{t:"Wir sprechen nicht durch das Berechnen von Grammatikregeln oder das Zusammensetzen von W\u00f6rterbuchdefinitionen. Wir sprechen, weil wir f\u00fchlen, leben und etwas beabsichtigen."}],
+    [{t:"Nat\u00fcrliche Sprache und Kultur sind unvorhersehbar, im st\u00e4ndigen Wandel, manchmal irrational und oft \u00fcberraschend. Bedeutung ist nicht nur informativ, sondern relational, kontextabh\u00e4ngig und menschlich."}],
+    [{t:"Heute k\u00f6nnen wir immer leistungsf\u00e4higere KI-Modelle nutzen, um Sprachen im grossen Massstab zu erstellen, zu \u00fcbersetzen, zu steuern und zu sch\u00fctzen."}],
     [{t:"Doch KI erlebt Sprache nicht."}],
-    [{t:"Für ein Modell sind Wörter Symbole in hochdimensionalen Räumen. Bedeutung entsteht durch Muster und Beziehungen, nicht durch Erfahrung."}],
+    [{t:"F\u00fcr ein Modell sind W\u00f6rter Symbole in hochdimensionalen R\u00e4umen. Bedeutung entsteht durch Muster und Beziehungen, nicht durch Erfahrung."}],
     [{t:"Menschen erleben Sprache und Kultur von innen."}],
     [{t:"KI reproduziert sie von aussen."}],
     [{t:"Hier setzt Lingonect an."}],
-    [{t:"Lingonect verbindet wirklich mehrsprachige Menschen und nutzt KI, um dieses Wissen verantwortungsvoll zu üben, zu korrigieren und weiterzugeben."}]
+    [{t:"Lingonect verbindet wirklich mehrsprachige Menschen und nutzt KI, um dieses Wissen verantwortungsvoll zu \u00fcben, zu korrigieren und weiterzugeben."}]
   ],
 
   es: [
     [{t:"El lenguaje",b:true},{t:" y la "},{t:"cultura",b:true},{t:" son exclusivamente humanos."}],
-    [{t:"A diferencia de la inteligencia artificial, los seres humanos generamos el lenguaje desde dentro. Surge a partir de la emoción, la experiencia, la alegría, el trauma, el dolor y la memoria."}],
-    [{t:"No hablamos calculando reglas gramaticales ni ensamblando definiciones de diccionario. Hablamos porque sentimos, porque vivimos y porque tenemos intención."}],
-    [{t:"El lenguaje natural y la cultura son impredecibles, están en constante evolución, a veces son irracionales y, con frecuencia, sorprendentes. El significado no es únicamente informativo. Es relacional, contextual y profundamente humano."}],
-    [{t:"Hoy podemos apoyarnos en modelos de inteligencia artificial cada vez más avanzados para crear, traducir, gobernar y salvaguardar lenguas a gran escala."}],
+    [{t:"A diferencia de la inteligencia artificial, los seres humanos generamos el lenguaje desde dentro. Surge a partir de la emoci\u00f3n, la experiencia, la alegr\u00eda, el trauma, el dolor y la memoria."}],
+    [{t:"No hablamos calculando reglas gramaticales ni ensamblando definiciones de diccionario. Hablamos porque sentimos, porque vivimos y porque tenemos intenci\u00f3n."}],
+    [{t:"El lenguaje natural y la cultura son impredecibles, est\u00e1n en constante evoluci\u00f3n, a veces son irracionales y, con frecuencia, sorprendentes. El significado no es \u00fanicamente informativo. Es relacional, contextual y profundamente humano."}],
+    [{t:"Hoy podemos apoyarnos en modelos de inteligencia artificial cada vez m\u00e1s avanzados para crear, traducir, gobernar y salvaguardar lenguas a gran escala."}],
     [{t:"Pero la inteligencia artificial no experimenta el lenguaje."}],
-    [{t:"Para un modelo, las palabras son símbolos en espacios de alta dimensión. El significado se aprende a través de patrones y relaciones, no mediante la experiencia vivida."}],
+    [{t:"Para un modelo, las palabras son s\u00edmbolos en espacios de alta dimensi\u00f3n. El significado se aprende a trav\u00e9s de patrones y relaciones, no mediante la experiencia vivida."}],
     [{t:"Los seres humanos experimentan el lenguaje y la cultura desde dentro."}],
     [{t:"La inteligencia artificial los reproduce desde fuera."}],
-    [{t:"Ahí es donde entra Lingonect."}],
-    [{t:"Lingonect reúne a personas verdaderamente multilingües y utiliza la inteligencia artificial para practicar, perfeccionar y compartir de forma responsable el conocimiento lingüístico y cultural."}]
+    [{t:"Ah\u00ed es donde entra Lingonect."}],
+    [{t:"Lingonect re\u00fane a personas verdaderamente multiling\u00fces y utiliza la inteligencia artificial para practicar, perfeccionar y compartir de forma responsable el conocimiento ling\u00fc\u00edstico y cultural."}]
   ]
 };
 
