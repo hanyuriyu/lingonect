@@ -563,9 +563,9 @@ async function translateWithClaude(text) {
       messages: [{ role: "user", content: text }]
     })
   });
-  if (!res.ok) throw new Error(`Claude ${res.status}`);
-  const data = await res.json();
-  return data.content[0].text.trim();
+    const data = await res.json();
+    if (!res.ok || data.type === "error") throw new Error(`Claude: ${data.error?.message || res.status}`);
+    return data.content[0].text.trim();
 }
 
 // ── DeepL ──
