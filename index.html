@@ -14,19 +14,12 @@
   --bg:#ffffff;
   --text:#111;
   --cobalt:#0047FF;
-
-  /* Desktop text column width */
   --text-col:520px;
-
-  /* Logo */
   --logo-size:240px;
   --logo-opacity:0.9;
-
-  /* Mobile sizing */
   --mobile-logo:150px;
 }
 
-/* Use dynamic viewport height where supported (fixes iOS Safari address bar issues) */
 @supports (height: 100dvh){
   html,body{ height:100dvh; }
 }
@@ -36,10 +29,9 @@ html,body{
   background:var(--bg);
   color:var(--text);
   overflow:hidden;
-  font-family:"Special+Elite","Courier New",monospace;
+  font-family:"Special Elite","Courier New",monospace;
 }
 
-/* === CENTERED TEXT STAGE (desktop default) === */
 .stage{
   position:fixed;
   left:50%;
@@ -76,7 +68,7 @@ html,body{
 }
 @keyframes blink{50%{opacity:0}}
 
-/* === LOGO (desktop: left-centred rail) === */
+/* === LOGO RAIL === */
 .logo-rail{
   position:fixed;
   top:50%;
@@ -87,7 +79,12 @@ html,body{
   align-items:center;
   justify-content:center;
   z-index:1;
-  pointer-events:none;
+}
+
+.logo-group{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
 }
 
 .logo{
@@ -95,7 +92,25 @@ html,body{
   height:var(--logo-size);
   object-fit:contain;
   opacity:var(--logo-opacity);
+  pointer-events:none;
 }
+
+.auth-nav{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  margin-top:14px;
+}
+
+.auth-link{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:15px;
+  color:#000;
+  text-decoration:none;
+  line-height:2.2;
+  transition:color .2s;
+}
+.auth-link:hover{ color:var(--cobalt); }
 
 /* === LANGUAGE SWITCHER === */
 .language-switcher{
@@ -107,8 +122,8 @@ html,body{
   justify-content:center;
   gap:28px;
   z-index:3;
-  padding:0 14px;          /* prevents edge clipping on small screens */
-  flex-wrap:wrap;          /* allow wrap on narrow screens */
+  padding:0 14px;
+  flex-wrap:wrap;
   row-gap:10px;
 }
 
@@ -128,15 +143,10 @@ html,body{
 
 .lang-btn.active{ color:var(--cobalt); }
 
-/* =========================
-   MOBILE / SMALL SCREENS
-   - stack layout
-   - prevent overlap/cropping
-========================= */
+/* === MOBILE === */
 @media (max-width: 820px){
   body{ overflow:hidden; }
 
-  /* Make a simple stacked grid: logo on top, text below */
   .logo-rail{
     top:18px;
     left:50%;
@@ -145,7 +155,7 @@ html,body{
     height:auto;
     justify-content:center;
     align-items:center;
-    z-index:2;             /* above background, below text */
+    z-index:2;
   }
   .logo{
     width:var(--mobile-logo);
@@ -154,16 +164,19 @@ html,body{
 
   .stage{
     left:50%;
-    top:52%;
+    top:62%;
     transform:translate(-50%,-50%);
-    width:min(92vw, 560px);     /* fluid width */
-    height:60vh;               /* more room for buttons */
+    width:min(92vw, 560px);
+    height:50vh;
   }
 
   #typed{
     font-size:18px;
     line-height:1.7;
   }
+
+  .auth-nav{ margin-top:10px; }
+  .auth-link{ font-size:14px; line-height:2; }
 
   .language-switcher{
     bottom:18px;
@@ -175,10 +188,11 @@ html,body{
 @media (max-width: 420px){
   .stage{
     width:92vw;
-    height:58vh;
+    height:46vh;
   }
   #typed{ font-size:17px; }
-  .logo{ width:140px; height:140px; }
+  .logo{ width:120px; height:120px; }
+  .auth-link{ font-size:13px; }
   .language-switcher{ gap:14px; }
 }
 </style>
@@ -187,8 +201,14 @@ html,body{
 <body>
 
 <!-- LOGO -->
-<div class="logo-rail" aria-hidden="true">
-  <img class="logo" src="logo.png" alt="">
+<div class="logo-rail">
+  <div class="logo-group">
+    <img class="logo" src="logo.png" alt="Lingonect">
+    <nav class="auth-nav" aria-label="Account">
+      <a href="login.html" class="auth-link">Login</a>
+      <a href="register.html" class="auth-link">Register</a>
+    </nav>
+  </div>
 </div>
 
 <!-- CENTERED TYPING STAGE -->
@@ -207,9 +227,6 @@ html,body{
 </div>
 
 <script>
-/* =========================
-   TEXT CONTENT
-========================= */
 const TEXTS = {
 
   en: [
@@ -231,9 +248,9 @@ const TEXTS = {
     [{t:"与人工智能不同，人类的语言从内心生长而出——它流淌着情感的脉搏，烙印着经验的刻痕，交织着欢欣、创伤、痛楚与记忆的温度。我们说话，并非依靠语法规则的精密计算，亦非堆砌词典中的冰冷定义。我们言说，是因为我们感知，因为我们活着，因为我们心有所向。"}],
     [{t:"自然语言与文化充满不可预测的灵动，始终处于流动变迁之中。它们时而非理性，常常出人意料。意义不止于信息传递，更承载着关系、语境，以及人性深处的共鸣。"}],
     [{t:"今天，我们可以借助日益精进的人工智能模型，大规模地协助创造、翻译、治理与守护语言。"}],
-    [{t:"但人工智能从未真正“体验”语言。"}],
+    [{t:"但人工智能从未真正"体验"语言。"}],
     [{t:"对模型而言，词语只是高维空间中的符号；意义通过模式与关联习得，而非源于真实鲜活的生命经历。人类从内而外地沉浸于语言与文化，人工智能则从外部重现它们。"}],
-    [{t:"这正是「Lingonect (语联)」存在的意义。"}],
+    [{t:"这正是「语联」存在的意义。"}],
     [{t:"语联汇聚真正掌握多门语言的人类，借助人工智能辅助练习、修正并负责任地分享语言知识。在这里，科技与人性相遇，让跨越文化的理解，生根于真实的生命体验之中。"}]
   ],
 
@@ -266,9 +283,6 @@ const TEXTS = {
   ]
 };
 
-/* =========================
-   TYPEWRITER ENGINE (instant switch)
-========================= */
 let currentLang = "en";
 let runId = 0;
 
@@ -288,7 +302,7 @@ function recenter(){
 }
 
 async function typeText(lang){
-  const myRun = ++runId;  // cancels any previous run immediately
+  const myRun = ++runId;
   typed.innerHTML = "";
   content.style.transform = "translateY(0)";
   recenter();
@@ -311,33 +325,21 @@ async function typeText(lang){
   }
 }
 
-/* Keep centring correct on orientation change / resize */
-window.addEventListener("resize", () => {
-  // minor debounce to allow iOS layout to settle
-  setTimeout(recenter, 50);
-});
+window.addEventListener("resize", () => { setTimeout(recenter, 50); });
 
-/* =========================
-   LANGUAGE SWITCHER
-========================= */
 document.querySelectorAll(".lang-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
     const lang = btn.dataset.lang;
     if(lang === currentLang) return;
-
     document.querySelectorAll(".lang-btn").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-
     currentLang = lang;
     typeText(lang);
   });
 });
 
-/* Start */
 typeText("en");
 </script>
 
 </body>
 </html>
-
-
