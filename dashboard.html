@@ -687,33 +687,34 @@ modalSave.addEventListener("click", () => {
   settingsModal.classList.remove("open");
 });
 
-// ── Jais-2 (HuggingFace serverless inference — OpenAI-compatible chat format) ──
-// Uses inceptionai/Jais-2-8B-Chat which works without trust_remote_code.
+// ── Jais-2 (HuggingFace serverless text-generation endpoint) ──
+// Uses the standard /models/{id} endpoint which supports browser CORS.
 // Token is stored in localStorage — click the logo to open API Keys.
 const JAIS_ENDPOINT =
-  "https://api-inference.huggingface.co/models/inceptionai/Jais-2-8B-Chat/v1/chat/completions";
+  "https://api-inference.huggingface.co/models/inceptionai/Jais-2-8B-Chat";
 
 async function translateWithJais(text) {
   const token = localStorage.getItem("jais_hf_token");
   if (!token) throw new Error("HuggingFace token not set — click the logo to add it.");
 
+  const prompt =
+    `Translate the following text to ${targetLang}. ` +
+    `Return only the translation, no explanations.\n\nText: ${text}\n\nTranslation:`;
+
   const res = await fetch(JAIS_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${token}`
+      "Content-Type":     "application/json",
+      "Authorization":    `Bearer ${token}`,
+      "x-wait-for-model": "true"
     },
     body: JSON.stringify({
-      model: "inceptionai/Jais-2-8B-Chat",
-      messages: [
-        {
-          role: "system",
-          content: `You are a professional translator. Detect the source language and translate the text to ${targetLang}. Return only the translated text — no explanations, labels, or extra commentary.`
-        },
-        { role: "user", content: text }
-      ],
-      max_tokens:  300,
-      temperature: 0.3
+      inputs: prompt,
+      parameters: {
+        max_new_tokens:   200,
+        temperature:      0.3,
+        return_full_text: false
+      }
     })
   });
   if (!res.ok) {
@@ -721,7 +722,8 @@ async function translateWithJais(text) {
     throw new Error(err.error || `Jais ${res.status}`);
   }
   const data = await res.json();
-  return data.choices[0].message.content.trim();
+  const raw = Array.isArray(data) ? data[0].generated_text : data.generated_text;
+  return raw.trim();
 }
 
 // ── Engine registry (add future engines here) ──
