@@ -676,12 +676,12 @@ async function translateWithDeepL(text) {
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
-    id:         "mistral",
-    name:       "Mistral AI",
-    logoUrl:    "https://mistral.ai/favicon.ico",
-    badgeClass: "mistral",
-    badgeText:  "M",
-    translate:  translateWithMistral
+    id:         "claude",
+    name:       "Claude",
+    logoUrl:    "https://www.anthropic.com/favicon.ico",
+    badgeClass: "claude",
+    badgeText:  "C",
+    translate:  translateWithClaude
   },
   {
     id:         "deepl",
@@ -690,14 +690,6 @@ const engines = [
     badgeClass: "deepl",
     badgeText:  "D",
     translate:  translateWithDeepL
-  },
-  {
-    id:         "claude",
-    name:       "Claude",
-    logoUrl:    "https://www.anthropic.com/favicon.ico",
-    badgeClass: "claude",
-    badgeText:  "C",
-    translate:  translateWithClaude
   },
   {
     id:         "google",
@@ -714,6 +706,14 @@ const engines = [
     badgeClass: "perplexity",
     badgeText:  "P",
     translate:  translateWithPerplexity
+  },
+  {
+    id:         "mistral",
+    name:       "Mistral AI",
+    logoUrl:    "https://mistral.ai/favicon.ico",
+    badgeClass: "mistral",
+    badgeText:  "M",
+    translate:  translateWithMistral
   }
 ];
 
