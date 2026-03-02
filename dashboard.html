@@ -287,6 +287,7 @@ body{
 .engine-logo-badge.mistral{ background:#f0501a; }
 .engine-logo-badge.deepl  { background:#003CAA; }
 .engine-logo-badge.claude { background:#C96442; }
+.engine-logo-badge.google { background:#4285F4; }
 
 .result-content{
   width:100%;
@@ -521,7 +522,8 @@ inputEl.addEventListener("input", () => {
 });
 
 // ── API keys (edit these values on GitHub) ──
-const MISTRAL_KEY = "E2JIrC6eIPdrNZ6HojKY2OYXpMN38v12";
+const MISTRAL_KEY  = "E2JIrC6eIPdrNZ6HojKY2OYXpMN38v12";
+const GOOGLE_KEY   = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
 
 // ── Mistral AI ──
 async function translateWithMistral(text) {
@@ -567,6 +569,46 @@ async function translateWithClaude(text) {
     const data = await res.json();
     if (!res.ok || data.type === "error") throw new Error(`Claude: ${data.error?.message || res.status}`);
     return data.content[0].text.trim();
+}
+
+// ── Google Translate ──
+const GOOGLE_LANG_MAP = {
+  "English":               "en",
+  "Spanish":               "es",
+  "French":                "fr",
+  "German":                "de",
+  "Italian":               "it",
+  "Portuguese":            "pt",
+  "Swedish":               "sv",
+  "Norwegian":             "no",
+  "Danish":                "da",
+  "Finnish":               "fi",
+  "Dutch":                 "nl",
+  "Polish":                "pl",
+  "Russian":               "ru",
+  "Ukrainian":             "uk",
+  "Turkish":               "tr",
+  "Arabic":                "ar",
+  "Japanese":              "ja",
+  "Chinese (Simplified)":  "zh-CN",
+  "Chinese (Traditional)": "zh-TW",
+  "Korean":                "ko"
+};
+
+async function translateWithGoogle(text) {
+  const langCode = GOOGLE_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Google Translate does not support ${targetLang}.`);
+  const res = await fetch(
+    `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: text, target: langCode, format: "text" })
+    }
+  );
+  if (!res.ok) throw new Error(`Google Translate ${res.status}`);
+  const data = await res.json();
+  return data.data.translations[0].translatedText;
 }
 
 // ── DeepL ──
@@ -633,6 +675,14 @@ const engines = [
     badgeClass: "claude",
     badgeText:  "C",
     translate:  translateWithClaude
+  },
+  {
+    id:         "google",
+    name:       "Google Translate",
+    logoUrl:    "https://translate.google.com/favicon.ico",
+    badgeClass: "google",
+    badgeText:  "G",
+    translate:  translateWithGoogle
   }
 ];
 
