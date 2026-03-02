@@ -41,8 +41,10 @@ body{
   transform:translateY(-50%);
   width:calc(50% - (var(--text-col) / 2));
   display:flex;
+  flex-direction:column;
   align-items:center;
   justify-content:center;
+  gap:20px;
   z-index:1;
 }
 
@@ -316,17 +318,7 @@ body{
   font-style:italic;
 }
 
-/* ── LOGOUT / BOTTOM BAR ── */
-.logout-wrap{
-  position:fixed;
-  bottom:28px;
-  left:0;
-  right:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:3;
-}
+/* ── LOGOUT ── */
 .logout-btn{
   font-family:"Special Elite","Courier New",monospace;
   font-size:14px;
@@ -383,6 +375,7 @@ body{
 <!-- LOGO — fixed left rail on desktop, top-center on mobile -->
 <div class="logo-rail">
   <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
 </div>
 
 <div class="page-wrap">
@@ -443,10 +436,6 @@ body{
   </main>
 </div>
 
-<!-- Bottom bar -->
-<div class="logout-wrap">
-  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
-</div>
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
