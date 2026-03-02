@@ -525,7 +525,6 @@ inputEl.addEventListener("input", () => {
 // ── API keys (edit these values on GitHub) ──
 const MISTRAL_KEY     = "E2JIrC6eIPdrNZ6HojKY2OYXpMN38v12";
 const GOOGLE_KEY      = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
-const PERPLEXITY_KEY  = "YOUR_PERPLEXITY_KEY_HERE";
 
 // ── Mistral AI ──
 async function translateWithMistral(text) {
@@ -572,14 +571,13 @@ async function translateWithClaude(text) {
     return data.content[0].text.trim();
 }
 
-// ── Perplexity ──
+// ── Perplexity (via Cloudflare Worker) ──
+const PERPLEXITY_PROXY = "https://lingonectperplexity.hanyuriyu.workers.dev";
+
 async function translateWithPerplexity(text) {
-  const res = await fetch("https://api.perplexity.ai/chat/completions", {
+  const res = await fetch(PERPLEXITY_PROXY, {
     method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${PERPLEXITY_KEY}`
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "sonar",
       messages: [
