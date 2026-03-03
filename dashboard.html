@@ -272,6 +272,9 @@ body{
   border-radius:8px;
   object-fit:contain;
 }
+.engine-logo-img--gemini{
+  transform:scale(1.7);
+}
 
 /* Fallback text badge when img fails */
 .engine-logo-badge{
@@ -774,7 +777,7 @@ function buildCard(engine) {
   const logoHtml = `
     <div class="engine-logo-wrap">
       <img
-        class="engine-logo-img"
+        class="engine-logo-img engine-logo-img--${engine.id}"
         src="${engine.logoUrl}"
         alt="${engine.name}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
