@@ -292,6 +292,7 @@ body{
 .engine-logo-badge.google     { background:#4285F4; }
 .engine-logo-badge.perplexity { background:#20808D; }
 .engine-logo-badge.openai     { background:#000000; }
+.engine-logo-badge.gemini     { background:#8B5CF6; }
 
 .result-content{
   width:100%;
@@ -690,6 +691,21 @@ async function translateWithDeepL(text) {
   return data.translations[0].text.trim();
 }
 
+// ── Gemini (via Cloudflare Worker) ──
+const GEMINI_PROXY = "https://geminitranslate.hanyuriyu.workers.dev";
+
+async function translateWithGemini(text) {
+  const res = await fetch(GEMINI_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, targetLang })
+  });
+  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  const data = await res.json();
+  if (data.type === "error") throw new Error(`Gemini: ${data.error?.message}`);
+  return data.translated.trim();
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -739,6 +755,14 @@ const engines = [
     badgeClass: "mistral",
     badgeText:  "M",
     translate:  translateWithMistral
+  },
+  {
+    id:         "gemini",
+    name:       "Gemini",
+    logoUrl:    "https://www.gstatic.com/lamda/images/gemini_favicon_f069958c85030456e93de685481c559f160ea06.svg",
+    badgeClass: "gemini",
+    badgeText:  "G",
+    translate:  translateWithGemini
   }
 ];
 
