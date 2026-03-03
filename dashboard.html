@@ -273,6 +273,9 @@ body{
   border-radius:8px;
   object-fit:contain;
 }
+.engine-logo-img--gemini{
+  transform:scale(3.5);
+}
 
 /* Fallback text badge when img fails */
 .engine-logo-badge{
@@ -760,7 +763,7 @@ const engines = [
   {
     id:         "gemini",
     name:       "Gemini",
-    logoUrl:    "https://www.gstatic.com/lamda/images/gemini_favicon_f069958c85030456e93de685481c559f160ea06.svg",
+    logoUrl:    "gemini_logo.png",
     badgeClass: "gemini",
     badgeText:  "G",
     translate:  translateWithGemini
@@ -775,7 +778,7 @@ function buildCard(engine) {
   const logoHtml = `
     <div class="engine-logo-wrap">
       <img
-        class="engine-logo-img"
+        class="engine-logo-img engine-logo-img--${engine.id}"
         src="${engine.logoUrl}"
         alt="${engine.name}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
