@@ -702,7 +702,7 @@ async function translateWithGemini(text) {
   const res = await fetch(GEMINI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, targetLang, model: "gemini-2.0-flash" })
+    body: JSON.stringify({ text, targetLang, model: "gemini-2.5-flash" })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
