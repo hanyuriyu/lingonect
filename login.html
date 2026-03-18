@@ -274,7 +274,7 @@ const ALLOWED_EMAIL = "linguisticsconsulting@gmail.com";
 // Redirect already-authenticated users straight to dashboard
 auth.onAuthStateChanged(user => {
   if (user && user.emailVerified && user.email === ALLOWED_EMAIL) {
-    window.location.href = "dashboard.html";
+    window.location.href = "engines.html";
   }
 });
 
@@ -297,7 +297,7 @@ document.getElementById("googleBtn").addEventListener("click", () => {
         showError("Access is currently restricted.");
         return;
       }
-      window.location.href = "dashboard.html";
+      window.location.href = "engines.html";
     })
     .catch(err => showError(err.message));
 });
@@ -322,7 +322,7 @@ document.getElementById("loginBtn").addEventListener("click", () => {
         showError("Please verify your email before logging in. Check your inbox.");
         return;
       }
-      window.location.href = "dashboard.html";
+      window.location.href = "engines.html";
     })
     .catch(err => {
       if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
