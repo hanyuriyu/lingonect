@@ -715,7 +715,7 @@ async function translateWithGemini(text) {
 }
 
 // ── DeepSeek (via Cloudflare Worker) ──
-const DEEPSEEK_PROXY = "https://deepseektranslate.hanyuriyu.workers.dev";
+const DEEPSEEK_PROXY = "https://deepseek.hanyuriyu.workers.dev";
 
 async function translateWithDeepSeek(text) {
   const res = await fetch(DEEPSEEK_PROXY, {
