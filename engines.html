@@ -299,6 +299,7 @@ body{
 .engine-logo-badge.gemini     { background:#8B5CF6; }
 .engine-logo-badge.deepseek   { background:#4D6BFE; }
 .engine-logo-badge.grok       { background:#000000; }
+.engine-logo-badge.tencent    { background:#0052D9; }
 
 .result-content{
   width:100%;
@@ -760,6 +761,48 @@ async function translateWithGrok(text) {
   return data.choices[0].message.content.trim();
 }
 
+// ── Tencent Translate (via Cloudflare Worker) ──
+const TENCENT_PROXY = "https://tencenttranslate.hanyuriyu.workers.dev";
+
+const TENCENT_LANG_MAP = {
+  "English":               "en",
+  "Spanish":               "es",
+  "French":                "fr",
+  "German":                "de",
+  "Italian":               "it",
+  "Portuguese":            "pt",
+  "Swedish":               "sv",
+  "Norwegian":             "no",
+  "Danish":                "da",
+  "Finnish":               "fi",
+  "Dutch":                 "nl",
+  "Polish":                "pl",
+  "Russian":               "ru",
+  "Ukrainian":             "uk",
+  "Turkish":               "tr",
+  "Arabic":                "ar",
+  "Japanese":              "ja",
+  "Chinese (Simplified)":  "zh",
+  "Chinese (Traditional)": "zh-TW",
+  "Korean":                "ko"
+};
+
+async function translateWithTencent(text) {
+  const langCode = TENCENT_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Tencent Translate does not support ${targetLang}.`);
+  const res = await fetch(TENCENT_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source: "auto", target: langCode })
+  });
+  if (!res.ok) throw new Error(`Tencent Translate ${res.status}`);
+  const data = await res.json();
+  if (data.Response && data.Response.Error) {
+    throw new Error(`Tencent: ${data.Response.Error.Message}`);
+  }
+  return data.Response.TargetText.trim();
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -833,6 +876,14 @@ const engines = [
     badgeClass: "grok",
     badgeText:  "X",
     translate:  translateWithGrok
+  },
+  {
+    id:         "tencent",
+    name:       "Tencent Translate",
+    logoUrl:    "https://www.tencent.com/favicon.ico",
+    badgeClass: "tencent",
+    badgeText:  "T",
+    translate:  translateWithTencent
   }
 ];
 
