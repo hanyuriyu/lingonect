@@ -301,6 +301,7 @@ body{
 .engine-logo-badge.grok       { background:#000000; }
 .engine-logo-badge.tencent    { background:#0052D9; }
 .engine-logo-badge.alibaba    { background:#FF6A00; }
+.engine-logo-badge.microsoft  { background:#00A4EF; }
 
 .result-content{
   width:100%;
@@ -827,6 +828,46 @@ async function translateWithAlibaba(text) {
   return data.choices[0].message.content.trim();
 }
 
+// ── Microsoft Translate (via Cloudflare Worker) ──
+const MICROSOFT_PROXY = "https://microsoft.hanyuriyu.workers.dev";
+
+const MICROSOFT_LANG_MAP = {
+  "English":               "en",
+  "Spanish":               "es",
+  "French":                "fr",
+  "German":                "de",
+  "Italian":               "it",
+  "Portuguese":            "pt",
+  "Swedish":               "sv",
+  "Norwegian":             "nb",
+  "Danish":                "da",
+  "Finnish":               "fi",
+  "Dutch":                 "nl",
+  "Polish":                "pl",
+  "Russian":               "ru",
+  "Ukrainian":             "uk",
+  "Turkish":               "tr",
+  "Arabic":                "ar",
+  "Japanese":              "ja",
+  "Chinese (Simplified)":  "zh-Hans",
+  "Chinese (Traditional)": "zh-Hant",
+  "Korean":                "ko"
+};
+
+async function translateWithMicrosoft(text) {
+  const langCode = MICROSOFT_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Microsoft Translate does not support ${targetLang}.`);
+  const res = await fetch(MICROSOFT_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, to: langCode })
+  });
+  if (!res.ok) throw new Error(`Microsoft Translate ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(`Microsoft: ${data.error.message}`);
+  return data[0].translations[0].text.trim();
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -916,6 +957,14 @@ const engines = [
     badgeClass: "alibaba",
     badgeText:  "A",
     translate:  translateWithAlibaba
+  },
+  {
+    id:         "microsoft",
+    name:       "Microsoft Translate",
+    logoUrl:    "microsoft_logo.png",
+    badgeClass: "microsoft",
+    badgeText:  "MS",
+    translate:  translateWithMicrosoft
   }
 ];
 
