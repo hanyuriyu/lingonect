@@ -304,7 +304,8 @@ body{
 .engine-logo-badge.microsoft  { background:#00A4EF; }
 
 .result-content{
-  width:100%;
+  flex:1;
+  min-width:0;
 }
 
 .engine-name{
@@ -333,8 +334,8 @@ body{
   font-size:12px;
   font-weight:800;
   color:var(--cobalt);
-  text-align:center;
-  margin:0 0 6px;
+  text-align:right;
+  margin:0 0 0;
   letter-spacing:.3px;
   line-height:1.4;
 }
@@ -342,27 +343,24 @@ body{
 .star-rating{
   display:flex;
   align-items:center;
+  justify-content:flex-end;
   gap:2px;
   flex-shrink:0;
-  padding:22px 0;
-  border-top:1px solid #e8e8e8;
-  min-height:40px;
-  box-sizing:border-box;
-  padding-top:40px; /* offset for engine-name label height */
+  margin-left:auto;
 }
 
 .star-rating .star{
   position:relative;
-  width:22px;
-  height:22px;
+  width:20px;
+  height:20px;
   cursor:pointer;
   -webkit-user-select:none;
   user-select:none;
 }
 
 .star-rating .star svg{
-  width:22px;
-  height:22px;
+  width:20px;
+  height:20px;
   display:block;
 }
 
@@ -372,17 +370,18 @@ body{
 .star-rating .star .star-full-fill{ fill:var(--cobalt); }
 
 .star-rating .star-value{
-  font-size:12px;
+  font-size:11px;
   color:#999;
-  margin-left:4px;
-  min-width:22px;
+  margin-left:3px;
+  min-width:18px;
   text-align:center;
   font-weight:800;
 }
 
 .rating-submit-wrap{
-  text-align:center;
+  text-align:right;
   margin-top:18px;
+  padding-bottom:4px;
 }
 
 .rating-submit-btn{
@@ -454,9 +453,8 @@ body{
   }
   .hero-sub{ font-size:15px; }
 
-  #ratingsColumn{ width:120px !important; }
-  .star-rating .star svg{ width:18px; height:18px; }
-  .star-rating .star{ width:18px; height:18px; }
+  .star-rating .star svg{ width:16px; height:16px; }
+  .star-rating .star{ width:16px; height:16px; }
 }
 
 @media (max-width:420px){
@@ -527,16 +525,11 @@ body{
     <div class="word-count" id="wordCount">0 / 50 words</div>
 
     <!-- RESULTS -->
-    <div style="display:flex;gap:16px;align-items:flex-start;">
-      <div class="results-area" id="resultsArea" style="flex:1;min-width:0;"></div>
-      <div id="ratingsColumn" style="display:none;flex-shrink:0;width:140px;">
-        <p class="ratings-header">Please always rate<br>each engine output</p>
-        <div id="ratingsContainer"></div>
-        <div class="rating-submit-wrap">
-          <button class="rating-submit-btn" id="ratingSubmitBtn" type="button">Submit Ratings</button>
-          <div class="rating-toast" id="ratingToast">Ratings submitted!</div>
-        </div>
-      </div>
+    <div id="ratingsHeader" class="ratings-header" style="display:none;">Please always rate each engine output</div>
+    <div class="results-area" id="resultsArea"></div>
+    <div id="ratingsFooter" class="rating-submit-wrap" style="display:none;">
+      <button class="rating-submit-btn" id="ratingSubmitBtn" type="button">Submit Ratings</button>
+      <div class="rating-toast" id="ratingToast">Ratings submitted!</div>
     </div>
 
   </main>
@@ -681,15 +674,6 @@ function renderStars(engineId) {
 
   const valEl = document.getElementById(`star-val-${engineId}`);
   if (valEl) valEl.textContent = rating > 0 ? rating.toFixed(1) : "";
-}
-
-function buildRatingsColumn() {
-  const container = document.getElementById("ratingsContainer");
-  container.innerHTML = "";
-  engines.forEach(engine => {
-    container.appendChild(buildStarRow(engine.id));
-  });
-  document.getElementById("ratingsColumn").style.display = "block";
 }
 
 // ── Submit Ratings to Firestore ──
@@ -1257,6 +1241,9 @@ function buildCard(engine) {
       <p class="translation-text loading" id="result-${engine.id}">Translating…</p>
     </div>`;
 
+  // Add star rating inline
+  card.appendChild(buildStarRow(engine.id));
+
   return card;
 }
 
@@ -1272,8 +1259,9 @@ submitEl.addEventListener("click", async () => {
   // Render all engine cards immediately (shows "Translating…")
   engines.forEach(engine => resultsArea.appendChild(buildCard(engine)));
 
-  // Build star rating column alongside results
-  buildRatingsColumn();
+  // Show ratings header and submit footer
+  document.getElementById("ratingsHeader").style.display = "";
+  document.getElementById("ratingsFooter").style.display = "";
 
   // Fire all translations in parallel
   engines.forEach(async engine => {
