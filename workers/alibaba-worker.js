@@ -1,11 +1,9 @@
 /**
  * Cloudflare Worker: Alibaba (Qwen) Translation Proxy
  *
- * Deploy steps:
- *   1. npx wrangler init alibabatranslate
- *   2. Replace the generated worker code with this file
- *   3. npx wrangler secret put DASHSCOPE_API_KEY   (paste your key when prompted)
- *   4. npx wrangler deploy
+ * Environment secrets required:
+ *   Settings > Variables and Secrets > Add:
+ *     DASHSCOPE_API_KEY (encrypt)
  *
  * The worker will be available at:
  *   https://alibaba.hanyuriyu.workers.dev
@@ -13,7 +11,6 @@
 
 export default {
   async fetch(request, env) {
-    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -24,15 +21,12 @@ export default {
         },
       });
     }
-
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
-
     try {
       const body = await request.json();
-
-      const res = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+      const res = await fetch("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -45,9 +39,7 @@ export default {
           max_tokens: body.max_tokens ?? 1024,
         }),
       });
-
       const data = await res.json();
-
       return new Response(JSON.stringify(data), {
         status: res.status,
         headers: {
