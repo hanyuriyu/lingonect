@@ -328,6 +328,88 @@ body{
   font-style:italic;
 }
 
+/* ── STAR RATINGS ── */
+.ratings-header{
+  font-size:12px;
+  font-weight:800;
+  color:var(--cobalt);
+  text-align:center;
+  margin:0 0 6px;
+  letter-spacing:.3px;
+  line-height:1.4;
+}
+
+.star-rating{
+  display:flex;
+  align-items:center;
+  gap:2px;
+  flex-shrink:0;
+  padding:22px 0;
+  border-top:1px solid #e8e8e8;
+  min-height:40px;
+  box-sizing:border-box;
+  padding-top:40px; /* offset for engine-name label height */
+}
+
+.star-rating .star{
+  position:relative;
+  width:22px;
+  height:22px;
+  cursor:pointer;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+.star-rating .star svg{
+  width:22px;
+  height:22px;
+  display:block;
+}
+
+.star-rating .star .star-empty{ fill:#d0d0d0; }
+.star-rating .star .star-left-fill{ fill:var(--cobalt); clip-path:inset(0 50% 0 0); }
+.star-rating .star .star-right-fill{ fill:var(--cobalt); clip-path:inset(0 0 0 50%); }
+.star-rating .star .star-full-fill{ fill:var(--cobalt); }
+
+.star-rating .star-value{
+  font-size:12px;
+  color:#999;
+  margin-left:4px;
+  min-width:22px;
+  text-align:center;
+  font-weight:800;
+}
+
+.rating-submit-wrap{
+  text-align:center;
+  margin-top:18px;
+}
+
+.rating-submit-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:13px;
+  font-weight:800;
+  background:var(--cobalt);
+  color:#fff;
+  border:2px solid var(--cobalt);
+  border-radius:6px;
+  padding:9px 28px;
+  cursor:pointer;
+  transition:opacity .2s;
+}
+.rating-submit-btn:hover:not(:disabled){ opacity:.85; }
+.rating-submit-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+.rating-toast{
+  font-size:12px;
+  color:#2e7d32;
+  margin-top:8px;
+  font-weight:800;
+  opacity:0;
+  transition:opacity .3s;
+}
+.rating-toast.show{ opacity:1; }
+
 /* ── LOGOUT ── */
 .logout-btn{
   font-family:"Special Elite","Courier New",monospace;
@@ -371,6 +453,10 @@ body{
     white-space:normal;
   }
   .hero-sub{ font-size:15px; }
+
+  #ratingsColumn{ width:120px !important; }
+  .star-rating .star svg{ width:18px; height:18px; }
+  .star-rating .star{ width:18px; height:18px; }
 }
 
 @media (max-width:420px){
@@ -441,7 +527,17 @@ body{
     <div class="word-count" id="wordCount">0 / 50 words</div>
 
     <!-- RESULTS -->
-    <div class="results-area" id="resultsArea"></div>
+    <div style="display:flex;gap:16px;align-items:flex-start;">
+      <div class="results-area" id="resultsArea" style="flex:1;min-width:0;"></div>
+      <div id="ratingsColumn" style="display:none;flex-shrink:0;width:140px;">
+        <p class="ratings-header">Please always rate<br>each engine output</p>
+        <div id="ratingsContainer"></div>
+        <div class="rating-submit-wrap">
+          <button class="rating-submit-btn" id="ratingSubmitBtn" type="button">Submit Ratings</button>
+          <div class="rating-toast" id="ratingToast">Ratings submitted!</div>
+        </div>
+      </div>
+    </div>
 
   </main>
 </div>
@@ -450,6 +546,7 @@ body{
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
 // ── Firebase auth ──
@@ -475,6 +572,179 @@ auth.onAuthStateChanged(user => {
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+const db = firebase.firestore();
+
+// ── Star Rating System ──
+const currentRatings = {}; // { engineId: 0..5 in 0.5 steps }
+
+const STAR_SVG_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z";
+
+function createStarSVG() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "22");
+  svg.setAttribute("height", "22");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", STAR_SVG_PATH);
+  svg.appendChild(path);
+  return { svg, path };
+}
+
+function buildStarRow(engineId) {
+  currentRatings[engineId] = 0;
+
+  const row = document.createElement("div");
+  row.className = "star-rating";
+  row.dataset.engine = engineId;
+
+  for (let i = 1; i <= 5; i++) {
+    const starEl = document.createElement("span");
+    starEl.className = "star";
+    starEl.dataset.index = i;
+
+    // Empty star (background)
+    const { svg: emptySvg, path: emptyPath } = createStarSVG();
+    emptyPath.classList.add("star-empty");
+    starEl.appendChild(emptySvg);
+
+    // Filled overlay (hidden initially)
+    const { svg: fillSvg, path: fillPath } = createStarSVG();
+    fillPath.classList.add("star-full-fill");
+    fillSvg.style.position = "absolute";
+    fillSvg.style.top = "0";
+    fillSvg.style.left = "0";
+    fillSvg.style.display = "none";
+    fillPath.dataset.fillType = "none";
+    starEl.appendChild(fillSvg);
+
+    starEl.addEventListener("click", () => handleStarClick(engineId, i));
+    row.appendChild(starEl);
+  }
+
+  const valSpan = document.createElement("span");
+  valSpan.className = "star-value";
+  valSpan.id = `star-val-${engineId}`;
+  valSpan.textContent = "";
+  row.appendChild(valSpan);
+
+  return row;
+}
+
+function handleStarClick(engineId, starIndex) {
+  const current = currentRatings[engineId];
+  const halfVal = starIndex - 0.5;
+  const fullVal = starIndex;
+
+  // If clicking the same star: toggle half -> full -> off
+  if (current === fullVal) {
+    currentRatings[engineId] = 0; // clear
+  } else if (current === halfVal) {
+    currentRatings[engineId] = fullVal; // half -> full
+  } else {
+    currentRatings[engineId] = halfVal; // first click -> half
+  }
+
+  renderStars(engineId);
+}
+
+function renderStars(engineId) {
+  const rating = currentRatings[engineId];
+  const row = document.querySelector(`.star-rating[data-engine="${engineId}"]`);
+  if (!row) return;
+
+  const stars = row.querySelectorAll(".star");
+  stars.forEach(starEl => {
+    const idx = parseInt(starEl.dataset.index);
+    const fillSvg = starEl.querySelectorAll("svg")[1];
+    const fillPath = fillSvg.querySelector("path");
+
+    if (rating >= idx) {
+      // Full star
+      fillSvg.style.display = "block";
+      fillPath.style.clipPath = "none";
+      fillPath.classList.remove("star-left-fill", "star-right-fill");
+      fillPath.classList.add("star-full-fill");
+    } else if (rating === idx - 0.5) {
+      // Half star
+      fillSvg.style.display = "block";
+      fillPath.style.clipPath = "inset(0 50% 0 0)";
+      fillPath.classList.remove("star-full-fill", "star-right-fill");
+      fillPath.classList.add("star-left-fill");
+    } else {
+      // Empty
+      fillSvg.style.display = "none";
+    }
+  });
+
+  const valEl = document.getElementById(`star-val-${engineId}`);
+  if (valEl) valEl.textContent = rating > 0 ? rating.toFixed(1) : "";
+}
+
+function buildRatingsColumn() {
+  const container = document.getElementById("ratingsContainer");
+  container.innerHTML = "";
+  engines.forEach(engine => {
+    container.appendChild(buildStarRow(engine.id));
+  });
+  document.getElementById("ratingsColumn").style.display = "block";
+}
+
+// ── Submit Ratings to Firestore ──
+document.getElementById("ratingSubmitBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("ratingSubmitBtn");
+  const toast = document.getElementById("ratingToast");
+
+  // Collect ratings
+  const ratings = {};
+  let hasAny = false;
+  engines.forEach(engine => {
+    const val = currentRatings[engine.id] || 0;
+    if (val > 0) {
+      ratings[engine.id] = val;
+      hasAny = true;
+    }
+  });
+
+  if (!hasAny) return;
+
+  btn.disabled = true;
+
+  // Generate anonymous session ID (not tied to PII)
+  const sessionId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+  try {
+    await db.collection("ratings").add({
+      ratings,
+      sourceText: inputEl.value.trim().substring(0, 200),
+      targetLanguage: targetLang,
+      sessionId,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2500);
+
+    // Reset stars after submit
+    engines.forEach(engine => {
+      currentRatings[engine.id] = 0;
+      renderStars(engine.id);
+    });
+  } catch (err) {
+    console.error("Failed to save ratings:", err);
+    toast.textContent = "Failed to save. Try again.";
+    toast.style.color = "#cc0000";
+    toast.classList.add("show");
+    setTimeout(() => {
+      toast.classList.remove("show");
+      toast.textContent = "Ratings submitted!";
+      toast.style.color = "#2e7d32";
+    }, 2500);
+  }
+
+  btn.disabled = false;
 });
 
 // ── Language selector ──
@@ -1001,6 +1271,9 @@ submitEl.addEventListener("click", async () => {
 
   // Render all engine cards immediately (shows "Translating…")
   engines.forEach(engine => resultsArea.appendChild(buildCard(engine)));
+
+  // Build star rating column alongside results
+  buildRatingsColumn();
 
   // Fire all translations in parallel
   engines.forEach(async engine => {
