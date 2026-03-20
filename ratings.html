@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lingonect — Ratings</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:130px;
+}
+
+html{ height:100%; }
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Special Elite","Courier New",monospace;
+  visibility:hidden;
+  overflow-y:auto;
+}
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  border-bottom:1px solid #e8e8e8;
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); border-bottom:2px solid var(--cobalt); padding-bottom:2px; }
+
+/* ── LOGO RAIL ── */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - 520px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  z-index:1;
+}
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#000;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  transition:color .2s;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* ── PAGE WRAP ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:80px 0 100px;
+  box-sizing:border-box;
+}
+
+.stage{
+  width:1040px;
+  max-width:96vw;
+  margin:0 auto;
+  position:relative;
+  z-index:2;
+}
+
+.page-title{
+  font-size:22px;
+  font-weight:800;
+  text-align:center;
+  margin:0 0 8px;
+}
+.page-sub{
+  font-size:15px;
+  text-align:center;
+  color:#666;
+  margin:0 0 32px;
+}
+
+/* ── RATINGS TABLE ── */
+.ratings-table-wrap{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.ratings-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+  white-space:nowrap;
+}
+
+.ratings-table th{
+  font-size:11px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.3px;
+  color:#666;
+  padding:10px 12px;
+  border-bottom:2px solid #e8e8e8;
+  text-align:center;
+  vertical-align:bottom;
+}
+.ratings-table th:first-child{
+  text-align:left;
+  min-width:170px;
+}
+
+.ratings-table td{
+  padding:10px 12px;
+  border-bottom:1px solid #f0f0f0;
+  text-align:center;
+  vertical-align:middle;
+}
+.ratings-table td:first-child{
+  text-align:left;
+}
+
+.ratings-table tbody tr:hover{
+  background:#fafafa;
+}
+
+/* Engine cell */
+.engine-cell{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.engine-cell img{
+  width:24px;
+  height:24px;
+  object-fit:contain;
+  border-radius:4px;
+}
+.engine-cell span{
+  font-weight:800;
+  font-size:13px;
+}
+
+/* Rating value */
+.rating-val{
+  font-weight:800;
+  color:var(--text);
+}
+.rating-val.na{
+  color:#ccc;
+  font-weight:400;
+  font-style:italic;
+}
+
+/* Custom pair header selectors */
+.custom-pair-header{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+.custom-pair-header select{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:10px;
+  padding:2px 4px;
+  border:1px solid #ccc;
+  border-radius:4px;
+  background:#fff;
+  cursor:pointer;
+  max-width:110px;
+}
+.custom-pair-header .arrow-down{
+  font-size:10px;
+  color:#999;
+  line-height:1;
+}
+
+/* Loading state */
+.loading-msg{
+  text-align:center;
+  color:#999;
+  padding:40px 0;
+  font-size:14px;
+}
+
+/* ── MOBILE ── */
+@media (max-width:820px){
+  .logo-rail{
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
+    width:auto;
+    justify-content:center;
+    padding:32px 0 4px;
+    margin-bottom:10px;
+  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
+  .page-wrap{
+    padding:60px 0 100px;
+  }
+  .stage{ padding:0 8px; box-sizing:border-box; }
+  .page-title{ font-size:16px; }
+}
+
+@media (max-width:420px){
+  .logo{ width:110px; height:110px; }
+  .page-title{ font-size:14px; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html" class="active">Ratings</a>
+</nav>
+
+<!-- LOGO RAIL -->
+<div class="logo-rail">
+  <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
+
+<div class="page-wrap">
+  <main class="stage">
+    <p class="page-title">Engine Ratings by Language Pair</p>
+    <p class="page-sub">Average star ratings from all submitted evaluations</p>
+
+    <div id="loadingMsg" class="loading-msg">Loading ratings data…</div>
+
+    <div class="ratings-table-wrap" id="tableWrap" style="display:none;">
+      <table class="ratings-table" id="ratingsTable">
+        <thead>
+          <tr>
+            <th>Engine</th>
+            <th>EN → ES</th>
+            <th>EN → FR</th>
+            <th>EN → DE</th>
+            <th>EN → IT</th>
+            <th>EN → JA</th>
+            <th>EN → AR</th>
+            <th>EN → KO</th>
+            <th>EN → ZH</th>
+            <th id="customHeader1">
+              <div class="custom-pair-header">
+                <select id="customSource1">
+                  <option value="">Source</option>
+                </select>
+                <span class="arrow-down">↓</span>
+                <select id="customTarget1">
+                  <option value="">Target</option>
+                </select>
+              </div>
+            </th>
+            <th id="customHeader2">
+              <div class="custom-pair-header">
+                <select id="customSource2">
+                  <option value="">Source</option>
+                </select>
+                <span class="arrow-down">↓</span>
+                <select id="customTarget2">
+                  <option value="">Target</option>
+                </select>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="ratingsBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+// ── Firebase auth ──
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+auth.onAuthStateChanged(user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  document.body.style.visibility = "visible";
+  loadRatings();
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+const db = firebase.firestore();
+
+// ── Engine definitions ──
+const engines = [
+  { id: "claude",    name: "Claude",              logoUrl: "https://www.anthropic.com/favicon.ico" },
+  { id: "openai",    name: "OpenAI",              logoUrl: "https://openai.com/favicon.ico" },
+  { id: "deepl",     name: "DeepL",               logoUrl: "eepL_logo26.png" },
+  { id: "google",    name: "Google Translate",     logoUrl: "https://translate.google.com/favicon.ico" },
+  { id: "perplexity",name: "Perplexity",           logoUrl: "Perplexity-Logo.png" },
+  { id: "mistral",   name: "Mistral AI",           logoUrl: "https://mistral.ai/favicon.ico" },
+  { id: "gemini",    name: "Gemini",               logoUrl: "gemini-color.png" },
+  { id: "deepseek",  name: "DeepSeek",             logoUrl: "deepseek_logo.png" },
+  { id: "grok",      name: "Grok",                 logoUrl: "https://x.ai/favicon.ico" },
+  { id: "tencent",   name: "Tencent Translate",    logoUrl: "tencent_logo.png" },
+  { id: "alibaba",   name: "Alibaba Translate",    logoUrl: "alibaba_logo.png" },
+  { id: "microsoft", name: "Microsoft Translate",   logoUrl: "microsoft_logo.png" }
+];
+
+// ── Language pairs ──
+const PRESET_PAIRS = [
+  { source: "English", target: "Spanish" },
+  { source: "English", target: "French" },
+  { source: "English", target: "German" },
+  { source: "English", target: "Italian" },
+  { source: "English", target: "Japanese" },
+  { source: "English", target: "Arabic" },
+  { source: "English", target: "Korean" },
+  { source: "English", target: "Chinese (Simplified)" }
+];
+
+const ALL_LANGUAGES = [
+  "English","Spanish","French","German","Italian","Portuguese",
+  "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
+  "Russian","Ukrainian","Turkish","Arabic","Japanese",
+  "Chinese (Simplified)","Chinese (Traditional)","Korean"
+];
+
+// Populate custom dropdowns
+function populateDropdowns() {
+  ["customSource1","customSource2","customTarget1","customTarget2"].forEach(id => {
+    const sel = document.getElementById(id);
+    ALL_LANGUAGES.forEach(lang => {
+      const opt = document.createElement("option");
+      opt.value = lang;
+      opt.textContent = lang;
+      sel.appendChild(opt);
+    });
+  });
+}
+populateDropdowns();
+
+// ── Ratings data store ──
+// ratingsData[pairKey] = { engineId: { sum, count } }
+// pairKey = "source|target" e.g. "English|Spanish"
+let ratingsData = {};
+
+function pairKey(source, target) { return source + "|" + target; }
+
+async function loadRatings() {
+  const snapshot = await db.collection("ratings").get();
+
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    const target = d.targetLanguage;
+    if (!target) return;
+
+    // For older docs without sourceLanguage, fall back to "English"
+    const source = d.sourceLanguage || "English";
+    const key = pairKey(source, target);
+
+    if (!ratingsData[key]) ratingsData[key] = {};
+
+    const ratings = d.ratings || {};
+    for (const [engineId, value] of Object.entries(ratings)) {
+      if (!ratingsData[key][engineId]) {
+        ratingsData[key][engineId] = { sum: 0, count: 0 };
+      }
+      ratingsData[key][engineId].sum += value;
+      ratingsData[key][engineId].count += 1;
+    }
+  });
+
+  renderTable();
+  document.getElementById("loadingMsg").style.display = "none";
+  document.getElementById("tableWrap").style.display = "";
+}
+
+function getAverage(source, target, engineId) {
+  const key = pairKey(source, target);
+  const d = ratingsData[key] && ratingsData[key][engineId];
+  if (!d || d.count === 0) return null;
+  return (d.sum / d.count).toFixed(1);
+}
+
+function renderCell(avg) {
+  if (avg === null) return '<span class="rating-val na">N/A</span>';
+  return `<span class="rating-val">${avg} ★</span>`;
+}
+
+function renderTable() {
+  const tbody = document.getElementById("ratingsBody");
+  tbody.innerHTML = "";
+
+  const customSource1 = document.getElementById("customSource1").value;
+  const customTarget1 = document.getElementById("customTarget1").value;
+  const customSource2 = document.getElementById("customSource2").value;
+  const customTarget2 = document.getElementById("customTarget2").value;
+
+  engines.forEach(engine => {
+    const tr = document.createElement("tr");
+
+    // Engine cell
+    let html = `<td><div class="engine-cell"><img src="${engine.logoUrl}" alt="${engine.name}"><span>${engine.name}</span></div></td>`;
+
+    // Preset pairs
+    PRESET_PAIRS.forEach(pair => {
+      const avg = getAverage(pair.source, pair.target, engine.id);
+      html += `<td>${renderCell(avg)}</td>`;
+    });
+
+    // Custom pair 1
+    if (customSource1 && customTarget1) {
+      const avg = getAverage(customSource1, customTarget1, engine.id);
+      html += `<td>${renderCell(avg)}</td>`;
+    } else {
+      html += '<td><span class="rating-val na">—</span></td>';
+    }
+
+    // Custom pair 2
+    if (customSource2 && customTarget2) {
+      const avg = getAverage(customSource2, customTarget2, engine.id);
+      html += `<td>${renderCell(avg)}</td>`;
+    } else {
+      html += '<td><span class="rating-val na">—</span></td>';
+    }
+
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+}
+
+// Re-render when custom dropdowns change
+["customSource1","customTarget1","customSource2","customTarget2"].forEach(id => {
+  document.getElementById(id).addEventListener("change", renderTable);
+});
+</script>
+</body>
+</html>
