@@ -525,7 +525,7 @@ body{
     <div class="word-count" id="wordCount">0 / 50 words</div>
 
     <!-- RESULTS -->
-    <div id="ratingsHeader" class="ratings-header" style="display:none;">Please always rate each engine output</div>
+    <div id="ratingsHeader" class="ratings-header" style="display:none;">Please always rate<br>each engine output</div>
     <div class="results-area" id="resultsArea"></div>
     <div id="ratingsFooter" class="rating-submit-wrap" style="display:none;">
       <button class="rating-submit-btn" id="ratingSubmitBtn" type="button">Submit Ratings</button>
@@ -681,14 +681,19 @@ document.getElementById("ratingSubmitBtn").addEventListener("click", async () =>
   const btn = document.getElementById("ratingSubmitBtn");
   const toast = document.getElementById("ratingToast");
 
-  // Collect ratings
+  // Collect ratings and translations
   const ratings = {};
+  const translations = {};
   let hasAny = false;
   engines.forEach(engine => {
     const val = currentRatings[engine.id] || 0;
     if (val > 0) {
       ratings[engine.id] = val;
       hasAny = true;
+    }
+    const el = document.getElementById(`result-${engine.id}`);
+    if (el && !el.classList.contains("loading")) {
+      translations[engine.id] = el.textContent;
     }
   });
 
@@ -702,6 +707,7 @@ document.getElementById("ratingSubmitBtn").addEventListener("click", async () =>
   try {
     await db.collection("ratings").add({
       ratings,
+      translations,
       sourceText: inputEl.value.trim().substring(0, 200),
       targetLanguage: targetLang,
       sessionId,
