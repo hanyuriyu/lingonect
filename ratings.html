@@ -275,6 +275,7 @@ body{
         <thead>
           <tr>
             <th>Engine</th>
+            <th>Overall</th>
             <th>EN → ES</th>
             <th>EN → FR</th>
             <th>EN → DE</th>
@@ -441,9 +442,24 @@ function getAverage(source, target, engineId) {
   return (d.sum / d.count).toFixed(1);
 }
 
+function getOverallAverage(engineId) {
+  let totalSum = 0, totalCount = 0;
+  for (const key of Object.keys(ratingsData)) {
+    const d = ratingsData[key][engineId];
+    if (d) { totalSum += d.sum; totalCount += d.count; }
+  }
+  if (totalCount === 0) return null;
+  return (totalSum / totalCount).toFixed(1);
+}
+
 function renderCell(avg) {
   if (avg === null) return '<span class="rating-val na">N/A</span>';
   return `<span class="rating-val">${avg} ★</span>`;
+}
+
+function renderOverallCell(avg) {
+  if (avg === null) return '<span class="rating-val na">N/A</span>';
+  return `<span class="rating-val" style="color:var(--cobalt);font-weight:800;">${avg} ★</span>`;
 }
 
 function renderTable() {
@@ -460,6 +476,10 @@ function renderTable() {
 
     // Engine cell
     let html = `<td><div class="engine-cell"><img src="${engine.logoUrl}" alt="${engine.name}"><span>${engine.name}</span></div></td>`;
+
+    // Overall rating
+    const overall = getOverallAverage(engine.id);
+    html += `<td>${renderOverallCell(overall)}</td>`;
 
     // Preset pairs
     PRESET_PAIRS.forEach(pair => {
