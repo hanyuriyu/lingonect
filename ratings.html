@@ -368,14 +368,14 @@ const engines = [
 
 // ── Language pairs ──
 const PRESET_PAIRS = [
-  { target: "Spanish" },
-  { target: "French" },
-  { target: "German" },
-  { target: "Italian" },
-  { target: "Japanese" },
-  { target: "Arabic" },
-  { target: "Korean" },
-  { target: "Chinese (Simplified)" }
+  { source: "English", target: "Spanish" },
+  { source: "English", target: "French" },
+  { source: "English", target: "German" },
+  { source: "English", target: "Italian" },
+  { source: "English", target: "Japanese" },
+  { source: "English", target: "Arabic" },
+  { source: "English", target: "Korean" },
+  { source: "English", target: "Chinese (Simplified)" }
 ];
 
 const ALL_LANGUAGES = [
@@ -400,8 +400,11 @@ function populateDropdowns() {
 populateDropdowns();
 
 // ── Ratings data store ──
-// ratingsData[targetLanguage] = { engineId: { sum, count } }
+// ratingsData[pairKey] = { engineId: { sum, count } }
+// pairKey = "source|target" e.g. "English|Spanish"
 let ratingsData = {};
+
+function pairKey(source, target) { return source + "|" + target; }
 
 async function loadRatings() {
   const snapshot = await db.collection("ratings").get();
@@ -411,15 +414,19 @@ async function loadRatings() {
     const target = d.targetLanguage;
     if (!target) return;
 
-    if (!ratingsData[target]) ratingsData[target] = {};
+    // For older docs without sourceLanguage, fall back to "English"
+    const source = d.sourceLanguage || "English";
+    const key = pairKey(source, target);
+
+    if (!ratingsData[key]) ratingsData[key] = {};
 
     const ratings = d.ratings || {};
     for (const [engineId, value] of Object.entries(ratings)) {
-      if (!ratingsData[target][engineId]) {
-        ratingsData[target][engineId] = { sum: 0, count: 0 };
+      if (!ratingsData[key][engineId]) {
+        ratingsData[key][engineId] = { sum: 0, count: 0 };
       }
-      ratingsData[target][engineId].sum += value;
-      ratingsData[target][engineId].count += 1;
+      ratingsData[key][engineId].sum += value;
+      ratingsData[key][engineId].count += 1;
     }
   });
 
@@ -428,8 +435,9 @@ async function loadRatings() {
   document.getElementById("tableWrap").style.display = "";
 }
 
-function getAverage(targetLang, engineId) {
-  const d = ratingsData[targetLang] && ratingsData[targetLang][engineId];
+function getAverage(source, target, engineId) {
+  const key = pairKey(source, target);
+  const d = ratingsData[key] && ratingsData[key][engineId];
   if (!d || d.count === 0) return null;
   return (d.sum / d.count).toFixed(1);
 }
@@ -443,7 +451,9 @@ function renderTable() {
   const tbody = document.getElementById("ratingsBody");
   tbody.innerHTML = "";
 
+  const customSource1 = document.getElementById("customSource1").value;
   const customTarget1 = document.getElementById("customTarget1").value;
+  const customSource2 = document.getElementById("customSource2").value;
   const customTarget2 = document.getElementById("customTarget2").value;
 
   engines.forEach(engine => {
@@ -454,21 +464,21 @@ function renderTable() {
 
     // Preset pairs
     PRESET_PAIRS.forEach(pair => {
-      const avg = getAverage(pair.target, engine.id);
+      const avg = getAverage(pair.source, pair.target, engine.id);
       html += `<td>${renderCell(avg)}</td>`;
     });
 
     // Custom pair 1
-    if (customTarget1) {
-      const avg = getAverage(customTarget1, engine.id);
+    if (customSource1 && customTarget1) {
+      const avg = getAverage(customSource1, customTarget1, engine.id);
       html += `<td>${renderCell(avg)}</td>`;
     } else {
       html += '<td><span class="rating-val na">—</span></td>';
     }
 
     // Custom pair 2
-    if (customTarget2) {
-      const avg = getAverage(customTarget2, engine.id);
+    if (customSource2 && customTarget2) {
+      const avg = getAverage(customSource2, customTarget2, engine.id);
       html += `<td>${renderCell(avg)}</td>`;
     } else {
       html += '<td><span class="rating-val na">—</span></td>';

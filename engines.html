@@ -524,17 +524,47 @@ body{
       ></textarea>
 
       <div class="input-actions">
-        <!-- Language selector -->
-        <div class="lang-select-wrap" id="langSelectWrap">
-          <button class="lang-btn" id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
-            <span id="langLabel">English</span>
+        <!-- Source language selector -->
+        <div class="lang-select-wrap" id="srcLangSelectWrap">
+          <button class="lang-btn" id="srcLangBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="srcLangLabel">English</span>
             <span class="lang-arrow">▾</span>
           </button>
-          <div class="lang-dropdown" id="langDropdown" role="listbox">
+          <div class="lang-dropdown" id="srcLangDropdown" role="listbox">
             <button class="lang-option active" data-lang="English">English</button>
             <button class="lang-option" data-lang="Spanish">Spanish</button>
             <button class="lang-option" data-lang="French">French</button>
             <button class="lang-option" data-lang="German">German</button>
+            <button class="lang-option" data-lang="Italian">Italian</button>
+            <button class="lang-option" data-lang="Portuguese">Portuguese</button>
+            <button class="lang-option" data-lang="Swedish">Swedish</button>
+            <button class="lang-option" data-lang="Norwegian">Norwegian</button>
+            <button class="lang-option" data-lang="Danish">Danish</button>
+            <button class="lang-option" data-lang="Finnish">Finnish</button>
+            <button class="lang-option" data-lang="Dutch">Dutch</button>
+            <button class="lang-option" data-lang="Polish">Polish</button>
+            <button class="lang-option" data-lang="Russian">Russian</button>
+            <button class="lang-option" data-lang="Ukrainian">Ukrainian</button>
+            <button class="lang-option" data-lang="Turkish">Turkish</button>
+            <button class="lang-option" data-lang="Arabic">Arabic</button>
+            <button class="lang-option" data-lang="Japanese">Japanese</button>
+            <button class="lang-option" data-lang="Chinese (Simplified)">Chinese (Simplified)</button>
+            <button class="lang-option" data-lang="Chinese (Traditional)">Chinese (Traditional)</button>
+            <button class="lang-option" data-lang="Korean">Korean</button>
+          </div>
+        </div>
+
+        <!-- Target language selector -->
+        <div class="lang-select-wrap" id="langSelectWrap">
+          <button class="lang-btn" id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="langLabel">German</span>
+            <span class="lang-arrow">▾</span>
+          </button>
+          <div class="lang-dropdown" id="langDropdown" role="listbox">
+            <button class="lang-option" data-lang="English">English</button>
+            <button class="lang-option" data-lang="Spanish">Spanish</button>
+            <button class="lang-option" data-lang="French">French</button>
+            <button class="lang-option active" data-lang="German">German</button>
             <button class="lang-option" data-lang="Italian">Italian</button>
             <button class="lang-option" data-lang="Portuguese">Portuguese</button>
             <button class="lang-option" data-lang="Swedish">Swedish</button>
@@ -744,6 +774,7 @@ document.getElementById("ratingSubmitBtn").addEventListener("click", async () =>
       ratings,
       translations,
       sourceText: inputEl.value.trim().substring(0, 200),
+      sourceLanguage: sourceLang,
       targetLanguage: targetLang,
       sessionId,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -772,8 +803,35 @@ document.getElementById("ratingSubmitBtn").addEventListener("click", async () =>
   btn.disabled = false;
 });
 
-// ── Language selector ──
-let targetLang = "English";
+// ── Language selectors ──
+let sourceLang = "English";
+let targetLang = "German";
+
+// Source language selector
+const srcLangWrap     = document.getElementById("srcLangSelectWrap");
+const srcLangBtn      = document.getElementById("srcLangBtn");
+const srcLangLabel    = document.getElementById("srcLangLabel");
+const srcLangDropdown = document.getElementById("srcLangDropdown");
+
+srcLangBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  langWrap.classList.remove("open");
+  langBtn.setAttribute("aria-expanded", "false");
+  const isOpen = srcLangWrap.classList.toggle("open");
+  srcLangBtn.setAttribute("aria-expanded", isOpen);
+});
+
+srcLangDropdown.addEventListener("click", e => {
+  const opt = e.target.closest(".lang-option");
+  if (!opt) return;
+  sourceLang = opt.dataset.lang;
+  srcLangLabel.textContent = opt.dataset.lang;
+  srcLangDropdown.querySelectorAll(".lang-option").forEach(o => o.classList.toggle("active", o === opt));
+  srcLangWrap.classList.remove("open");
+  srcLangBtn.setAttribute("aria-expanded", "false");
+});
+
+// Target language selector
 const langWrap     = document.getElementById("langSelectWrap");
 const langBtn      = document.getElementById("langBtn");
 const langLabel    = document.getElementById("langLabel");
@@ -781,6 +839,8 @@ const langDropdown = document.getElementById("langDropdown");
 
 langBtn.addEventListener("click", e => {
   e.stopPropagation();
+  srcLangWrap.classList.remove("open");
+  srcLangBtn.setAttribute("aria-expanded", "false");
   const isOpen = langWrap.classList.toggle("open");
   langBtn.setAttribute("aria-expanded", isOpen);
 });
@@ -796,6 +856,8 @@ langDropdown.addEventListener("click", e => {
 });
 
 document.addEventListener("click", () => {
+  srcLangWrap.classList.remove("open");
+  srcLangBtn.setAttribute("aria-expanded", "false");
   langWrap.classList.remove("open");
   langBtn.setAttribute("aria-expanded", "false");
 });
