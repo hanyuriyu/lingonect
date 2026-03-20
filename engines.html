@@ -523,19 +523,14 @@ inputEl.addEventListener("input", () => {
 });
 
 // ── API keys (edit these values on GitHub) ──
-const MISTRAL_KEY     = "E2JIrC6eIPdrNZ6HojKY2OYXpMN38v12";
 const GOOGLE_KEY      = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
 
 // ── Mistral AI ──
+const MISTRAL_PROXY = "https://mistral.hanyuriyu.workers.dev";
 async function translateWithMistral(text) {
-  const key = MISTRAL_KEY;
-  if (!key) throw new Error("Mistral API key not configured.");
-  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+  const res = await fetch(MISTRAL_PROXY, {
     method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${key}`
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "mistral-small-latest",
       messages: [
