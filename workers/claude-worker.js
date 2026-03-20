@@ -1,14 +1,11 @@
 /**
- * Cloudflare Worker: Alibaba (Qwen) Translation Proxy
+ * Cloudflare Worker: Claude (Anthropic) Translation Proxy
  *
- * Deploy steps:
- *   1. npx wrangler init alibabatranslate
- *   2. Replace the generated worker code with this file
- *   3. npx wrangler secret put DASHSCOPE_API_KEY   (paste your key when prompted)
- *   4. npx wrangler deploy
+ * Environment secrets required:
+ *   npx wrangler secret put ANTHROPIC_API_KEY
  *
  * The worker will be available at:
- *   https://alibaba.hanyuriyu.workers.dev
+ *   https://claudetranslate.hanyuriyu.workers.dev
  */
 
 export default {
@@ -32,17 +29,18 @@ export default {
     try {
       const body = await request.json();
 
-      const res = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.DASHSCOPE_API_KEY}`,
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: body.model || "qwen-plus",
+          model: body.model || "claude-haiku-4-5-20251001",
+          max_tokens: body.max_tokens || 1024,
+          system: body.system,
           messages: body.messages,
-          temperature: body.temperature ?? 0.3,
-          max_tokens: body.max_tokens ?? 1024,
         }),
       });
 

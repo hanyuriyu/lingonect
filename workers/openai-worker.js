@@ -1,14 +1,11 @@
 /**
- * Cloudflare Worker: Alibaba (Qwen) Translation Proxy
+ * Cloudflare Worker: OpenAI Translation Proxy
  *
- * Deploy steps:
- *   1. npx wrangler init alibabatranslate
- *   2. Replace the generated worker code with this file
- *   3. npx wrangler secret put DASHSCOPE_API_KEY   (paste your key when prompted)
- *   4. npx wrangler deploy
+ * Environment secrets required:
+ *   npx wrangler secret put OPENAI_API_KEY
  *
  * The worker will be available at:
- *   https://alibaba.hanyuriyu.workers.dev
+ *   https://openai.hanyuriyu.workers.dev
  */
 
 export default {
@@ -32,14 +29,14 @@ export default {
     try {
       const body = await request.json();
 
-      const res = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.DASHSCOPE_API_KEY}`,
+          "Authorization": `Bearer ${env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: body.model || "qwen-plus",
+          model: body.model || "gpt-4o-mini",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
