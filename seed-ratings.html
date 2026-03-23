@@ -26,6 +26,118 @@ body{
 }
 h1{ text-align:center; font-size:22px; margin-bottom:8px; }
 .subtitle{ text-align:center; color:#666; margin-bottom:30px; }
+
+/* ── Controls panel ── */
+.controls{
+  max-width:900px;
+  margin:0 auto 24px;
+  padding:20px;
+  background:#f9f9f9;
+  border:1px solid #e0e0e0;
+  border-radius:8px;
+}
+.controls h2{
+  font-size:16px;
+  margin:0 0 12px;
+}
+.control-row{
+  display:flex;
+  gap:12px;
+  align-items:flex-end;
+  margin-bottom:14px;
+  flex-wrap:wrap;
+}
+.control-group{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.control-group label{
+  font-size:12px;
+  font-weight:800;
+  color:#555;
+}
+.control-group textarea{
+  font-family:inherit;
+  font-size:13px;
+  padding:8px;
+  border:1px solid #ccc;
+  border-radius:4px;
+  width:500px;
+  max-width:80vw;
+  resize:vertical;
+}
+.control-group select{
+  font-family:inherit;
+  font-size:13px;
+  padding:8px;
+  border:1px solid #ccc;
+  border-radius:4px;
+  background:#fff;
+}
+.add-btn{
+  font-family:inherit;
+  font-size:13px;
+  font-weight:800;
+  padding:8px 16px;
+  color:#fff;
+  background:var(--cobalt);
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.add-btn:hover{ opacity:0.85; }
+
+/* ── Tag lists ── */
+.tag-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:10px;
+}
+.tag{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:4px 10px;
+  background:#e8e8e8;
+  border-radius:12px;
+  font-size:12px;
+}
+.tag.preset{ background:#d0e0ff; }
+.tag.custom{ background:#d0f0d0; }
+.tag .remove{
+  cursor:pointer;
+  font-weight:800;
+  color:#888;
+  margin-left:2px;
+}
+.tag .remove:hover{ color:#c00; }
+
+/* ── Rater selector ── */
+.rater-section{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid #e0e0e0;
+}
+.rater-options{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:6px;
+}
+.rater-option{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:12px;
+}
+.rater-option input[type="radio"]{
+  margin:0;
+}
+
+/* ── Status & progress ── */
 #status{
   max-width:900px;
   margin:0 auto 20px;
@@ -65,33 +177,52 @@ h1{ text-align:center; font-size:22px; margin-bottom:8px; }
   width:0%;
   transition:width 0.3s;
 }
-.summary{ max-width:900px; margin:20px auto; }
-table{
-  width:100%;
-  border-collapse:collapse;
-  font-size:12px;
-}
-th,td{
-  padding:6px 8px;
-  border:1px solid #ddd;
-  text-align:left;
-}
-th{ background:#f0f0f0; }
 </style>
 </head>
 <body>
 
 <h1>Seed Ratings</h1>
-<p class="subtitle">Translate sentences through all engines and submit Claude AI ratings</p>
+<p class="subtitle">Translate sentences through all engines and submit ratings to Firestore</p>
+
+<!-- ── Controls ── -->
+<div class="controls">
+
+  <!-- Sentences -->
+  <h2>Sentences</h2>
+  <div class="tag-list" id="sentenceTags"></div>
+  <div class="control-row">
+    <div class="control-group">
+      <label>Add a new sentence (max 50 words)</label>
+      <textarea id="newSentence" rows="2" placeholder="Type a sentence to translate..."></textarea>
+    </div>
+    <button class="add-btn" id="addSentenceBtn">+ Add Sentence</button>
+  </div>
+
+  <!-- Language pairs -->
+  <h2>Language Pairs</h2>
+  <div class="tag-list" id="pairTags"></div>
+  <div class="control-row">
+    <div class="control-group">
+      <label>Source language</label>
+      <select id="customSource"></select>
+    </div>
+    <div class="control-group">
+      <label>Target language</label>
+      <select id="customTarget"></select>
+    </div>
+    <button class="add-btn" id="addPairBtn">+ Add Pair</button>
+  </div>
+
+  <!-- Rater engine selector -->
+  <div class="rater-section">
+    <h2>Who rates the translations?</h2>
+    <div class="rater-options" id="raterOptions"></div>
+  </div>
+</div>
 
 <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
 <button id="startBtn">Start Seeding</button>
-<div id="status">Ready. Click "Start Seeding" to begin.
-This will:
-1. Translate 3 sentences × 8 language pairs × 12 engines (288 translations)
-2. Submit 24 rating documents to Firestore with Claude AI's subjective ratings</div>
-
-<div class="summary" id="summary"></div>
+<div id="status">Ready. Configure sentences, language pairs, and rater above, then click "Start Seeding".</div>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -119,24 +250,40 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-// ── Source sentences (each under 50 words) ──
-const SENTENCES = [
+// ── All supported languages ──
+const ALL_LANGUAGES = [
+  "English","Spanish","French","German","Italian","Portuguese",
+  "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
+  "Russian","Ukrainian","Turkish","Arabic","Japanese",
+  "Chinese (Simplified)","Chinese (Traditional)","Korean"
+];
+
+// ── State: sentences ──
+const sentences = [
   "The morning sun cast golden light across the old stone bridge, where two children played with paper boats in the stream below.",
   "Scientists recently discovered a new species of deep-sea fish that produces its own bioluminescent light, allowing it to navigate and hunt in the darkest regions of the ocean floor.",
   "My grandmother always believed that the best recipes are never written down. They live in the hands that stir the pot and the hearts that gather around the table every evening."
 ];
 
-// ── 8 main language pairs ──
-const LANG_PAIRS = [
-  { source: "English", target: "Spanish" },
-  { source: "English", target: "French" },
-  { source: "English", target: "German" },
-  { source: "English", target: "Italian" },
-  { source: "English", target: "Japanese" },
-  { source: "English", target: "Arabic" },
-  { source: "English", target: "Korean" },
-  { source: "English", target: "Chinese (Simplified)" }
+// ── State: language pairs (preset 8 + user-added) ──
+const PRESET_PAIR_KEYS = new Set([
+  "English|Spanish","English|French","English|German","English|Italian",
+  "English|Japanese","English|Arabic","English|Korean","English|Chinese (Simplified)"
+]);
+
+const langPairs = [
+  { source: "English", target: "Spanish",               preset: true },
+  { source: "English", target: "French",                preset: true },
+  { source: "English", target: "German",                preset: true },
+  { source: "English", target: "Italian",               preset: true },
+  { source: "English", target: "Japanese",              preset: true },
+  { source: "English", target: "Arabic",                preset: true },
+  { source: "English", target: "Korean",                preset: true },
+  { source: "English", target: "Chinese (Simplified)",  preset: true }
 ];
+
+// ── State: selected rater ──
+let selectedRater = "claude";   // default
 
 // ── Engine proxies ──
 const CLAUDE_PROXY     = "https://claudetranslate.hanyuriyu.workers.dev";
@@ -152,22 +299,34 @@ const TENCENT_PROXY    = "https://tencent.hanyuriyu.workers.dev";
 const ALIBABA_PROXY    = "https://alibaba.hanyuriyu.workers.dev";
 const MICROSOFT_PROXY  = "https://microsoft.hanyuriyu.workers.dev";
 
-// ── Language code maps ──
+// ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
-  "Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Japanese":"ja","Arabic":"ar","Korean":"ko","Chinese (Simplified)":"zh-CN"
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Arabic":"ar","Japanese":"ja","Chinese (Simplified)":"zh-CN",
+  "Chinese (Traditional)":"zh-TW","Korean":"ko"
 };
 const DEEPL_LANG_MAP = {
-  "Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
-  "Japanese":"JA","Arabic":"AR","Korean":"KO","Chinese (Simplified)":"ZH-HANS"
+  "English":"EN-US","Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
+  "Portuguese":"PT-BR","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
+  "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
+  "Arabic":"AR","Japanese":"JA","Chinese (Simplified)":"ZH-HANS",
+  "Chinese (Traditional)":"ZH-HANT","Korean":"KO"
 };
 const TENCENT_LANG_MAP = {
-  "Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Japanese":"ja","Arabic":"ar","Korean":"ko","Chinese (Simplified)":"zh"
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Arabic":"ar","Japanese":"ja","Chinese (Simplified)":"zh",
+  "Chinese (Traditional)":"zh-TW","Korean":"ko"
 };
 const MICROSOFT_LANG_MAP = {
-  "Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Japanese":"ja","Arabic":"ar","Korean":"ko","Chinese (Simplified)":"zh-Hans"
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese":"pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Arabic":"ar","Japanese":"ja","Chinese (Simplified)":"zh-Hans",
+  "Chinese (Traditional)":"zh-Hant","Korean":"ko"
 };
 
 // ── Translation functions ──
@@ -209,6 +368,7 @@ async function translateWithOpenAI(text, targetLang) {
 
 async function translateWithDeepL(text, targetLang) {
   const langCode = DEEPL_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`DeepL does not support ${targetLang}.`);
   const res = await fetch(DEEPL_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -221,6 +381,7 @@ async function translateWithDeepL(text, targetLang) {
 
 async function translateWithGoogle(text, targetLang) {
   const langCode = GOOGLE_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Google does not support ${targetLang}.`);
   const res = await fetch(
     `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
     {
@@ -248,7 +409,7 @@ async function translateWithPerplexity(text, targetLang) {
   });
   if (!res.ok) throw new Error(`Perplexity ${res.status}`);
   const data = await res.json();
-  return data.choices[0].message.content.trim();
+  return data.choices[0].message.content.trim().replace(/!\[.*?\]\(.*?\)/g, "").replace(/\[\d+\]/g, "").trim();
 }
 
 async function translateWithMistral(text, targetLang) {
@@ -315,6 +476,7 @@ async function translateWithGrok(text, targetLang) {
 
 async function translateWithTencent(text, targetLang) {
   const langCode = TENCENT_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Tencent does not support ${targetLang}.`);
   const res = await fetch(TENCENT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -344,6 +506,7 @@ async function translateWithAlibaba(text, targetLang) {
 
 async function translateWithMicrosoft(text, targetLang) {
   const langCode = MICROSOFT_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Microsoft does not support ${targetLang}.`);
   const res = await fetch(MICROSOFT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -370,51 +533,197 @@ const ENGINE_LIST = [
   { id: "microsoft",  name: "Microsoft Translate",  translate: translateWithMicrosoft }
 ];
 
-// ── Claude AI subjective ratings ──
-// Ratings per engine per target language (out of 5, in 0.5 increments)
-// Based on Claude AI's assessment of general translation quality
-const CLAUDE_RATINGS = {
-  // EN → Spanish
-  "Spanish": {
-    claude: 4.5, openai: 4.5, deepl: 5.0, google: 4.0, perplexity: 4.0,
-    mistral: 4.0, gemini: 4.0, deepseek: 3.5, grok: 3.5, tencent: 3.5, alibaba: 3.5, microsoft: 4.0
-  },
-  // EN → French
-  "French": {
-    claude: 4.5, openai: 4.5, deepl: 5.0, google: 4.0, perplexity: 4.0,
-    mistral: 4.5, gemini: 4.0, deepseek: 3.5, grok: 3.5, tencent: 3.5, alibaba: 3.5, microsoft: 4.0
-  },
-  // EN → German
-  "German": {
-    claude: 4.5, openai: 4.5, deepl: 5.0, google: 4.0, perplexity: 4.0,
-    mistral: 4.0, gemini: 4.0, deepseek: 3.5, grok: 3.5, tencent: 3.0, alibaba: 3.0, microsoft: 4.0
-  },
-  // EN → Italian
-  "Italian": {
-    claude: 4.5, openai: 4.0, deepl: 5.0, google: 4.0, perplexity: 3.5,
-    mistral: 4.0, gemini: 4.0, deepseek: 3.5, grok: 3.5, tencent: 3.0, alibaba: 3.0, microsoft: 4.0
-  },
-  // EN → Japanese
-  "Japanese": {
-    claude: 4.5, openai: 4.5, deepl: 4.0, google: 4.0, perplexity: 3.5,
-    mistral: 3.0, gemini: 4.0, deepseek: 4.0, grok: 3.5, tencent: 4.0, alibaba: 3.5, microsoft: 3.5
-  },
-  // EN → Arabic
-  "Arabic": {
-    claude: 4.0, openai: 4.0, deepl: 3.5, google: 4.5, perplexity: 3.5,
-    mistral: 3.0, gemini: 3.5, deepseek: 3.0, grok: 3.0, tencent: 3.0, alibaba: 3.0, microsoft: 4.0
-  },
-  // EN → Korean
-  "Korean": {
-    claude: 4.5, openai: 4.0, deepl: 4.0, google: 4.0, perplexity: 3.5,
-    mistral: 3.0, gemini: 4.0, deepseek: 3.5, grok: 3.0, tencent: 3.5, alibaba: 3.5, microsoft: 3.5
-  },
-  // EN → Chinese (Simplified)
-  "Chinese (Simplified)": {
-    claude: 4.5, openai: 4.5, deepl: 4.0, google: 4.0, perplexity: 3.5,
-    mistral: 3.0, gemini: 4.0, deepseek: 4.5, grok: 3.5, tencent: 4.5, alibaba: 4.0, microsoft: 4.0
+// ── Rating function: ask the selected rater engine to score a translation ──
+async function rateTranslation(sourceText, targetLang, translatedText, raterEngine) {
+  const ratePrompt =
+    `You are a translation quality evaluator. Rate the following translation from English to ${targetLang} on a scale of 1 to 5 (in 0.5 increments: 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, or 5).\n\n` +
+    `Source (English): ${sourceText}\n\n` +
+    `Translation (${targetLang}): ${translatedText}\n\n` +
+    `Consider accuracy, fluency, and naturalness. Output ONLY the numeric score, nothing else.`;
+
+  const engine = ENGINE_LIST.find(e => e.id === raterEngine);
+  if (!engine) throw new Error(`Rater engine "${raterEngine}" not found`);
+
+  // For API-based engines (not DeepL/Google/Tencent/Microsoft which are non-LLM),
+  // we send a rating prompt. For non-LLM engines, fall back to Claude.
+  const NON_LLM = ["deepl", "google", "tencent", "microsoft"];
+  const actualRater = NON_LLM.includes(raterEngine) ? "claude" : raterEngine;
+
+  let rawScore;
+
+  if (actualRater === "claude") {
+    const res = await fetch(CLAUDE_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 16,
+        system: "You are a translation quality evaluator. Output ONLY a numeric score.",
+        messages: [{ role: "user", content: ratePrompt }]
+      })
+    });
+    if (!res.ok) throw new Error(`Rating (Claude) ${res.status}`);
+    const data = await res.json();
+    rawScore = data.content[0].text.trim();
+  } else if (actualRater === "openai") {
+    const res = await fetch(OPENAI_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a translation quality evaluator. Output ONLY a numeric score." },
+          { role: "user", content: ratePrompt }
+        ]
+      })
+    });
+    if (!res.ok) throw new Error(`Rating (OpenAI) ${res.status}`);
+    const data = await res.json();
+    rawScore = data.choices[0].message.content.trim();
+  } else if (actualRater === "gemini") {
+    const res = await fetch(GEMINI_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: ratePrompt, targetLang: "English", model: "gemini-2.5-flash" })
+    });
+    if (!res.ok) throw new Error(`Rating (Gemini) ${res.status}`);
+    const data = await res.json();
+    rawScore = data.translated.trim();
+  } else {
+    // Generic OpenAI-compatible proxy (Mistral, DeepSeek, Grok, Perplexity, Alibaba)
+    const proxyMap = {
+      mistral:    { proxy: MISTRAL_PROXY,    model: "mistral-small-latest" },
+      deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
+      grok:       { proxy: GROK_PROXY,       model: "grok-3" },
+      perplexity: { proxy: PERPLEXITY_PROXY, model: "sonar" },
+      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-plus" }
+    };
+    const cfg = proxyMap[actualRater];
+    if (!cfg) throw new Error(`No proxy config for rater "${actualRater}"`);
+
+    const res = await fetch(cfg.proxy, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: "system", content: "You are a translation quality evaluator. Output ONLY a numeric score." },
+          { role: "user", content: ratePrompt }
+        ]
+      })
+    });
+    if (!res.ok) throw new Error(`Rating (${actualRater}) ${res.status}`);
+    const data = await res.json();
+    rawScore = data.choices[0].message.content.trim();
   }
-};
+
+  // Parse score: extract the first number
+  const match = rawScore.match(/(\d+\.?\d*)/);
+  if (!match) throw new Error(`Could not parse score from: "${rawScore}"`);
+  let score = parseFloat(match[1]);
+
+  // Clamp to 0.5–5.0 and snap to nearest 0.5
+  score = Math.max(0.5, Math.min(5.0, score));
+  score = Math.round(score * 2) / 2;
+  return score;
+}
+
+// ── UI: Render sentence tags ──
+function renderSentenceTags() {
+  const container = document.getElementById("sentenceTags");
+  container.innerHTML = "";
+  sentences.forEach((s, i) => {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.innerHTML = `<span>${s.substring(0, 60)}${s.length > 60 ? "..." : ""}</span><span class="remove" data-idx="${i}">&times;</span>`;
+    container.appendChild(tag);
+  });
+  container.querySelectorAll(".remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      sentences.splice(parseInt(btn.dataset.idx), 1);
+      renderSentenceTags();
+    });
+  });
+}
+
+// ── UI: Render language pair tags ──
+function renderPairTags() {
+  const container = document.getElementById("pairTags");
+  container.innerHTML = "";
+  langPairs.forEach((p, i) => {
+    const tag = document.createElement("span");
+    tag.className = "tag " + (p.preset ? "preset" : "custom");
+    const label = `${p.source} → ${p.target}`;
+    tag.innerHTML = `<span>${label}</span><span class="remove" data-idx="${i}">&times;</span>`;
+    container.appendChild(tag);
+  });
+  container.querySelectorAll(".remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      langPairs.splice(parseInt(btn.dataset.idx), 1);
+      renderPairTags();
+    });
+  });
+}
+
+// ── UI: Populate language dropdowns ──
+function populateDropdowns() {
+  const srcSel = document.getElementById("customSource");
+  const tgtSel = document.getElementById("customTarget");
+  ALL_LANGUAGES.forEach(lang => {
+    srcSel.add(new Option(lang, lang));
+    tgtSel.add(new Option(lang, lang));
+  });
+  srcSel.value = "English";
+  tgtSel.value = "Portuguese";
+}
+
+// ── UI: Build rater radio buttons ──
+function buildRaterOptions() {
+  const container = document.getElementById("raterOptions");
+  ENGINE_LIST.forEach(engine => {
+    const id = `rater-${engine.id}`;
+    const label = document.createElement("label");
+    label.className = "rater-option";
+    label.innerHTML =
+      `<input type="radio" name="rater" value="${engine.id}" ${engine.id === "claude" ? "checked" : ""}> ${engine.name}`;
+    container.appendChild(label);
+  });
+  container.addEventListener("change", (e) => {
+    if (e.target.name === "rater") selectedRater = e.target.value;
+  });
+}
+
+// ── UI: Add sentence button ──
+document.getElementById("addSentenceBtn").addEventListener("click", () => {
+  const textarea = document.getElementById("newSentence");
+  const text = textarea.value.trim();
+  if (!text) return;
+  const wordCount = text.split(/\s+/).length;
+  if (wordCount > 50) {
+    alert("Sentence must be 50 words or fewer. Currently: " + wordCount + " words.");
+    return;
+  }
+  sentences.push(text);
+  textarea.value = "";
+  renderSentenceTags();
+});
+
+// ── UI: Add pair button ──
+document.getElementById("addPairBtn").addEventListener("click", () => {
+  const src = document.getElementById("customSource").value;
+  const tgt = document.getElementById("customTarget").value;
+  if (src === tgt) {
+    alert("Source and target must be different.");
+    return;
+  }
+  const key = src + "|" + tgt;
+  if (langPairs.some(p => p.source + "|" + p.target === key)) {
+    alert("This pair already exists.");
+    return;
+  }
+  langPairs.push({ source: src, target: tgt, preset: false });
+  renderPairTags();
+});
 
 // ── Status logging ──
 const statusEl = document.getElementById("status");
@@ -425,49 +734,56 @@ function log(msg) {
 
 // ── Main seeding function ──
 document.getElementById("startBtn").addEventListener("click", async () => {
+  if (sentences.length === 0) { alert("Add at least one sentence."); return; }
+  if (langPairs.length === 0) { alert("Add at least one language pair."); return; }
+
   const btn = document.getElementById("startBtn");
   btn.disabled = true;
-  statusEl.textContent = "Starting seed process...";
 
-  const totalTasks = SENTENCES.length * LANG_PAIRS.length;
+  const raterName = ENGINE_LIST.find(e => e.id === selectedRater)?.name || selectedRater;
+  statusEl.textContent = `Starting seed process...\nRater: ${raterName}\nSentences: ${sentences.length}\nLanguage pairs: ${langPairs.length}\nEngines: ${ENGINE_LIST.length}\nTotal translations: ${sentences.length * langPairs.length * ENGINE_LIST.length}`;
+
+  const totalTasks = sentences.length * langPairs.length;
   let completed = 0;
   let docsWritten = 0;
   let errors = 0;
 
-  for (const sentence of SENTENCES) {
-    const shortText = sentence.substring(0, 60) + "...";
+  for (const sentence of sentences) {
+    const shortText = sentence.substring(0, 60) + (sentence.length > 60 ? "..." : "");
 
-    for (const pair of LANG_PAIRS) {
-      log(`\n── Translating: "${shortText}" → ${pair.target} ──`);
+    for (const pair of langPairs) {
+      log(`\n── "${shortText}" → ${pair.target} ──`);
 
       const translations = {};
       const ratings = {};
 
-      // Translate with all engines in parallel (batched to avoid overwhelming)
-      const results = await Promise.allSettled(
+      // Step 1: Translate with all engines in parallel
+      await Promise.allSettled(
         ENGINE_LIST.map(async (engine) => {
           try {
             const translated = await engine.translate(sentence, pair.target);
             translations[engine.id] = translated;
-            log(`  ✓ ${engine.name}: ${translated.substring(0, 80)}...`);
+            log(`  ✓ ${engine.name}: ${translated.substring(0, 80)}${translated.length > 80 ? "..." : ""}`);
           } catch (err) {
             log(`  ✗ ${engine.name}: ${err.message}`);
           }
         })
       );
 
-      // Apply Claude AI ratings for this language pair
-      const langRatings = CLAUDE_RATINGS[pair.target];
-      if (langRatings) {
-        for (const engine of ENGINE_LIST) {
-          // Only rate engines that successfully translated
-          if (translations[engine.id] && langRatings[engine.id]) {
-            ratings[engine.id] = langRatings[engine.id];
-          }
+      // Step 2: Rate each successful translation using the selected rater
+      log(`  ── Rating with ${raterName} ──`);
+      for (const engine of ENGINE_LIST) {
+        if (!translations[engine.id]) continue;
+        try {
+          const score = await rateTranslation(sentence, pair.target, translations[engine.id], selectedRater);
+          ratings[engine.id] = score;
+          log(`  ★ ${engine.name}: ${score.toFixed(1)}`);
+        } catch (err) {
+          log(`  ✗ Rating ${engine.name}: ${err.message}`);
         }
       }
 
-      // Submit to Firestore
+      // Step 3: Submit to Firestore
       if (Object.keys(ratings).length > 0) {
         try {
           const sessionId = crypto.randomUUID
@@ -485,10 +801,10 @@ document.getElementById("startBtn").addEventListener("click", async () => {
           });
 
           docsWritten++;
-          log(`  → Saved to Firestore (${Object.keys(ratings).length} engine ratings)`);
+          log(`  → Saved (${Object.keys(ratings).length} ratings)`);
         } catch (err) {
           errors++;
-          log(`  ✗ Firestore write failed: ${err.message}`);
+          log(`  ✗ Firestore: ${err.message}`);
         }
       }
 
@@ -496,18 +812,24 @@ document.getElementById("startBtn").addEventListener("click", async () => {
       document.getElementById("progressBar").style.width =
         ((completed / totalTasks) * 100) + "%";
 
-      // Small delay between language pairs to avoid rate limits
-      await new Promise(r => setTimeout(r, 1000));
+      // Small delay between pairs to avoid rate limits
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 
   log(`\n══════════════════════════════════════`);
-  log(`Done! ${docsWritten} rating documents written, ${errors} errors.`);
+  log(`Done! ${docsWritten} documents written, ${errors} errors.`);
   log(`══════════════════════════════════════`);
 
   btn.disabled = false;
   btn.textContent = "Done!";
 });
+
+// ── Init UI ──
+populateDropdowns();
+renderSentenceTags();
+renderPairTags();
+buildRaterOptions();
 </script>
 </body>
 </html>
