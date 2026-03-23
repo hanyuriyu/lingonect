@@ -23,8 +23,36 @@ body{
   color:var(--text);
   font-family:"Special Elite","Courier New",monospace;
   font-size:14px;
+  visibility:hidden;
 }
-h1{ text-align:center; font-size:22px; margin-bottom:8px; }
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); }
+
+h1{ text-align:center; font-size:22px; margin-bottom:8px; margin-top:60px; }
 .subtitle{ text-align:center; color:#666; margin-bottom:30px; }
 
 /* ── Controls panel ── */
@@ -181,6 +209,13 @@ h1{ text-align:center; font-size:22px; margin-bottom:8px; }
 </head>
 <body>
 
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html">Ratings</a>
+  <a href="seed-ratings.html" class="active">Seed Ratings</a>
+</nav>
+
 <h1>Seed Ratings</h1>
 <p class="subtitle">Translate sentences through all engines and submit ratings to Firestore</p>
 
@@ -244,10 +279,18 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
+const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+
 auth.onAuthStateChanged(user => {
   if (!user || !user.emailVerified) {
     window.location.href = "login.html";
+    return;
   }
+  if (user.email !== ADMIN_EMAIL) {
+    window.location.href = "engines.html";
+    return;
+  }
+  document.body.style.visibility = "visible";
 });
 
 // ── All supported languages ──
