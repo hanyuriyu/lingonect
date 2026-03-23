@@ -298,8 +298,12 @@ auth.onAuthStateChanged(user => {
 const ALL_LANGUAGES = [
   "English","Spanish","French","German","Italian","Portuguese",
   "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
-  "Russian","Ukrainian","Turkish","Arabic","Japanese",
-  "Chinese (Simplified)","Chinese (Traditional)","Korean"
+  "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
+  "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
+  "Latvian","Estonian","Slovenian","Catalan","Icelandic",
+  "Arabic","Hebrew","Persian (Farsi)","Hindi","Urdu","Bengali",
+  "Japanese","Chinese (Simplified)","Chinese (Traditional)","Korean",
+  "Thai","Vietnamese","Indonesian","Malay","Tagalog (Filipino)"
 ];
 
 // ── State: sentences ──
@@ -348,29 +352,45 @@ const GOOGLE_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
   "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
-  "Arabic":"ar","Japanese":"ja","Chinese (Simplified)":"zh-CN",
-  "Chinese (Traditional)":"zh-TW","Korean":"ko"
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 const DEEPL_LANG_MAP = {
   "English":"EN-US","Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
   "Portuguese":"PT-BR","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
   "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
-  "Arabic":"AR","Japanese":"JA","Chinese (Simplified)":"ZH-HANS",
-  "Chinese (Traditional)":"ZH-HANT","Korean":"KO"
+  "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
+  "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
+  "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS",
+  "Arabic":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
+  "Japanese":"JA","Chinese (Simplified)":"ZH-HANS","Chinese (Traditional)":"ZH-HANT","Korean":"KO",
+  "Thai":"TH","Vietnamese":"VI","Indonesian":"ID","Malay":"MS","Tagalog (Filipino)":"TL"
 };
 const TENCENT_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
   "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
-  "Arabic":"ar","Japanese":"ja","Chinese (Simplified)":"zh",
-  "Chinese (Traditional)":"zh-TW","Korean":"ko"
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 const MICROSOFT_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
   "Portuguese":"pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
-  "Arabic":"ar","Japanese":"ja","Chinese (Simplified)":"zh-Hans",
-  "Chinese (Traditional)":"zh-Hant","Korean":"ko"
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh-Hans","Chinese (Traditional)":"zh-Hant","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"fil"
 };
 
 // ── Translation functions ──
