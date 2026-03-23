@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lingonect — Profile</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:130px;
+}
+
+html{ height:100%; }
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Special Elite","Courier New",monospace;
+  visibility:hidden;
+  overflow-y:auto;
+}
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); }
+
+/* ── LOGO RAIL ── */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - 520px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  z-index:1;
+}
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#000;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  transition:color .2s;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* ── PAGE WRAP ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:120px 0 100px;
+  box-sizing:border-box;
+}
+
+.stage{
+  width:600px;
+  max-width:96vw;
+  margin:0 auto;
+  position:relative;
+  z-index:2;
+}
+
+.page-title{
+  font-size:22px;
+  font-weight:800;
+  text-align:center;
+  margin:0 0 8px;
+}
+.page-sub{
+  font-size:15px;
+  text-align:center;
+  color:#666;
+  margin:0 0 32px;
+}
+
+/* ── FORM STYLES ── */
+.field-group{
+  margin-bottom:24px;
+}
+.field-group label{
+  display:block;
+  font-size:12px;
+  font-weight:800;
+  color:#555;
+  text-transform:uppercase;
+  letter-spacing:.3px;
+  margin-bottom:6px;
+}
+.field-group input[type="text"]{
+  font-family:inherit;
+  font-size:14px;
+  padding:10px 12px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  width:100%;
+  box-sizing:border-box;
+}
+.field-group input[type="text"]:focus{
+  outline:none;
+  border-color:var(--cobalt);
+}
+.username-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.username-row input{ flex:1; }
+.username-status{
+  font-size:12px;
+  margin-top:4px;
+  min-height:18px;
+}
+.username-status.ok{ color:green; }
+.username-status.taken{ color:#c00; }
+
+/* ── CERTIFICATION ── */
+.cert-badge{
+  display:inline-block;
+  padding:6px 16px;
+  border-radius:20px;
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:.3px;
+}
+.cert-badge.certified{
+  background:#d0f0d0;
+  color:#1a7a1a;
+}
+.cert-badge.uncertified{
+  background:#f0e0d0;
+  color:#8a6530;
+}
+.cert-admin-select{
+  font-family:inherit;
+  font-size:13px;
+  padding:8px 12px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  background:#fff;
+  cursor:pointer;
+}
+
+/* ── LANGUAGE SECTIONS ── */
+.lang-section{
+  margin-bottom:24px;
+}
+.lang-section h3{
+  font-size:14px;
+  margin:0 0 10px;
+}
+.lang-entries{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.lang-entry{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.lang-entry select{
+  font-family:inherit;
+  font-size:13px;
+  padding:8px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  background:#fff;
+  cursor:pointer;
+}
+.lang-entry select.lang-name{ flex:1; }
+.lang-entry select.lang-level{ width:200px; }
+.remove-lang{
+  background:none;
+  border:none;
+  font-size:18px;
+  color:#999;
+  cursor:pointer;
+  padding:0 4px;
+  line-height:1;
+}
+.remove-lang:hover{ color:#c00; }
+.add-lang-btn{
+  font-family:inherit;
+  font-size:12px;
+  font-weight:800;
+  color:var(--cobalt);
+  background:none;
+  border:1px dashed var(--cobalt);
+  border-radius:6px;
+  padding:8px 16px;
+  cursor:pointer;
+  margin-top:8px;
+}
+.add-lang-btn:hover{ background:#f0f4ff; }
+
+/* ── SAVE BUTTON ── */
+.save-btn{
+  display:block;
+  width:100%;
+  font-family:inherit;
+  font-size:16px;
+  font-weight:800;
+  color:#fff;
+  background:var(--cobalt);
+  border:none;
+  border-radius:6px;
+  padding:14px 0;
+  cursor:pointer;
+  margin-top:32px;
+  transition:opacity .2s;
+}
+.save-btn:hover{ opacity:0.85; }
+.save-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+.save-msg{
+  text-align:center;
+  font-size:13px;
+  margin-top:10px;
+  min-height:20px;
+}
+.save-msg.ok{ color:green; }
+.save-msg.err{ color:#c00; }
+
+/* ── MOBILE ── */
+@media (max-width:820px){
+  .logo-rail{
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
+    width:auto;
+    justify-content:center;
+    padding:32px 0 4px;
+    margin-bottom:10px;
+  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
+  .page-wrap{
+    padding:60px 0 100px;
+  }
+  .stage{ padding:0 16px; box-sizing:border-box; }
+  .page-title{ font-size:16px; }
+  .lang-entry{ flex-wrap:wrap; }
+  .lang-entry select.lang-level{ width:100%; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html">Ratings</a>
+  <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
+  <a href="profile.html" class="active">Profile</a>
+</nav>
+
+<!-- LOGO RAIL -->
+<div class="logo-rail">
+  <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
+
+<div class="page-wrap">
+  <main class="stage">
+    <p class="page-title">User Profile</p>
+    <p class="page-sub">Set your username and language information</p>
+
+    <!-- USERNAME -->
+    <div class="field-group">
+      <label>Username</label>
+      <div class="username-row">
+        <input type="text" id="usernameInput" placeholder="Choose a unique username" maxlength="30" autocomplete="off" />
+      </div>
+      <div class="username-status" id="usernameStatus"></div>
+    </div>
+
+    <!-- CERTIFICATION -->
+    <div class="field-group">
+      <label>Certification</label>
+      <div id="certContainer"></div>
+    </div>
+
+    <!-- MOTHER TONGUES -->
+    <div class="lang-section">
+      <h3>Mother Tongue(s)</h3>
+      <div class="lang-entries" id="motherTongues"></div>
+      <button class="add-lang-btn" id="addMotherBtn" type="button">+ Add Mother Tongue</button>
+    </div>
+
+    <!-- FOREIGN LANGUAGES -->
+    <div class="lang-section">
+      <h3>Foreign Languages</h3>
+      <div class="lang-entries" id="foreignLangs"></div>
+      <button class="add-lang-btn" id="addForeignBtn" type="button">+ Add Foreign Language</button>
+    </div>
+
+    <button class="save-btn" id="saveBtn" type="button">Save Profile</button>
+    <div class="save-msg" id="saveMsg"></div>
+  </main>
+</div>
+
+<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+// ── Firebase ──
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+
+const ALL_LANGUAGES = [
+  "English","Spanish","French","German","Italian","Portuguese",
+  "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
+  "Russian","Ukrainian","Turkish","Arabic","Japanese",
+  "Chinese (Simplified)","Chinese (Traditional)","Korean"
+];
+
+const LEVELS = [
+  "A1","A2","B1","B2","C1","C2",
+  "Elementary Fluency","Conversational Fluency","Work Fluency"
+];
+
+let currentUser = null;
+let isAdmin = false;
+let savedUsername = "";        // the username already saved in Firestore
+let viewingUid = null;         // whose profile we're editing (own by default)
+
+// ── Auth ──
+auth.onAuthStateChanged(async user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  currentUser = user;
+  isAdmin = (user.email === ADMIN_EMAIL);
+
+  if (isAdmin) {
+    document.getElementById("seedNavLink").style.display = "";
+  }
+
+  viewingUid = user.uid;
+
+  // Check URL for ?uid= param (admin viewing another user)
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("uid") && isAdmin) {
+    viewingUid = params.get("uid");
+  }
+
+  await loadProfile();
+  document.body.style.visibility = "visible";
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+// ── Username validation (debounced) ──
+let usernameTimer = null;
+const usernameInput = document.getElementById("usernameInput");
+const usernameStatus = document.getElementById("usernameStatus");
+
+usernameInput.addEventListener("input", () => {
+  clearTimeout(usernameTimer);
+  const val = usernameInput.value.trim();
+  if (!val) {
+    usernameStatus.textContent = "";
+    return;
+  }
+  if (val.length < 3) {
+    usernameStatus.textContent = "Username must be at least 3 characters";
+    usernameStatus.className = "username-status taken";
+    return;
+  }
+  if (!/^[a-zA-Z0-9_.-]+$/.test(val)) {
+    usernameStatus.textContent = "Only letters, numbers, underscores, dots, hyphens";
+    usernameStatus.className = "username-status taken";
+    return;
+  }
+  usernameStatus.textContent = "Checking…";
+  usernameStatus.className = "username-status";
+  usernameTimer = setTimeout(() => checkUsername(val), 400);
+});
+
+async function checkUsername(name) {
+  const lower = name.toLowerCase();
+  // If it's the same as the already-saved username, it's fine
+  if (lower === savedUsername.toLowerCase()) {
+    usernameStatus.textContent = "✓ Your current username";
+    usernameStatus.className = "username-status ok";
+    return;
+  }
+  const snap = await db.collection("usernames").doc(lower).get();
+  if (snap.exists && snap.data().uid !== viewingUid) {
+    usernameStatus.textContent = "✗ Username already taken";
+    usernameStatus.className = "username-status taken";
+  } else {
+    usernameStatus.textContent = "✓ Available";
+    usernameStatus.className = "username-status ok";
+  }
+}
+
+// ── Certification ──
+function renderCert(certValue) {
+  const container = document.getElementById("certContainer");
+  container.innerHTML = "";
+
+  if (isAdmin && viewingUid !== currentUser.uid) {
+    // Admin viewing another user — show dropdown
+    const sel = document.createElement("select");
+    sel.className = "cert-admin-select";
+    sel.id = "certSelect";
+    ["Uncertified", "Lingonect Certified"].forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      if (opt === certValue) o.selected = true;
+      sel.appendChild(o);
+    });
+    container.appendChild(sel);
+  } else if (isAdmin) {
+    // Admin viewing own profile — show dropdown
+    const sel = document.createElement("select");
+    sel.className = "cert-admin-select";
+    sel.id = "certSelect";
+    ["Uncertified", "Lingonect Certified"].forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      if (opt === certValue) o.selected = true;
+      sel.appendChild(o);
+    });
+    container.appendChild(sel);
+  } else {
+    // Normal user — read-only badge
+    const badge = document.createElement("span");
+    badge.className = "cert-badge " + (certValue === "Lingonect Certified" ? "certified" : "uncertified");
+    badge.textContent = certValue;
+    container.appendChild(badge);
+  }
+}
+
+// ── Language entry helpers ──
+function createLangEntry(containerId, lang, level) {
+  const container = document.getElementById(containerId);
+  const row = document.createElement("div");
+  row.className = "lang-entry";
+
+  const langSel = document.createElement("select");
+  langSel.className = "lang-name";
+  const emptyOpt = document.createElement("option");
+  emptyOpt.value = "";
+  emptyOpt.textContent = "Select language";
+  langSel.appendChild(emptyOpt);
+  ALL_LANGUAGES.forEach(l => {
+    const o = document.createElement("option");
+    o.value = l;
+    o.textContent = l;
+    if (l === lang) o.selected = true;
+    langSel.appendChild(o);
+  });
+
+  const levelSel = document.createElement("select");
+  levelSel.className = "lang-level";
+  const emptyLvl = document.createElement("option");
+  emptyLvl.value = "";
+  emptyLvl.textContent = "Select level";
+  levelSel.appendChild(emptyLvl);
+  LEVELS.forEach(lv => {
+    const o = document.createElement("option");
+    o.value = lv;
+    o.textContent = lv;
+    if (lv === level) o.selected = true;
+    levelSel.appendChild(o);
+  });
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "remove-lang";
+  removeBtn.type = "button";
+  removeBtn.innerHTML = "&times;";
+  removeBtn.addEventListener("click", () => row.remove());
+
+  row.appendChild(langSel);
+  row.appendChild(levelSel);
+  row.appendChild(removeBtn);
+  container.appendChild(row);
+}
+
+document.getElementById("addMotherBtn").addEventListener("click", () => {
+  createLangEntry("motherTongues", "", "");
+});
+
+document.getElementById("addForeignBtn").addEventListener("click", () => {
+  createLangEntry("foreignLangs", "", "");
+});
+
+// ── Load profile from Firestore ──
+async function loadProfile() {
+  const doc = await db.collection("profiles").doc(viewingUid).get();
+  if (doc.exists) {
+    const data = doc.data();
+
+    // Username
+    if (data.username) {
+      usernameInput.value = data.username;
+      savedUsername = data.username;
+    }
+
+    // Certification
+    renderCert(data.certification || "Uncertified");
+
+    // Mother tongues
+    if (data.motherTongues && data.motherTongues.length > 0) {
+      data.motherTongues.forEach(mt => {
+        createLangEntry("motherTongues", mt.language, mt.level);
+      });
+    } else {
+      createLangEntry("motherTongues", "", "");
+    }
+
+    // Foreign languages
+    if (data.foreignLanguages && data.foreignLanguages.length > 0) {
+      data.foreignLanguages.forEach(fl => {
+        createLangEntry("foreignLangs", fl.language, fl.level);
+      });
+    } else {
+      createLangEntry("foreignLangs", "", "");
+    }
+  } else {
+    // New profile — show defaults
+    renderCert("Uncertified");
+    createLangEntry("motherTongues", "", "");
+    createLangEntry("foreignLangs", "", "");
+  }
+}
+
+// ── Gather language entries from DOM ──
+function gatherLangs(containerId) {
+  const entries = [];
+  document.getElementById(containerId).querySelectorAll(".lang-entry").forEach(row => {
+    const lang = row.querySelector(".lang-name").value;
+    const level = row.querySelector(".lang-level").value;
+    if (lang) {
+      entries.push({ language: lang, level: level || "" });
+    }
+  });
+  return entries;
+}
+
+// ── Save profile ──
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  const saveMsg = document.getElementById("saveMsg");
+  const saveBtn = document.getElementById("saveBtn");
+  saveMsg.textContent = "";
+
+  const username = usernameInput.value.trim();
+
+  // Validate username
+  if (!username || username.length < 3) {
+    saveMsg.textContent = "Username must be at least 3 characters.";
+    saveMsg.className = "save-msg err";
+    return;
+  }
+  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+    saveMsg.textContent = "Username contains invalid characters.";
+    saveMsg.className = "save-msg err";
+    return;
+  }
+
+  // Check username uniqueness
+  const lower = username.toLowerCase();
+  if (lower !== savedUsername.toLowerCase()) {
+    const snap = await db.collection("usernames").doc(lower).get();
+    if (snap.exists && snap.data().uid !== viewingUid) {
+      saveMsg.textContent = "Username is already taken.";
+      saveMsg.className = "save-msg err";
+      return;
+    }
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+
+  try {
+    const motherTongues = gatherLangs("motherTongues");
+    const foreignLanguages = gatherLangs("foreignLangs");
+
+    // Determine certification value
+    let certification = "Uncertified";
+    const certSelect = document.getElementById("certSelect");
+    if (certSelect && isAdmin) {
+      certification = certSelect.value;
+    } else {
+      // Preserve existing certification for non-admin users
+      const existing = await db.collection("profiles").doc(viewingUid).get();
+      if (existing.exists && existing.data().certification) {
+        certification = existing.data().certification;
+      }
+    }
+
+    const profileData = {
+      username,
+      certification,
+      motherTongues,
+      foreignLanguages,
+      email: viewingUid === currentUser.uid ? currentUser.email : undefined,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Clean undefined fields
+    Object.keys(profileData).forEach(k => {
+      if (profileData[k] === undefined) delete profileData[k];
+    });
+
+    const batch = db.batch();
+
+    // Save profile
+    batch.set(db.collection("profiles").doc(viewingUid), profileData, { merge: true });
+
+    // Update username index — delete old entry if username changed
+    if (savedUsername && savedUsername.toLowerCase() !== lower) {
+      batch.delete(db.collection("usernames").doc(savedUsername.toLowerCase()));
+    }
+    batch.set(db.collection("usernames").doc(lower), { uid: viewingUid });
+
+    await batch.commit();
+
+    savedUsername = username;
+    saveMsg.textContent = "Profile saved!";
+    saveMsg.className = "save-msg ok";
+  } catch (err) {
+    saveMsg.textContent = "Error saving: " + err.message;
+    saveMsg.className = "save-msg err";
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save Profile";
+  }
+});
+</script>
+</body>
+</html>
