@@ -547,11 +547,35 @@ body{
             <button class="lang-option" data-lang="Russian">Russian</button>
             <button class="lang-option" data-lang="Ukrainian">Ukrainian</button>
             <button class="lang-option" data-lang="Turkish">Turkish</button>
+            <button class="lang-option" data-lang="Greek">Greek</button>
+            <button class="lang-option" data-lang="Romanian">Romanian</button>
+            <button class="lang-option" data-lang="Hungarian">Hungarian</button>
+            <button class="lang-option" data-lang="Czech">Czech</button>
+            <button class="lang-option" data-lang="Slovak">Slovak</button>
+            <button class="lang-option" data-lang="Bulgarian">Bulgarian</button>
+            <button class="lang-option" data-lang="Croatian">Croatian</button>
+            <button class="lang-option" data-lang="Serbian">Serbian</button>
+            <button class="lang-option" data-lang="Lithuanian">Lithuanian</button>
+            <button class="lang-option" data-lang="Latvian">Latvian</button>
+            <button class="lang-option" data-lang="Estonian">Estonian</button>
+            <button class="lang-option" data-lang="Slovenian">Slovenian</button>
+            <button class="lang-option" data-lang="Catalan">Catalan</button>
+            <button class="lang-option" data-lang="Icelandic">Icelandic</button>
             <button class="lang-option" data-lang="Arabic">Arabic</button>
+            <button class="lang-option" data-lang="Hebrew">Hebrew</button>
+            <button class="lang-option" data-lang="Persian (Farsi)">Persian (Farsi)</button>
+            <button class="lang-option" data-lang="Hindi">Hindi</button>
+            <button class="lang-option" data-lang="Urdu">Urdu</button>
+            <button class="lang-option" data-lang="Bengali">Bengali</button>
             <button class="lang-option" data-lang="Japanese">Japanese</button>
             <button class="lang-option" data-lang="Chinese (Simplified)">Chinese (Simplified)</button>
             <button class="lang-option" data-lang="Chinese (Traditional)">Chinese (Traditional)</button>
             <button class="lang-option" data-lang="Korean">Korean</button>
+            <button class="lang-option" data-lang="Thai">Thai</button>
+            <button class="lang-option" data-lang="Vietnamese">Vietnamese</button>
+            <button class="lang-option" data-lang="Indonesian">Indonesian</button>
+            <button class="lang-option" data-lang="Malay">Malay</button>
+            <button class="lang-option" data-lang="Tagalog (Filipino)">Tagalog (Filipino)</button>
           </div>
         </div>
 
@@ -577,11 +601,35 @@ body{
             <button class="lang-option" data-lang="Russian">Russian</button>
             <button class="lang-option" data-lang="Ukrainian">Ukrainian</button>
             <button class="lang-option" data-lang="Turkish">Turkish</button>
+            <button class="lang-option" data-lang="Greek">Greek</button>
+            <button class="lang-option" data-lang="Romanian">Romanian</button>
+            <button class="lang-option" data-lang="Hungarian">Hungarian</button>
+            <button class="lang-option" data-lang="Czech">Czech</button>
+            <button class="lang-option" data-lang="Slovak">Slovak</button>
+            <button class="lang-option" data-lang="Bulgarian">Bulgarian</button>
+            <button class="lang-option" data-lang="Croatian">Croatian</button>
+            <button class="lang-option" data-lang="Serbian">Serbian</button>
+            <button class="lang-option" data-lang="Lithuanian">Lithuanian</button>
+            <button class="lang-option" data-lang="Latvian">Latvian</button>
+            <button class="lang-option" data-lang="Estonian">Estonian</button>
+            <button class="lang-option" data-lang="Slovenian">Slovenian</button>
+            <button class="lang-option" data-lang="Catalan">Catalan</button>
+            <button class="lang-option" data-lang="Icelandic">Icelandic</button>
             <button class="lang-option" data-lang="Arabic">Arabic</button>
+            <button class="lang-option" data-lang="Hebrew">Hebrew</button>
+            <button class="lang-option" data-lang="Persian (Farsi)">Persian (Farsi)</button>
+            <button class="lang-option" data-lang="Hindi">Hindi</button>
+            <button class="lang-option" data-lang="Urdu">Urdu</button>
+            <button class="lang-option" data-lang="Bengali">Bengali</button>
             <button class="lang-option" data-lang="Japanese">Japanese</button>
             <button class="lang-option" data-lang="Chinese (Simplified)">Chinese (Simplified)</button>
             <button class="lang-option" data-lang="Chinese (Traditional)">Chinese (Traditional)</button>
             <button class="lang-option" data-lang="Korean">Korean</button>
+            <button class="lang-option" data-lang="Thai">Thai</button>
+            <button class="lang-option" data-lang="Vietnamese">Vietnamese</button>
+            <button class="lang-option" data-lang="Indonesian">Indonesian</button>
+            <button class="lang-option" data-lang="Malay">Malay</button>
+            <button class="lang-option" data-lang="Tagalog (Filipino)">Tagalog (Filipino)</button>
           </div>
         </div>
 
@@ -980,26 +1028,15 @@ async function translateWithPerplexity(text) {
 
 // ── Google Translate ──
 const GOOGLE_LANG_MAP = {
-  "English":               "en",
-  "Spanish":               "es",
-  "French":                "fr",
-  "German":                "de",
-  "Italian":               "it",
-  "Portuguese":            "pt",
-  "Swedish":               "sv",
-  "Norwegian":             "no",
-  "Danish":                "da",
-  "Finnish":               "fi",
-  "Dutch":                 "nl",
-  "Polish":                "pl",
-  "Russian":               "ru",
-  "Ukrainian":             "uk",
-  "Turkish":               "tr",
-  "Arabic":                "ar",
-  "Japanese":              "ja",
-  "Chinese (Simplified)":  "zh-CN",
-  "Chinese (Traditional)": "zh-TW",
-  "Korean":                "ko"
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 
 async function translateWithGoogle(text) {
@@ -1020,26 +1057,15 @@ async function translateWithGoogle(text) {
 
 // ── DeepL ──
 const DEEPL_LANG_MAP = {
-  "English":               "EN-US",
-  "Spanish":               "ES",
-  "French":                "FR",
-  "German":                "DE",
-  "Italian":               "IT",
-  "Portuguese":            "PT-BR",
-  "Swedish":               "SV",
-  "Norwegian":             "NB",
-  "Danish":                "DA",
-  "Finnish":               "FI",
-  "Dutch":                 "NL",
-  "Polish":                "PL",
-  "Russian":               "RU",
-  "Ukrainian":             "UK",
-  "Turkish":               "TR",
-  "Arabic":                "AR",
-  "Japanese":              "JA",
-  "Chinese (Simplified)":  "ZH-HANS",
-  "Chinese (Traditional)": "ZH-HANT",
-  "Korean":                "KO"
+  "English":"EN-US","Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
+  "Portuguese":"PT-BR","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
+  "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
+  "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
+  "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
+  "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS",
+  "Arabic":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
+  "Japanese":"JA","Chinese (Simplified)":"ZH-HANS","Chinese (Traditional)":"ZH-HANT","Korean":"KO",
+  "Thai":"TH","Vietnamese":"VI","Indonesian":"ID","Malay":"MS","Tagalog (Filipino)":"TL"
 };
 
 const DEEPL_PROXY = "https://deepl.hanyuriyu.workers.dev";
@@ -1124,26 +1150,15 @@ async function translateWithGrok(text) {
 const TENCENT_PROXY = "https://tencent.hanyuriyu.workers.dev";
 
 const TENCENT_LANG_MAP = {
-  "English":               "en",
-  "Spanish":               "es",
-  "French":                "fr",
-  "German":                "de",
-  "Italian":               "it",
-  "Portuguese":            "pt",
-  "Swedish":               "sv",
-  "Norwegian":             "no",
-  "Danish":                "da",
-  "Finnish":               "fi",
-  "Dutch":                 "nl",
-  "Polish":                "pl",
-  "Russian":               "ru",
-  "Ukrainian":             "uk",
-  "Turkish":               "tr",
-  "Arabic":                "ar",
-  "Japanese":              "ja",
-  "Chinese (Simplified)":  "zh",
-  "Chinese (Traditional)": "zh-TW",
-  "Korean":                "ko"
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 
 async function translateWithTencent(text) {
@@ -1189,26 +1204,15 @@ async function translateWithAlibaba(text) {
 const MICROSOFT_PROXY = "https://microsoft.hanyuriyu.workers.dev";
 
 const MICROSOFT_LANG_MAP = {
-  "English":               "en",
-  "Spanish":               "es",
-  "French":                "fr",
-  "German":                "de",
-  "Italian":               "it",
-  "Portuguese":            "pt",
-  "Swedish":               "sv",
-  "Norwegian":             "nb",
-  "Danish":                "da",
-  "Finnish":               "fi",
-  "Dutch":                 "nl",
-  "Polish":                "pl",
-  "Russian":               "ru",
-  "Ukrainian":             "uk",
-  "Turkish":               "tr",
-  "Arabic":                "ar",
-  "Japanese":              "ja",
-  "Chinese (Simplified)":  "zh-Hans",
-  "Chinese (Traditional)": "zh-Hant",
-  "Korean":                "ko"
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese":"pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh-Hans","Chinese (Traditional)":"zh-Hant","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"fil"
 };
 
 async function translateWithMicrosoft(text) {
