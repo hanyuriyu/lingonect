@@ -268,6 +268,60 @@ body{
 .save-msg.ok{ color:green; }
 .save-msg.err{ color:#c00; }
 
+/* ── READ-ONLY PROFILE VIEW ── */
+.profile-readonly{
+  background:#f9f9f9;
+  border:1px solid #e8e8e8;
+  border-radius:10px;
+  padding:28px 32px;
+}
+.ro-field{
+  margin-bottom:20px;
+}
+.ro-field:last-child{ margin-bottom:0; }
+.ro-label{
+  font-size:11px;
+  font-weight:800;
+  color:#888;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  margin-bottom:4px;
+}
+.ro-value{
+  font-size:15px;
+  font-weight:800;
+  color:var(--text);
+}
+.ro-lang-list{
+  list-style:none;
+  padding:0;
+  margin:4px 0 0;
+}
+.ro-lang-list li{
+  font-size:14px;
+  padding:4px 0;
+  border-bottom:1px solid #eee;
+}
+.ro-lang-list li:last-child{ border-bottom:none; }
+.ro-lang-list .level{
+  color:#666;
+  font-size:12px;
+  margin-left:8px;
+}
+.contact-note{
+  text-align:center;
+  font-size:13px;
+  color:#888;
+  margin-top:24px;
+  line-height:1.6;
+}
+.contact-note a{
+  color:var(--cobalt);
+  text-decoration:none;
+  font-weight:800;
+}
+.contact-note a:hover{ text-decoration:underline; }
+
 /* ── MOBILE ── */
 @media (max-width:820px){
   .logo-rail{
@@ -288,6 +342,7 @@ body{
   .page-title{ font-size:16px; }
   .lang-entry{ flex-wrap:wrap; }
   .lang-entry select.lang-level{ width:100%; }
+  .profile-readonly{ padding:20px 16px; }
 }
 </style>
 </head>
@@ -311,39 +366,45 @@ body{
 <div class="page-wrap">
   <main class="stage">
     <p class="page-title">User Profile</p>
-    <p class="page-sub">Set your username and language information</p>
+    <p class="page-sub" id="pageSub">Set your username and language information</p>
 
-    <!-- USERNAME -->
-    <div class="field-group">
-      <label>Username</label>
-      <div class="username-row">
-        <input type="text" id="usernameInput" placeholder="Choose a unique username" maxlength="30" autocomplete="off" />
+    <!-- READ-ONLY VIEW (shown after submission for non-admin users) -->
+    <div id="readonlyView" style="display:none;"></div>
+
+    <!-- EDIT FORM (shown for first-time setup or admin) -->
+    <div id="editForm">
+      <!-- USERNAME -->
+      <div class="field-group">
+        <label>Username</label>
+        <div class="username-row">
+          <input type="text" id="usernameInput" placeholder="Choose a unique username" maxlength="30" autocomplete="off" />
+        </div>
+        <div class="username-status" id="usernameStatus"></div>
       </div>
-      <div class="username-status" id="usernameStatus"></div>
-    </div>
 
-    <!-- CERTIFICATION -->
-    <div class="field-group">
-      <label>Certification</label>
-      <div id="certContainer"></div>
-    </div>
+      <!-- CERTIFICATION -->
+      <div class="field-group">
+        <label>Certification</label>
+        <div id="certContainer"></div>
+      </div>
 
-    <!-- MOTHER TONGUES -->
-    <div class="lang-section">
-      <h3>Mother Tongue(s)</h3>
-      <div class="lang-entries" id="motherTongues"></div>
-      <button class="add-lang-btn" id="addMotherBtn" type="button">+ Add Mother Tongue</button>
-    </div>
+      <!-- MOTHER TONGUES -->
+      <div class="lang-section">
+        <h3>Mother Tongue(s) / 1st Language</h3>
+        <div class="lang-entries" id="motherTongues"></div>
+        <button class="add-lang-btn" id="addMotherBtn" type="button">+ Add Mother Tongue</button>
+      </div>
 
-    <!-- FOREIGN LANGUAGES -->
-    <div class="lang-section">
-      <h3>Foreign Languages</h3>
-      <div class="lang-entries" id="foreignLangs"></div>
-      <button class="add-lang-btn" id="addForeignBtn" type="button">+ Add Foreign Language</button>
-    </div>
+      <!-- FOREIGN LANGUAGES -->
+      <div class="lang-section">
+        <h3>Foreign Languages</h3>
+        <div class="lang-entries" id="foreignLangs"></div>
+        <button class="add-lang-btn" id="addForeignBtn" type="button">+ Add Foreign Language</button>
+      </div>
 
-    <button class="save-btn" id="saveBtn" type="button">Save Profile</button>
-    <div class="save-msg" id="saveMsg"></div>
+      <button class="save-btn" id="saveBtn" type="button">Save Profile</button>
+      <div class="save-msg" id="saveMsg"></div>
+    </div>
   </main>
 </div>
 
@@ -378,15 +439,20 @@ const ALL_LANGUAGES = [
   "Chinese (Simplified)","Chinese (Traditional)","Korean"
 ];
 
-const LEVELS = [
+const MOTHER_LEVELS = [
+  "True Mother Tongue","Near Native","Native","1st Language","WEN"
+];
+
+const FOREIGN_LEVELS = [
   "A1","A2","B1","B2","C1","C2",
   "Elementary Fluency","Conversational Fluency","Work Fluency"
 ];
 
 let currentUser = null;
 let isAdmin = false;
-let savedUsername = "";        // the username already saved in Firestore
-let viewingUid = null;         // whose profile we're editing (own by default)
+let savedUsername = "";
+let viewingUid = null;
+let profileSubmitted = false;  // whether the profile has already been saved once
 
 // ── Auth ──
 auth.onAuthStateChanged(async user => {
@@ -446,7 +512,6 @@ usernameInput.addEventListener("input", () => {
 
 async function checkUsername(name) {
   const lower = name.toLowerCase();
-  // If it's the same as the already-saved username, it's fine
   if (lower === savedUsername.toLowerCase()) {
     usernameStatus.textContent = "✓ Your current username";
     usernameStatus.className = "username-status ok";
@@ -467,21 +532,7 @@ function renderCert(certValue) {
   const container = document.getElementById("certContainer");
   container.innerHTML = "";
 
-  if (isAdmin && viewingUid !== currentUser.uid) {
-    // Admin viewing another user — show dropdown
-    const sel = document.createElement("select");
-    sel.className = "cert-admin-select";
-    sel.id = "certSelect";
-    ["Uncertified", "Lingonect Certified"].forEach(opt => {
-      const o = document.createElement("option");
-      o.value = opt;
-      o.textContent = opt;
-      if (opt === certValue) o.selected = true;
-      sel.appendChild(o);
-    });
-    container.appendChild(sel);
-  } else if (isAdmin) {
-    // Admin viewing own profile — show dropdown
+  if (isAdmin) {
     const sel = document.createElement("select");
     sel.className = "cert-admin-select";
     sel.id = "certSelect";
@@ -494,7 +545,6 @@ function renderCert(certValue) {
     });
     container.appendChild(sel);
   } else {
-    // Normal user — read-only badge
     const badge = document.createElement("span");
     badge.className = "cert-badge " + (certValue === "Lingonect Certified" ? "certified" : "uncertified");
     badge.textContent = certValue;
@@ -503,7 +553,7 @@ function renderCert(certValue) {
 }
 
 // ── Language entry helpers ──
-function createLangEntry(containerId, lang, level) {
+function createLangEntry(containerId, lang, level, levelOptions) {
   const container = document.getElementById(containerId);
   const row = document.createElement("div");
   row.className = "lang-entry";
@@ -528,7 +578,7 @@ function createLangEntry(containerId, lang, level) {
   emptyLvl.value = "";
   emptyLvl.textContent = "Select level";
   levelSel.appendChild(emptyLvl);
-  LEVELS.forEach(lv => {
+  levelOptions.forEach(lv => {
     const o = document.createElement("option");
     o.value = lv;
     o.textContent = lv;
@@ -549,50 +599,122 @@ function createLangEntry(containerId, lang, level) {
 }
 
 document.getElementById("addMotherBtn").addEventListener("click", () => {
-  createLangEntry("motherTongues", "", "");
+  createLangEntry("motherTongues", "", "", MOTHER_LEVELS);
 });
 
 document.getElementById("addForeignBtn").addEventListener("click", () => {
-  createLangEntry("foreignLangs", "", "");
+  createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS);
 });
+
+// ── Render read-only profile view ──
+function renderReadonly(data) {
+  const container = document.getElementById("readonlyView");
+
+  const certClass = data.certification === "Lingonect Certified" ? "certified" : "uncertified";
+
+  let motherHtml = "";
+  if (data.motherTongues && data.motherTongues.length > 0) {
+    motherHtml = "<ul class=\"ro-lang-list\">" +
+      data.motherTongues.map(mt =>
+        `<li>${mt.language}${mt.level ? `<span class="level">${mt.level}</span>` : ""}</li>`
+      ).join("") + "</ul>";
+  } else {
+    motherHtml = '<span style="color:#999;">Not set</span>';
+  }
+
+  let foreignHtml = "";
+  if (data.foreignLanguages && data.foreignLanguages.length > 0) {
+    foreignHtml = "<ul class=\"ro-lang-list\">" +
+      data.foreignLanguages.map(fl =>
+        `<li>${fl.language}${fl.level ? `<span class="level">${fl.level}</span>` : ""}</li>`
+      ).join("") + "</ul>";
+  } else {
+    foreignHtml = '<span style="color:#999;">Not set</span>';
+  }
+
+  container.innerHTML = `
+    <div class="profile-readonly">
+      <div class="ro-field">
+        <div class="ro-label">Username</div>
+        <div class="ro-value">${data.username || "—"}</div>
+      </div>
+      <div class="ro-field">
+        <div class="ro-label">Certification</div>
+        <div><span class="cert-badge ${certClass}">${data.certification || "Uncertified"}</span></div>
+      </div>
+      <div class="ro-field">
+        <div class="ro-label">Mother Tongue(s) / 1st Language</div>
+        ${motherHtml}
+      </div>
+      <div class="ro-field">
+        <div class="ro-label">Foreign Languages</div>
+        ${foreignHtml}
+      </div>
+    </div>
+    <div class="contact-note">
+      To update your profile, please contact<br>
+      <a href="mailto:contact@lingonect.com">contact@lingonect.com</a>
+    </div>
+  `;
+}
+
+// ── Show edit form vs read-only view ──
+function showEditForm() {
+  document.getElementById("editForm").style.display = "";
+  document.getElementById("readonlyView").style.display = "none";
+  document.getElementById("pageSub").textContent = "Set your username and language information";
+}
+
+function showReadonly(data) {
+  document.getElementById("editForm").style.display = "none";
+  document.getElementById("readonlyView").style.display = "";
+  document.getElementById("pageSub").textContent = "";
+  renderReadonly(data);
+}
 
 // ── Load profile from Firestore ──
 async function loadProfile() {
   const doc = await db.collection("profiles").doc(viewingUid).get();
+
   if (doc.exists) {
     const data = doc.data();
+    profileSubmitted = true;
+    savedUsername = data.username || "";
 
-    // Username
-    if (data.username) {
-      usernameInput.value = data.username;
-      savedUsername = data.username;
-    }
+    // Admin can always edit; non-admin users see read-only after first save
+    if (isAdmin) {
+      showEditForm();
 
-    // Certification
-    renderCert(data.certification || "Uncertified");
+      // Populate edit form with existing data
+      usernameInput.value = data.username || "";
+      renderCert(data.certification || "Uncertified");
 
-    // Mother tongues
-    if (data.motherTongues && data.motherTongues.length > 0) {
-      data.motherTongues.forEach(mt => {
-        createLangEntry("motherTongues", mt.language, mt.level);
-      });
+      if (data.motherTongues && data.motherTongues.length > 0) {
+        data.motherTongues.forEach(mt => {
+          createLangEntry("motherTongues", mt.language, mt.level, MOTHER_LEVELS);
+        });
+      } else {
+        createLangEntry("motherTongues", "", "", MOTHER_LEVELS);
+      }
+
+      if (data.foreignLanguages && data.foreignLanguages.length > 0) {
+        data.foreignLanguages.forEach(fl => {
+          createLangEntry("foreignLangs", fl.language, fl.level, FOREIGN_LEVELS);
+        });
+      } else {
+        createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS);
+      }
     } else {
-      createLangEntry("motherTongues", "", "");
-    }
-
-    // Foreign languages
-    if (data.foreignLanguages && data.foreignLanguages.length > 0) {
-      data.foreignLanguages.forEach(fl => {
-        createLangEntry("foreignLangs", fl.language, fl.level);
-      });
-    } else {
-      createLangEntry("foreignLangs", "", "");
+      // Non-admin: show read-only view
+      showReadonly(data);
     }
   } else {
-    // New profile — show defaults
+    // New profile — show edit form for everyone
+    profileSubmitted = false;
+    showEditForm();
     renderCert("Uncertified");
-    createLangEntry("motherTongues", "", "");
-    createLangEntry("foreignLangs", "", "");
+    createLangEntry("motherTongues", "", "", MOTHER_LEVELS);
+    createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS);
   }
 }
 
@@ -665,14 +787,13 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       certification,
       motherTongues,
       foreignLanguages,
-      email: viewingUid === currentUser.uid ? currentUser.email : undefined,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // Clean undefined fields
-    Object.keys(profileData).forEach(k => {
-      if (profileData[k] === undefined) delete profileData[k];
-    });
+    // Set email on first save or when viewing own profile
+    if (viewingUid === currentUser.uid) {
+      profileData.email = currentUser.email;
+    }
 
     const batch = db.batch();
 
@@ -688,8 +809,15 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     await batch.commit();
 
     savedUsername = username;
-    saveMsg.textContent = "Profile saved!";
-    saveMsg.className = "save-msg ok";
+    profileSubmitted = true;
+
+    if (isAdmin) {
+      saveMsg.textContent = "Profile saved!";
+      saveMsg.className = "save-msg ok";
+    } else {
+      // Non-admin: switch to read-only view after first save
+      showReadonly(profileData);
+    }
   } catch (err) {
     saveMsg.textContent = "Error saving: " + err.message;
     saveMsg.className = "save-msg err";
