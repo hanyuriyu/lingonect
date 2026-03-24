@@ -269,11 +269,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
-const ALLOWED_EMAIL = "linguisticsconsulting@gmail.com";
+const ALLOWED_EMAILS = [
+  "linguisticsconsulting@gmail.com",
+  "hanyuriyu@googlemail.com"
+];
+
+function isAllowed(email) {
+  return ALLOWED_EMAILS.includes(email.toLowerCase());
+}
 
 // Redirect already-authenticated users straight to dashboard
 auth.onAuthStateChanged(user => {
-  if (user && user.emailVerified && user.email === ALLOWED_EMAIL) {
+  if (user && user.emailVerified && isAllowed(user.email)) {
     window.location.href = "engines.html";
   }
 });
@@ -292,7 +299,7 @@ document.getElementById("googleBtn").addEventListener("click", () => {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider)
     .then(cred => {
-      if (cred.user.email !== ALLOWED_EMAIL) {
+      if (!isAllowed(cred.user.email)) {
         auth.signOut();
         showError("Access is currently restricted.");
         return;
@@ -312,7 +319,7 @@ document.getElementById("loginBtn").addEventListener("click", () => {
 
   auth.signInWithEmailAndPassword(email, password)
     .then(cred => {
-      if (cred.user.email !== ALLOWED_EMAIL) {
+      if (!isAllowed(cred.user.email)) {
         auth.signOut();
         showError("Access is currently restricted.");
         return;
