@@ -240,6 +240,111 @@ body{
 }
 .add-lang-btn:hover{ background:#f0f4ff; }
 
+/* ── MOTHER TONGUE LAYOUT (entries + definitions side by side) ── */
+.mother-tongue-layout{
+  display:flex;
+  gap:24px;
+  align-items:flex-start;
+}
+.mother-tongue-left{ flex:1; min-width:0; }
+.mother-tongue-right{ width:290px; flex-shrink:0; }
+
+/* ── MULTI-SELECT LEVEL PICKER ── */
+.level-multi{
+  position:relative;
+  width:200px;
+}
+.level-multi-btn{
+  font-family:inherit;
+  font-size:13px;
+  padding:8px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  background:#fff;
+  cursor:pointer;
+  width:100%;
+  text-align:left;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:#555;
+}
+.level-multi-btn:focus{ outline:none; border-color:var(--cobalt); }
+.level-multi-dropdown{
+  display:none;
+  position:absolute;
+  top:100%;
+  left:0;
+  right:0;
+  background:#fff;
+  border:1px solid #ccc;
+  border-radius:6px;
+  margin-top:2px;
+  z-index:50;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+  padding:6px 0;
+}
+.level-multi-dropdown.open{ display:block; }
+.level-multi-dropdown label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 12px;
+  font-size:12px;
+  font-weight:800;
+  color:#333;
+  cursor:pointer;
+  text-transform:none;
+  letter-spacing:0;
+  margin-bottom:0;
+}
+.level-multi-dropdown label:hover{ background:#f0f4ff; }
+.level-multi-dropdown input[type="checkbox"]{
+  accent-color:var(--cobalt);
+}
+
+/* ── DEFINITIONS TABLE (retro / minimalist) ── */
+.def-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:11px;
+  line-height:1.45;
+}
+.def-table th{
+  text-align:left;
+  font-size:10px;
+  font-weight:800;
+  color:#888;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+  border-bottom:2px solid #111;
+  padding:4px 6px;
+}
+.def-table td{
+  padding:6px 6px;
+  border-bottom:1px solid #ddd;
+  vertical-align:top;
+}
+.def-table td:first-child{
+  font-weight:800;
+  white-space:nowrap;
+  width:1%;
+  color:#333;
+}
+.def-table td:last-child{
+  color:#555;
+}
+.def-table tr:last-child td{ border-bottom:none; }
+
+.mother-explanation{
+  font-size:11px;
+  line-height:1.55;
+  color:#666;
+  margin-top:14px;
+  border-top:1px solid #ddd;
+  padding-top:12px;
+}
+
 /* ── SAVE BUTTON ── */
 .save-btn{
   display:block;
@@ -342,6 +447,9 @@ body{
   .page-title{ font-size:16px; }
   .lang-entry{ flex-wrap:wrap; }
   .lang-entry select.lang-level{ width:100%; }
+  .mother-tongue-layout{ flex-direction:column; }
+  .mother-tongue-right{ width:100%; }
+  .level-multi{ width:100%; }
   .profile-readonly{ padding:20px 16px; }
 }
 </style>
@@ -391,8 +499,24 @@ body{
       <!-- MOTHER TONGUES -->
       <div class="lang-section">
         <h3>Mother Tongue(s) / 1st Language</h3>
-        <div class="lang-entries" id="motherTongues"></div>
-        <button class="add-lang-btn" id="addMotherBtn" type="button">+ Add Mother Tongue</button>
+        <div class="mother-tongue-layout">
+          <div class="mother-tongue-left">
+            <div class="lang-entries" id="motherTongues"></div>
+            <button class="add-lang-btn" id="addMotherBtn" type="button">+ Add Mother Tongue</button>
+          </div>
+          <div class="mother-tongue-right">
+            <table class="def-table">
+              <tr><th>Level</th><th>Definition</th></tr>
+              <tr><td>True Mother Tongue</td><td>The language you used from birth with the people closest to you (usually your mother, father, siblings).</td></tr>
+              <tr><td>1st Language</td><td>The language you have been using at a high level in your personal and professional space for at least a decade and you fully think in this language.</td></tr>
+              <tr><td>Native</td><td>The language you have been learning naturally because it is the official language spoken in the environment/country/location you have grown up in.</td></tr>
+              <tr><td>WEN</td><td>Well-educated Native Language: the language you have been fully educated in from elementary to university level and developed further in your professional life.</td></tr>
+            </table>
+            <div class="mother-explanation">
+              For the majority of the population, True Mother Tongue, 1st Language, Native Language and WEN will be the same. However, there are many cases where somebody has spoken one language at home from birth, lived in an environment which was native to another language and they were educated in yet another language. Pick <strong>WEN</strong> for your absolute strongest language you have grown up with, <strong>1st Language</strong> for a language that has become your strongest through education/work, <strong>Native</strong> for a language you feel totally comfortable with because you grew up in its environment but it is not necessarily your true mother tongue, neither your WEN or 1st. <strong>True Mother Tongue</strong> refers to the language you spoke at home from birth, but in some cases it may not be your strongest. You can select several levels for one language.
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- FOREIGN LANGUAGES -->
@@ -557,7 +681,8 @@ function renderCert(certValue) {
 }
 
 // ── Language entry helpers ──
-function createLangEntry(containerId, lang, level, levelOptions) {
+// level can be a string (single) or array (multi); multiLevel enables checkbox picker
+function createLangEntry(containerId, lang, level, levelOptions, multiLevel) {
   const container = document.getElementById(containerId);
   const row = document.createElement("div");
   row.className = "lang-entry";
@@ -576,19 +701,66 @@ function createLangEntry(containerId, lang, level, levelOptions) {
     langSel.appendChild(o);
   });
 
-  const levelSel = document.createElement("select");
-  levelSel.className = "lang-level";
-  const emptyLvl = document.createElement("option");
-  emptyLvl.value = "";
-  emptyLvl.textContent = "Select level";
-  levelSel.appendChild(emptyLvl);
-  levelOptions.forEach(lv => {
-    const o = document.createElement("option");
-    o.value = lv;
-    o.textContent = lv;
-    if (lv === level) o.selected = true;
-    levelSel.appendChild(o);
-  });
+  if (multiLevel) {
+    // Multi-select checkbox dropdown for mother tongue levels
+    const selectedLevels = Array.isArray(level) ? level : (level ? [level] : []);
+    const wrap = document.createElement("div");
+    wrap.className = "level-multi";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "level-multi-btn";
+    btn.textContent = selectedLevels.length ? selectedLevels.join(", ") : "Select level(s)";
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "level-multi-dropdown";
+
+    levelOptions.forEach(lv => {
+      const lbl = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = lv;
+      if (selectedLevels.includes(lv)) cb.checked = true;
+      cb.addEventListener("change", () => {
+        const checked = Array.from(dropdown.querySelectorAll("input:checked")).map(c => c.value);
+        btn.textContent = checked.length ? checked.join(", ") : "Select level(s)";
+      });
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(lv));
+      dropdown.appendChild(lbl);
+    });
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Close any other open dropdowns
+      document.querySelectorAll(".level-multi-dropdown.open").forEach(d => {
+        if (d !== dropdown) d.classList.remove("open");
+      });
+      dropdown.classList.toggle("open");
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(dropdown);
+    row.appendChild(langSel);
+    row.appendChild(wrap);
+  } else {
+    // Single select for foreign languages
+    const levelSel = document.createElement("select");
+    levelSel.className = "lang-level";
+    const emptyLvl = document.createElement("option");
+    emptyLvl.value = "";
+    emptyLvl.textContent = "Select level";
+    levelSel.appendChild(emptyLvl);
+    levelOptions.forEach(lv => {
+      const o = document.createElement("option");
+      o.value = lv;
+      o.textContent = lv;
+      if (lv === level) o.selected = true;
+      levelSel.appendChild(o);
+    });
+    row.appendChild(langSel);
+    row.appendChild(levelSel);
+  }
 
   const removeBtn = document.createElement("button");
   removeBtn.className = "remove-lang";
@@ -596,18 +768,21 @@ function createLangEntry(containerId, lang, level, levelOptions) {
   removeBtn.innerHTML = "&times;";
   removeBtn.addEventListener("click", () => row.remove());
 
-  row.appendChild(langSel);
-  row.appendChild(levelSel);
   row.appendChild(removeBtn);
   container.appendChild(row);
 }
 
+// Close multi-level dropdowns on outside click
+document.addEventListener("click", () => {
+  document.querySelectorAll(".level-multi-dropdown.open").forEach(d => d.classList.remove("open"));
+});
+
 document.getElementById("addMotherBtn").addEventListener("click", () => {
-  createLangEntry("motherTongues", "", "", MOTHER_LEVELS);
+  createLangEntry("motherTongues", "", [], MOTHER_LEVELS, true);
 });
 
 document.getElementById("addForeignBtn").addEventListener("click", () => {
-  createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS);
+  createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS, false);
 });
 
 // ── Render read-only profile view ──
@@ -619,9 +794,10 @@ function renderReadonly(data) {
   let motherHtml = "";
   if (data.motherTongues && data.motherTongues.length > 0) {
     motherHtml = "<ul class=\"ro-lang-list\">" +
-      data.motherTongues.map(mt =>
-        `<li>${mt.language}${mt.level ? `<span class="level">${mt.level}</span>` : ""}</li>`
-      ).join("") + "</ul>";
+      data.motherTongues.map(mt => {
+        const lvl = mt.levels ? mt.levels.join(", ") : (mt.level || "");
+        return `<li>${mt.language}${lvl ? `<span class="level">${lvl}</span>` : ""}</li>`;
+      }).join("") + "</ul>";
   } else {
     motherHtml = '<span style="color:#999;">Not set</span>';
   }
@@ -695,18 +871,19 @@ async function loadProfile() {
 
       if (data.motherTongues && data.motherTongues.length > 0) {
         data.motherTongues.forEach(mt => {
-          createLangEntry("motherTongues", mt.language, mt.level, MOTHER_LEVELS);
+          const lvls = mt.levels || (mt.level ? [mt.level] : []);
+          createLangEntry("motherTongues", mt.language, lvls, MOTHER_LEVELS, true);
         });
       } else {
-        createLangEntry("motherTongues", "", "", MOTHER_LEVELS);
+        createLangEntry("motherTongues", "", [], MOTHER_LEVELS, true);
       }
 
       if (data.foreignLanguages && data.foreignLanguages.length > 0) {
         data.foreignLanguages.forEach(fl => {
-          createLangEntry("foreignLangs", fl.language, fl.level, FOREIGN_LEVELS);
+          createLangEntry("foreignLangs", fl.language, fl.level, FOREIGN_LEVELS, false);
         });
       } else {
-        createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS);
+        createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS, false);
       }
     } else {
       // Non-admin: show read-only view
@@ -717,18 +894,22 @@ async function loadProfile() {
     profileSubmitted = false;
     showEditForm();
     renderCert("Uncertified");
-    createLangEntry("motherTongues", "", "", MOTHER_LEVELS);
-    createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS);
+    createLangEntry("motherTongues", "", [], MOTHER_LEVELS, true);
+    createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS, false);
   }
 }
 
 // ── Gather language entries from DOM ──
-function gatherLangs(containerId) {
+function gatherLangs(containerId, multi) {
   const entries = [];
   document.getElementById(containerId).querySelectorAll(".lang-entry").forEach(row => {
     const lang = row.querySelector(".lang-name").value;
-    const level = row.querySelector(".lang-level").value;
-    if (lang) {
+    if (!lang) return;
+    if (multi) {
+      const checked = Array.from(row.querySelectorAll(".level-multi-dropdown input:checked")).map(c => c.value);
+      entries.push({ language: lang, levels: checked });
+    } else {
+      const level = row.querySelector(".lang-level").value;
       entries.push({ language: lang, level: level || "" });
     }
   });
@@ -770,8 +951,8 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
   saveBtn.textContent = "Saving…";
 
   try {
-    const motherTongues = gatherLangs("motherTongues");
-    const foreignLanguages = gatherLangs("foreignLangs");
+    const motherTongues = gatherLangs("motherTongues", true);
+    const foreignLanguages = gatherLangs("foreignLangs", false);
 
     // Determine certification value
     let certification = "Uncertified";
