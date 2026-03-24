@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lingonect — Chat</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --text-col:960px;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:130px;
+  --terminal-bg:#0a0a0a;
+  --terminal-border:#333;
+  --green:#00ff41;
+  --yellow:#ffe600;
+  --amber:#ff8c00;
+}
+
+html{ height:100%; }
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Special Elite","Courier New",monospace;
+  visibility:hidden;
+  overflow-y:auto;
+}
+
+/* ── LOGO RAIL ── */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - (var(--text-col) / 2));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  z-index:1;
+}
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); }
+
+/* ── LOGOUT ── */
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#aaa;
+  background:none;
+  border:none;
+  cursor:pointer;
+  transition:color .2s;
+  letter-spacing:.5px;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* ── PAGE WRAPPER ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:80px 0 60px;
+  box-sizing:border-box;
+}
+
+/* ── STAGE ── */
+.stage{
+  width:var(--text-col);
+  max-width:92vw;
+  margin:0 auto;
+  position:relative;
+  z-index:2;
+}
+
+/* ── CHAT LAYOUT ── */
+.chat-layout{
+  display:flex;
+  gap:16px;
+  height:calc(100vh - 200px);
+  min-height:400px;
+}
+
+/* ── RETRO TERMINAL ── */
+.terminal-wrap{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.terminal{
+  flex:1;
+  background:var(--terminal-bg);
+  border:3px solid var(--terminal-border);
+  border-radius:12px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:
+    0 0 20px rgba(0,255,65,.08),
+    inset 0 0 60px rgba(0,0,0,.4);
+}
+
+/* CRT scanlines effect */
+.terminal::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,.15) 0px,
+    rgba(0,0,0,.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+  z-index:2;
+}
+
+/* Slight CRT curvature vignette */
+.terminal::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:12px;
+  box-shadow:inset 0 0 80px rgba(0,0,0,.5);
+  pointer-events:none;
+  z-index:3;
+}
+
+/* Title bar */
+.terminal-bar{
+  background:#1a1a1a;
+  border-bottom:1px solid var(--terminal-border);
+  padding:6px 14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.terminal-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+}
+.terminal-dot.red{ background:#ff5f57; }
+.terminal-dot.yellow{ background:#febc2e; }
+.terminal-dot.green{ background:#28c840; }
+.terminal-title{
+  flex:1;
+  text-align:center;
+  font-size:11px;
+  color:#666;
+  letter-spacing:1px;
+}
+
+/* Chat messages area */
+.chat-messages{
+  padding:16px;
+  overflow-y:auto;
+  height:calc(100% - 36px);
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  position:relative;
+  z-index:1;
+}
+
+.chat-msg{
+  font-family:"Courier New",monospace;
+  font-size:13px;
+  line-height:1.6;
+  word-break:break-word;
+}
+.chat-msg .msg-user{
+  color:var(--green);
+  font-weight:bold;
+}
+.chat-msg .msg-text{
+  color:#ccc;
+}
+.chat-msg.own .msg-user{
+  color:var(--yellow);
+}
+.chat-msg .msg-time{
+  color:#555;
+  font-size:10px;
+  margin-left:6px;
+}
+
+.chat-system{
+  font-family:"Courier New",monospace;
+  font-size:11px;
+  color:#555;
+  text-align:center;
+  padding:4px 0;
+}
+
+/* No chat selected state */
+.chat-empty{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  font-family:"Courier New",monospace;
+  font-size:13px;
+  color:#444;
+  text-align:center;
+  line-height:1.8;
+  position:relative;
+  z-index:1;
+}
+
+/* ── INPUT BAR ── */
+.chat-input-wrap{
+  display:flex;
+  gap:8px;
+}
+.chat-input{
+  flex:1;
+  background:var(--terminal-bg);
+  border:3px solid var(--terminal-border);
+  border-radius:8px;
+  padding:10px 14px;
+  font-family:"Courier New",monospace;
+  font-size:13px;
+  color:var(--green);
+  outline:none;
+  transition:border-color .2s;
+}
+.chat-input:focus{
+  border-color:var(--green);
+  box-shadow:0 0 10px rgba(0,255,65,.15);
+}
+.chat-input::placeholder{ color:#444; }
+.chat-input:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+}
+
+.chat-send-btn{
+  background:var(--terminal-bg);
+  border:3px solid var(--terminal-border);
+  border-radius:8px;
+  padding:10px 18px;
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:13px;
+  font-weight:800;
+  color:var(--green);
+  cursor:pointer;
+  transition:border-color .2s, color .2s;
+  letter-spacing:1px;
+}
+.chat-send-btn:hover:not(:disabled){
+  border-color:var(--green);
+  box-shadow:0 0 10px rgba(0,255,65,.15);
+}
+.chat-send-btn:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+}
+
+/* ── ONLINE USERS PANEL ── */
+.users-panel{
+  width:220px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  flex-shrink:0;
+}
+
+.users-box{
+  flex:1;
+  background:var(--terminal-bg);
+  border:3px solid var(--terminal-border);
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 0 20px rgba(0,255,65,.08);
+}
+
+.users-bar{
+  background:#1a1a1a;
+  border-bottom:1px solid var(--terminal-border);
+  padding:8px 14px;
+  font-size:11px;
+  color:#666;
+  letter-spacing:1px;
+  text-align:center;
+}
+
+.users-list{
+  padding:8px;
+  overflow-y:auto;
+  height:calc(100% - 36px);
+}
+
+.user-entry{
+  padding:6px 10px;
+  border-radius:6px;
+  cursor:pointer;
+  font-family:"Courier New",monospace;
+  font-size:12px;
+  font-weight:bold;
+  color:var(--green);
+  transition:background .15s;
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+.user-entry:hover{
+  background:rgba(0,255,65,.08);
+}
+.user-entry.selected{
+  color:var(--yellow);
+  background:rgba(255,230,0,.08);
+}
+.user-entry.self{
+  opacity:.5;
+  cursor:default;
+}
+.user-lang{
+  font-size:9px;
+  font-weight:normal;
+  color:#555;
+  letter-spacing:.5px;
+}
+.user-entry.selected .user-lang{
+  color:#887700;
+}
+
+.users-empty{
+  font-family:"Courier New",monospace;
+  font-size:11px;
+  color:#444;
+  text-align:center;
+  padding:20px 10px;
+}
+
+/* ── INCOMING CHAT NOTIFICATION ── */
+.incoming-toast{
+  display:none;
+  position:fixed;
+  top:60px;
+  right:20px;
+  background:var(--terminal-bg);
+  border:2px solid var(--green);
+  border-radius:10px;
+  padding:14px 20px;
+  z-index:500;
+  box-shadow:0 0 30px rgba(0,255,65,.2);
+  animation:pulse-border 1.5s ease-in-out infinite;
+  max-width:280px;
+}
+.incoming-toast.show{ display:block; }
+
+.toast-title{
+  font-family:"Courier New",monospace;
+  font-size:14px;
+  font-weight:bold;
+  color:var(--green);
+  margin-bottom:6px;
+  letter-spacing:1px;
+}
+.toast-body{
+  font-family:"Courier New",monospace;
+  font-size:12px;
+  color:#aaa;
+  margin-bottom:10px;
+}
+.toast-actions{
+  display:flex;
+  gap:8px;
+}
+.toast-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:11px;
+  font-weight:800;
+  padding:5px 14px;
+  border-radius:6px;
+  border:2px solid;
+  cursor:pointer;
+  background:transparent;
+  transition:background .2s;
+}
+.toast-btn.accept{
+  color:var(--green);
+  border-color:var(--green);
+}
+.toast-btn.accept:hover{ background:rgba(0,255,65,.12); }
+.toast-btn.dismiss{
+  color:#666;
+  border-color:#444;
+}
+.toast-btn.dismiss:hover{ background:rgba(255,255,255,.05); }
+
+@keyframes pulse-border{
+  0%,100%{ box-shadow:0 0 10px rgba(0,255,65,.1); }
+  50%{ box-shadow:0 0 30px rgba(0,255,65,.3); }
+}
+
+/* ── MOBILE ── */
+@media(max-width:900px){
+  .logo-rail{
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
+    width:auto;
+    justify-content:center;
+    padding:32px 0 4px;
+    margin-bottom:10px;
+  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
+
+  .page-wrap{
+    justify-content:flex-start;
+    padding:0 0 60px;
+  }
+
+  .stage{
+    padding:0 12px;
+    box-sizing:border-box;
+  }
+
+  .chat-layout{
+    flex-direction:column;
+    height:auto;
+  }
+
+  .terminal-wrap{
+    height:50vh;
+    min-height:300px;
+  }
+
+  .users-panel{
+    width:100%;
+    height:200px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html">Ratings</a>
+  <a href="chat.html" class="active">Chat</a>
+  <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
+  <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
+  <a href="profile.html">Profile</a>
+</nav>
+
+<!-- LOGO RAIL -->
+<div class="logo-rail">
+  <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
+
+<div class="page-wrap">
+  <main class="stage">
+    <div class="chat-layout">
+
+      <!-- Terminal + input -->
+      <div class="terminal-wrap">
+        <div class="terminal">
+          <div class="terminal-bar">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title" id="terminalTitle">LINGONECT CHAT</span>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-empty" id="chatEmpty">
+              Select an online user to start chatting.<br>
+              &gt; _
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-wrap">
+          <input class="chat-input" id="chatInput" type="text"
+                 placeholder="Type a message..." disabled />
+          <button class="chat-send-btn" id="sendBtn" disabled>SEND</button>
+        </div>
+      </div>
+
+      <!-- Online users -->
+      <div class="users-panel">
+        <div class="users-box">
+          <div class="users-bar">ONLINE USERS</div>
+          <div class="users-list" id="usersList">
+            <div class="users-empty">No users online</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Incoming chat toast (shown on ANY page via embed, but also here) -->
+<div class="incoming-toast" id="incomingToast">
+  <div class="toast-title">INCOMING CHAT</div>
+  <div class="toast-body" id="toastBody"></div>
+  <div class="toast-actions">
+    <button class="toast-btn accept" id="toastAccept">Open Chat</button>
+    <button class="toast-btn dismiss" id="toastDismiss">Dismiss</button>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b",
+  databaseURL:       "https://lingonect-4db51-default-rtdb.firebaseio.com"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const rtdb = firebase.database();
+
+const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+
+let currentUser  = null;
+let myProfile    = null;
+let selectedUid  = null;
+let chatListener = null;
+
+// ── Auth guard ──
+auth.onAuthStateChanged(async user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  currentUser = user;
+  if (user.email === ADMIN_EMAIL) {
+    document.getElementById("seedNavLink").style.display = "";
+    document.getElementById("adminNavLink").style.display = "";
+  }
+  document.body.style.visibility = "visible";
+
+  // Load own profile
+  const snap = await db.collection("profiles").doc(user.uid).get();
+  myProfile = snap.exists ? snap.data() : {};
+
+  // Set presence
+  setupPresence(user.uid);
+
+  // Listen for online users
+  listenOnlineUsers();
+
+  // Listen for incoming chat requests
+  listenIncoming(user.uid);
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+// ── Presence via Realtime Database ──
+function setupPresence(uid) {
+  const userStatusRef = rtdb.ref("presence/" + uid);
+  const username = (myProfile && myProfile.username) || "Anonymous";
+  const firstLang = getFirstLanguage(myProfile);
+
+  rtdb.ref(".info/connected").on("value", snap => {
+    if (snap.val() === true) {
+      userStatusRef.onDisconnect().remove();
+      userStatusRef.set({
+        online: true,
+        username: username,
+        firstLang: firstLang,
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+  });
+}
+
+function getFirstLanguage(profile) {
+  if (!profile || !profile.motherTongues || profile.motherTongues.length === 0) return "—";
+  return profile.motherTongues[0].language || "—";
+}
+
+// ── Online Users Listener ──
+let onlineUsers = {};
+
+function listenOnlineUsers() {
+  rtdb.ref("presence").on("value", snap => {
+    onlineUsers = {};
+    snap.forEach(child => {
+      const data = child.val();
+      if (data && data.online) {
+        onlineUsers[child.key] = data;
+      }
+    });
+    renderOnlineUsers();
+  });
+}
+
+function renderOnlineUsers() {
+  const container = document.getElementById("usersList");
+
+  // Sort: 1st by firstLang alphabetically, 2nd by username
+  const entries = Object.entries(onlineUsers).sort((a, b) => {
+    const langCmp = (a[1].firstLang || "").localeCompare(b[1].firstLang || "");
+    if (langCmp !== 0) return langCmp;
+    return (a[1].username || "").localeCompare(b[1].username || "");
+  });
+
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="users-empty">No users online</div>';
+    return;
+  }
+
+  container.innerHTML = entries.map(([uid, data]) => {
+    const isSelf = uid === currentUser.uid;
+    const isSelected = uid === selectedUid;
+    let cls = "user-entry";
+    if (isSelf) cls += " self";
+    if (isSelected) cls += " selected";
+
+    return `<div class="${cls}" data-uid="${uid}">
+      <span>${escHtml(data.username || "Anonymous")}</span>
+      <span class="user-lang">${escHtml(data.firstLang || "—")}</span>
+    </div>`;
+  }).join("");
+
+  // Click handlers
+  container.querySelectorAll(".user-entry:not(.self)").forEach(el => {
+    el.addEventListener("click", () => selectUser(el.dataset.uid));
+  });
+}
+
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Select a user to chat with ──
+function selectUser(uid) {
+  if (uid === selectedUid) return;
+  selectedUid = uid;
+
+  // Update UI
+  renderOnlineUsers();
+  const userData = onlineUsers[uid];
+  const name = userData ? userData.username : "User";
+  document.getElementById("terminalTitle").textContent = "CHAT — " + name.toUpperCase();
+  document.getElementById("chatInput").disabled = false;
+  document.getElementById("sendBtn").disabled = false;
+  document.getElementById("chatEmpty").style.display = "none";
+
+  // Send a chat-invite so the other user sees "Incoming Chat"
+  sendInvite(uid);
+
+  // Start listening to the conversation
+  listenChat(uid);
+}
+
+// ── Chat room ID (deterministic, alphabetical) ──
+function chatRoomId(uidA, uidB) {
+  return uidA < uidB ? uidA + "_" + uidB : uidB + "_" + uidA;
+}
+
+// ── Listen to chat messages ──
+function listenChat(otherUid) {
+  // Unsubscribe previous listener
+  if (chatListener) chatListener();
+
+  const roomId = chatRoomId(currentUser.uid, otherUid);
+  const messagesEl = document.getElementById("chatMessages");
+  messagesEl.innerHTML = "";
+  document.getElementById("chatEmpty").style.display = "none";
+
+  chatListener = db.collection("chats").doc(roomId).collection("messages")
+    .orderBy("ts", "asc")
+    .onSnapshot(snap => {
+      messagesEl.innerHTML = "";
+      if (snap.empty) {
+        messagesEl.innerHTML = '<div class="chat-system">— Start of conversation —</div>';
+      }
+      snap.forEach(doc => {
+        const m = doc.data();
+        const div = document.createElement("div");
+        const isOwn = m.from === currentUser.uid;
+        div.className = "chat-msg" + (isOwn ? " own" : "");
+
+        const time = m.ts ? new Date(m.ts.toMillis()).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) : "";
+
+        div.innerHTML = `<span class="msg-user">${escHtml(m.fromName || "?")}&gt;</span> <span class="msg-text">${escHtml(m.text)}</span><span class="msg-time">${time}</span>`;
+        messagesEl.appendChild(div);
+      });
+
+      // Auto-scroll to bottom
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+}
+
+// ── Send message ──
+function sendMessage() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text || !selectedUid) return;
+
+  const roomId = chatRoomId(currentUser.uid, selectedUid);
+  const myName = (myProfile && myProfile.username) || "Anonymous";
+
+  db.collection("chats").doc(roomId).collection("messages").add({
+    from: currentUser.uid,
+    fromName: myName,
+    text: text,
+    ts: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  input.value = "";
+  input.focus();
+}
+
+document.getElementById("sendBtn").addEventListener("click", sendMessage);
+document.getElementById("chatInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") sendMessage();
+});
+
+// ── Chat invite (notify the other user) ──
+function sendInvite(toUid) {
+  const myName = (myProfile && myProfile.username) || "Anonymous";
+  rtdb.ref("invites/" + toUid).set({
+    from: currentUser.uid,
+    fromName: myName,
+    ts: firebase.database.ServerValue.TIMESTAMP
+  });
+}
+
+// ── Listen for incoming chat invites ──
+function listenIncoming(uid) {
+  rtdb.ref("invites/" + uid).on("value", snap => {
+    const data = snap.val();
+    if (!data) return;
+
+    // Don't show if we're already chatting with this person
+    if (selectedUid === data.from) {
+      rtdb.ref("invites/" + uid).remove();
+      return;
+    }
+
+    // Show toast
+    const toast = document.getElementById("incomingToast");
+    document.getElementById("toastBody").textContent = (data.fromName || "Someone") + " wants to chat with you.";
+    toast.classList.add("show");
+
+    document.getElementById("toastAccept").onclick = () => {
+      toast.classList.remove("show");
+      rtdb.ref("invites/" + uid).remove();
+      selectUser(data.from);
+    };
+
+    document.getElementById("toastDismiss").onclick = () => {
+      toast.classList.remove("show");
+      rtdb.ref("invites/" + uid).remove();
+    };
+  });
+}
+</script>
+
+</body>
+</html>
