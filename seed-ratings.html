@@ -348,6 +348,7 @@ const GROK_PROXY       = "https://grok.hanyuriyu.workers.dev";
 const TENCENT_PROXY    = "https://tencent.hanyuriyu.workers.dev";
 const ALIBABA_PROXY    = "https://alibaba.hanyuriyu.workers.dev";
 const MICROSOFT_PROXY  = "https://microsoft.hanyuriyu.workers.dev";
+const JAIS_PROXY       = "https://jais.hanyuriyu.workers.dev";
 
 // ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
@@ -583,6 +584,25 @@ async function translateWithMicrosoft(text, targetLang) {
   return data[0].translations[0].text.trim();
 }
 
+async function translateWithJais(text, targetLang) {
+  const prompt = `### Instruction: You are a translation engine. Translate the following text into ${targetLang}. Output ONLY the translated text, no explanation.\n\n${text}\n### Response:`;
+  const res = await fetch(JAIS_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: { max_new_tokens: 1024, temperature: 0.3 }
+    })
+  });
+  if (!res.ok) throw new Error(`Jais ${res.status}`);
+  const data = await res.json();
+  const generated = Array.isArray(data) ? data[0].generated_text : data.generated_text || data[0]?.generated_text;
+  const answer = generated.includes("### Response:")
+    ? generated.split("### Response:").pop().trim()
+    : generated.replace(prompt, "").trim();
+  return answer;
+}
+
 // ── Engine registry ──
 const ENGINE_LIST = [
   { id: "claude",     name: "Claude",              translate: translateWithClaude },
@@ -596,7 +616,8 @@ const ENGINE_LIST = [
   { id: "grok",       name: "Grok",                 translate: translateWithGrok },
   { id: "tencent",    name: "Tencent Translate",    translate: translateWithTencent },
   { id: "alibaba",    name: "Alibaba Translate",    translate: translateWithAlibaba },
-  { id: "microsoft",  name: "Microsoft Translate",  translate: translateWithMicrosoft }
+  { id: "microsoft",  name: "Microsoft Translate",  translate: translateWithMicrosoft },
+  { id: "jais",       name: "Jais",                 translate: translateWithJais }
 ];
 
 // ── Rating function: ask the selected rater engine to score a translation ──
@@ -612,7 +633,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
 
   // For API-based engines (not DeepL/Google/Tencent/Microsoft which are non-LLM),
   // we send a rating prompt. For non-LLM engines, fall back to Claude.
-  const NON_LLM = ["deepl", "google", "tencent", "microsoft"];
+  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "jais"];
   const actualRater = NON_LLM.includes(raterEngine) ? "claude" : raterEngine;
 
   let rawScore;
