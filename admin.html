@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lingonect — Admin</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:130px;
+}
+
+html{ height:100%; }
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Special Elite","Courier New",monospace;
+  visibility:hidden;
+  overflow-y:auto;
+}
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); }
+
+/* ── LOGO RAIL ── */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - 520px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  z-index:1;
+}
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#000;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  transition:color .2s;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* ── PAGE WRAP ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:120px 0 100px;
+  box-sizing:border-box;
+}
+
+.stage{
+  width:700px;
+  max-width:96vw;
+  margin:0 auto;
+  position:relative;
+  z-index:2;
+}
+
+.page-title{
+  font-size:22px;
+  font-weight:800;
+  text-align:center;
+  margin:0 0 8px;
+}
+.page-sub{
+  font-size:15px;
+  text-align:center;
+  color:#666;
+  margin:0 0 32px;
+}
+
+/* ── TABS ── */
+.tab-bar{
+  display:flex;
+  gap:0;
+  border-bottom:2px solid #111;
+  margin-bottom:20px;
+}
+.tab-btn{
+  font-family:inherit;
+  font-size:13px;
+  font-weight:800;
+  padding:10px 20px;
+  background:none;
+  border:none;
+  border-bottom:3px solid transparent;
+  cursor:pointer;
+  color:#999;
+  margin-bottom:-2px;
+  transition:color .2s;
+}
+.tab-btn:hover{ color:#555; }
+.tab-btn.active{
+  color:var(--text);
+  border-bottom-color:var(--cobalt);
+}
+.tab-count{
+  font-size:11px;
+  color:#888;
+  margin-left:4px;
+}
+
+/* ── USER LIST ── */
+.user-list{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+.user-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 0;
+  border-bottom:1px solid #eee;
+  text-decoration:none;
+  color:inherit;
+  transition:background .15s;
+}
+.user-row:hover{ background:#f8f8ff; }
+.user-row:last-child{ border-bottom:none; }
+
+.user-num{
+  font-size:11px;
+  color:#bbb;
+  width:28px;
+  text-align:right;
+  flex-shrink:0;
+}
+.user-info{
+  flex:1;
+  min-width:0;
+}
+.user-name{
+  font-size:14px;
+  font-weight:800;
+}
+.user-email{
+  font-size:11px;
+  color:#888;
+  margin-top:2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.user-date{
+  font-size:11px;
+  color:#aaa;
+  flex-shrink:0;
+}
+
+/* ── BADGES ── */
+.badge{
+  display:inline-block;
+  padding:3px 10px;
+  border-radius:12px;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.3px;
+  flex-shrink:0;
+}
+.badge.certified{
+  background:#d0f0d0;
+  color:#1a7a1a;
+}
+.badge.uncertified{
+  background:#f0e0d0;
+  color:#8a6530;
+}
+
+.empty-msg{
+  text-align:center;
+  font-size:14px;
+  color:#999;
+  padding:40px 0;
+}
+
+/* ── MOBILE ── */
+@media (max-width:820px){
+  .logo-rail{
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
+    width:auto;
+    justify-content:center;
+    padding:32px 0 4px;
+    margin-bottom:10px;
+  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
+  .page-wrap{
+    padding:60px 0 100px;
+  }
+  .stage{ padding:0 16px; box-sizing:border-box; }
+  .page-title{ font-size:16px; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html">Ratings</a>
+  <a href="seed-ratings.html" id="seedNavLink">Seed Ratings</a>
+  <a href="admin.html" class="active" id="adminNavLink">Admin</a>
+  <a href="profile.html">Profile</a>
+</nav>
+
+<!-- LOGO RAIL -->
+<div class="logo-rail">
+  <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
+
+<div class="page-wrap">
+  <main class="stage">
+    <p class="page-title">User Management</p>
+    <p class="page-sub">All registered users</p>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="all" id="tabAll">All<span class="tab-count" id="countAll"></span></button>
+      <button class="tab-btn" data-tab="uncertified" id="tabUncert">Uncertified<span class="tab-count" id="countUncert"></span></button>
+      <button class="tab-btn" data-tab="certified" id="tabCert">Certified<span class="tab-count" id="countCert"></span></button>
+    </div>
+
+    <div class="user-list" id="userList"></div>
+  </main>
+</div>
+
+<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+
+let allUsers = [];
+let activeTab = "all";
+
+// ── Auth guard: admin only ──
+auth.onAuthStateChanged(async user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  if (user.email !== ADMIN_EMAIL) {
+    window.location.href = "engines.html";
+    return;
+  }
+
+  await loadUsers();
+  document.body.style.visibility = "visible";
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+// ── Tabs ──
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    renderList();
+  });
+});
+
+// ── Load all users ──
+async function loadUsers() {
+  const snap = await db.collection("profiles").get();
+  allUsers = [];
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    allUsers.push({
+      uid: doc.id,
+      username: d.username || "",
+      email: d.email || "",
+      certification: d.certification || "Uncertified",
+      createdAt: d.createdAt || d.updatedAt || null
+    });
+  });
+
+  // Sort by createdAt descending (newest first), nulls last
+  allUsers.sort((a, b) => {
+    const ta = a.createdAt ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt ? b.createdAt.toMillis() : 0;
+    return tb - ta;
+  });
+
+  updateCounts();
+  renderList();
+}
+
+function updateCounts() {
+  const cert = allUsers.filter(u => u.certification === "Lingonect Certified").length;
+  const uncert = allUsers.length - cert;
+  document.getElementById("countAll").textContent = " (" + allUsers.length + ")";
+  document.getElementById("countUncert").textContent = " (" + uncert + ")";
+  document.getElementById("countCert").textContent = " (" + cert + ")";
+}
+
+function renderList() {
+  const container = document.getElementById("userList");
+  let filtered = allUsers;
+
+  if (activeTab === "certified") {
+    filtered = allUsers.filter(u => u.certification === "Lingonect Certified");
+  } else if (activeTab === "uncertified") {
+    filtered = allUsers.filter(u => u.certification !== "Lingonect Certified");
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-msg">No users found</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map((u, i) => {
+    const isCert = u.certification === "Lingonect Certified";
+    const badgeClass = isCert ? "certified" : "uncertified";
+    const badgeText = isCert ? "Certified" : "Uncertified";
+    const dateStr = u.createdAt ? formatDate(u.createdAt) : "—";
+
+    return `
+      <a class="user-row" href="profile.html?uid=${u.uid}">
+        <span class="user-num">${i + 1}.</span>
+        <div class="user-info">
+          <div class="user-name">${escHtml(u.username) || "—"}</div>
+          <div class="user-email">${escHtml(u.email)}</div>
+        </div>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+        <span class="user-date">${dateStr}</span>
+      </a>
+    `;
+  }).join("");
+}
+
+function formatDate(ts) {
+  const d = ts.toDate();
+  const day = String(d.getDate()).padStart(2, "0");
+  const mon = String(d.getMonth() + 1).padStart(2, "0");
+  const yr = d.getFullYear();
+  return day + "/" + mon + "/" + yr;
+}
+
+function escHtml(str) {
+  const el = document.createElement("span");
+  el.textContent = str;
+  return el.innerHTML;
+}
+</script>
+</body>
+</html>

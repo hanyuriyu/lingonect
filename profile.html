@@ -468,6 +468,7 @@ body{
   <a href="engines.html">Engines</a>
   <a href="ratings.html">Ratings</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
+  <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="profile.html" class="active">Profile</a>
 </nav>
 
@@ -603,6 +604,7 @@ auth.onAuthStateChanged(async user => {
 
   if (isAdmin) {
     document.getElementById("seedNavLink").style.display = "";
+    document.getElementById("adminNavLink").style.display = "";
   }
 
   viewingUid = user.uid;
@@ -984,6 +986,11 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       foreignLanguages,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+
+    // Set createdAt only on first save
+    if (!profileSubmitted) {
+      profileData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
 
     // Set email on first save or when viewing own profile
     if (viewingUid === currentUser.uid) {

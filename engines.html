@@ -499,6 +499,7 @@ body{
   <a href="engines.html" class="active">Engines</a>
   <a href="ratings.html">Ratings</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
+  <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="profile.html">Profile</a>
 </nav>
 
@@ -678,6 +679,7 @@ auth.onAuthStateChanged(user => {
   }
   if (user.email === "linguisticsconsulting@gmail.com") {
     document.getElementById("seedNavLink").style.display = "";
+    document.getElementById("adminNavLink").style.display = "";
   }
   document.body.style.visibility = "visible";
 });
