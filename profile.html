@@ -240,14 +240,17 @@ body{
 }
 .add-lang-btn:hover{ background:#f0f4ff; }
 
-/* ── MOTHER TONGUE LAYOUT (entries + definitions side by side) ── */
+/* ── MOTHER TONGUE LAYOUT (entries left, definitions floated far right) ── */
 .mother-tongue-layout{
-  display:flex;
-  gap:24px;
-  align-items:flex-start;
+  position:relative;
 }
-.mother-tongue-left{ flex:1; min-width:0; }
-.mother-tongue-right{ width:290px; flex-shrink:0; }
+.mother-tongue-left{ /* normal flow */ }
+.mother-tongue-right{
+  position:absolute;
+  left:calc(100% + 40px);
+  top:0;
+  width:340px;
+}
 
 /* ── MULTI-SELECT LEVEL PICKER ── */
 .level-multi{
@@ -447,8 +450,11 @@ body{
   .page-title{ font-size:16px; }
   .lang-entry{ flex-wrap:wrap; }
   .lang-entry select.lang-level{ width:100%; }
-  .mother-tongue-layout{ flex-direction:column; }
-  .mother-tongue-right{ width:100%; }
+  .mother-tongue-right{
+    position:static;
+    width:100%;
+    margin-top:20px;
+  }
   .level-multi{ width:100%; }
   .profile-readonly{ padding:20px 16px; }
 }
