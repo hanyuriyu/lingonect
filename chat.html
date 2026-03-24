@@ -14,7 +14,7 @@
   --bg:#ffffff;
   --text:#111;
   --cobalt:#0047FF;
-  --text-col:720px;
+  --text-col:700px;
   --logo-size:240px;
   --logo-opacity:0.9;
   --mobile-logo:130px;
@@ -121,44 +121,27 @@ body{
 .chat-layout{
   display:flex;
   gap:16px;
-  height:520px;
+  height:420px;
 }
 
-/* ── RETRO MONITOR ── */
+/* ── RETRO TERMINAL ── */
 .terminal-wrap{
   flex:1;
   display:flex;
   flex-direction:column;
-  gap:10px;
-}
-
-.monitor-frame{
-  flex:1;
-  position:relative;
-  min-height:0;
-}
-
-.monitor-frame img.monitor-img{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:fill;
-  pointer-events:none;
-  z-index:4;
+  gap:12px;
 }
 
 .terminal{
-  position:absolute;
-  top:10%;
-  left:12%;
-  right:12%;
-  bottom:18%;
+  flex:1;
   background:var(--terminal-bg);
-  border-radius:6px;
+  border:3px solid var(--terminal-border);
+  border-radius:12px;
+  position:relative;
   overflow:hidden;
-  box-shadow:inset 0 0 40px rgba(0,0,0,.6);
-  z-index:1;
+  box-shadow:
+    0 0 20px rgba(0,255,65,.08),
+    inset 0 0 60px rgba(0,0,0,.4);
 }
 
 /* CRT scanlines effect */
@@ -168,8 +151,8 @@ body{
   inset:0;
   background:repeating-linear-gradient(
     0deg,
-    rgba(0,0,0,.12) 0px,
-    rgba(0,0,0,.12) 1px,
+    rgba(0,0,0,.15) 0px,
+    rgba(0,0,0,.15) 1px,
     transparent 1px,
     transparent 3px
   );
@@ -177,29 +160,29 @@ body{
   z-index:2;
 }
 
-/* CRT curvature vignette */
+/* Slight CRT curvature vignette */
 .terminal::after{
   content:"";
   position:absolute;
   inset:0;
-  border-radius:6px;
-  box-shadow:inset 0 0 60px rgba(0,0,0,.5);
+  border-radius:12px;
+  box-shadow:inset 0 0 80px rgba(0,0,0,.5);
   pointer-events:none;
   z-index:3;
 }
 
 /* Title bar */
 .terminal-bar{
-  background:rgba(0,0,0,.5);
-  border-bottom:1px solid rgba(255,255,255,.06);
-  padding:4px 10px;
+  background:#1a1a1a;
+  border-bottom:1px solid var(--terminal-border);
+  padding:6px 14px;
   display:flex;
   align-items:center;
-  gap:6px;
+  gap:8px;
 }
 .terminal-dot{
-  width:8px;
-  height:8px;
+  width:10px;
+  height:10px;
   border-radius:50%;
 }
 .terminal-dot.red{ background:#ff5f57; }
@@ -208,19 +191,19 @@ body{
 .terminal-title{
   flex:1;
   text-align:center;
-  font-size:10px;
-  color:#555;
+  font-size:11px;
+  color:#666;
   letter-spacing:1px;
 }
 
 /* Chat messages area */
 .chat-messages{
-  padding:10px 12px;
+  padding:16px;
   overflow-y:auto;
-  height:calc(100% - 28px);
+  height:calc(100% - 36px);
   display:flex;
   flex-direction:column;
-  gap:4px;
+  gap:6px;
   position:relative;
   z-index:1;
 }
@@ -278,11 +261,11 @@ body{
 .chat-input{
   flex:1;
   background:var(--terminal-bg);
-  border:2px solid var(--terminal-border);
-  border-radius:6px;
-  padding:8px 12px;
+  border:3px solid var(--terminal-border);
+  border-radius:8px;
+  padding:10px 14px;
   font-family:"Courier New",monospace;
-  font-size:12px;
+  font-size:13px;
   color:var(--green);
   outline:none;
   transition:border-color .2s;
@@ -299,11 +282,11 @@ body{
 
 .chat-send-btn{
   background:var(--terminal-bg);
-  border:2px solid var(--terminal-border);
-  border-radius:6px;
-  padding:8px 14px;
+  border:3px solid var(--terminal-border);
+  border-radius:8px;
+  padding:10px 18px;
   font-family:"Special Elite","Courier New",monospace;
-  font-size:12px;
+  font-size:13px;
   font-weight:800;
   color:var(--green);
   cursor:pointer;
@@ -324,37 +307,17 @@ body{
   width:180px;
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:12px;
   flex-shrink:0;
 }
 
-.users-monitor{
-  flex:1;
-  position:relative;
-  min-height:0;
-}
-
-.users-monitor img.monitor-img{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:fill;
-  pointer-events:none;
-  z-index:4;
-}
-
 .users-box{
-  position:absolute;
-  top:10%;
-  left:12%;
-  right:12%;
-  bottom:18%;
+  flex:1;
   background:var(--terminal-bg);
-  border-radius:6px;
+  border:3px solid var(--terminal-border);
+  border-radius:12px;
   overflow:hidden;
-  box-shadow:inset 0 0 40px rgba(0,0,0,.6);
-  z-index:1;
+  box-shadow:0 0 20px rgba(0,255,65,.08);
 }
 
 .users-bar{
@@ -507,17 +470,13 @@ body{
   }
 
   .terminal-wrap{
+    height:50vh;
     min-height:300px;
-  }
-  .monitor-frame{
-    height:340px;
   }
 
   .users-panel{
     width:100%;
-  }
-  .users-monitor{
-    height:260px;
+    height:200px;
   }
 }
 </style>
@@ -547,20 +506,17 @@ body{
 
       <!-- Terminal + input -->
       <div class="terminal-wrap">
-        <div class="monitor-frame">
-          <img class="monitor-img" src="monitor_transparent.png" alt="">
-          <div class="terminal">
-            <div class="terminal-bar">
-              <span class="terminal-dot red"></span>
-              <span class="terminal-dot yellow"></span>
-              <span class="terminal-dot green"></span>
-              <span class="terminal-title" id="terminalTitle">LINGONECT CHAT</span>
-            </div>
-            <div class="chat-messages" id="chatMessages">
-              <div class="chat-empty" id="chatEmpty">
-                Select an online user to start chatting.<br>
-                &gt; _
-              </div>
+        <div class="terminal">
+          <div class="terminal-bar">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title" id="terminalTitle">LINGONECT CHAT</span>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-empty" id="chatEmpty">
+              Select an online user to start chatting.<br>
+              &gt; _
             </div>
           </div>
         </div>
@@ -573,13 +529,10 @@ body{
 
       <!-- Online users -->
       <div class="users-panel">
-        <div class="users-monitor">
-          <img class="monitor-img" src="monitor_transparent.png" alt="">
-          <div class="users-box">
-            <div class="users-bar">ONLINE USERS</div>
-            <div class="users-list" id="usersList">
-              <div class="users-empty">No users online</div>
-            </div>
+        <div class="users-box">
+          <div class="users-bar">ONLINE USERS</div>
+          <div class="users-list" id="usersList">
+            <div class="users-empty">No users online</div>
           </div>
         </div>
       </div>
