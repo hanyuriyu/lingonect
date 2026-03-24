@@ -303,6 +303,7 @@ body{
 .engine-logo-badge.tencent    { background:#0052D9; }
 .engine-logo-badge.alibaba    { background:#FF6A00; }
 .engine-logo-badge.microsoft  { background:#00A4EF; }
+.engine-logo-badge.jais       { background:#00B4D8; }
 
 .result-content{
   flex:1;
@@ -1235,6 +1236,29 @@ async function translateWithMicrosoft(text) {
   return data[0].translations[0].text.trim();
 }
 
+// ── Jais (via Cloudflare Worker → Hugging Face Inference API) ──
+const JAIS_PROXY = "https://jais.hanyuriyu.workers.dev";
+
+async function translateWithJais(text) {
+  const prompt = `### Instruction: You are a translation engine. Translate the following text into ${targetLang}. Output ONLY the translated text, no explanation.\n\n${text}\n### Response:`;
+  const res = await fetch(JAIS_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: { max_new_tokens: 1024, temperature: 0.3 }
+    })
+  });
+  if (!res.ok) throw new Error(`Jais ${res.status}`);
+  const data = await res.json();
+  const generated = Array.isArray(data) ? data[0].generated_text : data.generated_text || data[0]?.generated_text;
+  // Strip the prompt from the response if echoed back
+  const answer = generated.includes("### Response:")
+    ? generated.split("### Response:").pop().trim()
+    : generated.replace(prompt, "").trim();
+  return answer;
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -1332,6 +1356,14 @@ const engines = [
     badgeClass: "microsoft",
     badgeText:  "MS",
     translate:  translateWithMicrosoft
+  },
+  {
+    id:         "jais",
+    name:       "Jais",
+    logoUrl:    "https://huggingface.co/favicon.ico",
+    badgeClass: "jais",
+    badgeText:  "J",
+    translate:  translateWithJais
   }
 ];
 
