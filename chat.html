@@ -727,7 +727,6 @@ function listenChat(otherUid) {
   const roomId = chatRoomId(currentUser.uid, otherUid);
   const messagesEl = document.getElementById("chatMessages");
   messagesEl.innerHTML = "";
-  document.getElementById("chatEmpty").style.display = "none";
 
   chatListener = db.collection("chats").doc(roomId).collection("messages")
     .orderBy("ts", "asc")
