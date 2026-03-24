@@ -174,6 +174,30 @@ html,body{
 }
 .form-footer a:hover{ color:var(--cobalt); border-bottom-color:var(--cobalt); }
 
+.consent-group{
+  margin:16px 0 6px;
+}
+.consent-label{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  font-size:11px;
+  color:#666;
+  line-height:1.6;
+  cursor:pointer;
+}
+.consent-label input[type="checkbox"]{
+  margin-top:3px;
+  flex-shrink:0;
+  accent-color:#111;
+}
+.consent-label a{
+  color:#111;
+  text-decoration:none;
+  border-bottom:1px solid #999;
+}
+.consent-label a:hover{ color:var(--cobalt); border-bottom-color:var(--cobalt); }
+
 .error-msg{
   font-size:13px;
   color:#c00;
@@ -270,6 +294,12 @@ html,body{
       <label>Confirm Password</label>
       <input type="password" id="password2" autocomplete="new-password" />
     </div>
+    <div class="consent-group">
+      <label class="consent-label">
+        <input type="checkbox" id="emailConsent" />
+        <span>I consent to Lingonect storing my email address for account administration purposes. No other personal data is collected. You can withdraw consent at any time by contacting <a href="mailto:contact@lingonect.com">contact@lingonect.com</a>.</span>
+      </label>
+    </div>
     <button class="submit-btn" id="registerBtn" type="button">Create Account</button>
     <div class="error-msg" id="errorMsg"></div>
 
@@ -287,6 +317,7 @@ html,body{
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -300,6 +331,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const db   = firebase.firestore();
 
 const ALLOWED_REG_EMAILS = ["hanyuriyu@googlemail.com"];
 
@@ -314,15 +346,23 @@ function clearError()   { errorEl.style.display = "none"; }
 // Google sign-up
 document.getElementById("googleBtn").addEventListener("click", () => {
   clearError();
+  const emailConsent = document.getElementById("emailConsent").checked;
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider)
-    .then(cred => {
+    .then(async cred => {
       if (!isRegAllowed(cred.user.email)) {
         cred.user.delete().catch(() => {});
         auth.signOut();
         showError("Registration is restricted. This email is not allowed.");
         return;
       }
+      const profileData = {
+        emailConsent,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (emailConsent) profileData.email = cred.user.email;
+      await db.collection("profiles").doc(cred.user.uid).set(profileData, { merge: true });
+      auth.signOut();
       document.getElementById("formPanel").style.display = "none";
       document.getElementById("successPanel").style.display = "";
     })
@@ -345,13 +385,20 @@ document.getElementById("registerBtn").addEventListener("click", () => {
     return;
   }
 
+  const emailConsent = document.getElementById("emailConsent").checked;
+
   auth.createUserWithEmailAndPassword(email, password)
-    .then(cred => {
-      return cred.user.sendEmailVerification().then(() => {
-        auth.signOut();
-        document.getElementById("formPanel").style.display = "none";
-        document.getElementById("successPanel").style.display = "";
-      });
+    .then(async cred => {
+      const profileData = {
+        emailConsent,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (emailConsent) profileData.email = email;
+      await db.collection("profiles").doc(cred.user.uid).set(profileData, { merge: true });
+      await cred.user.sendEmailVerification();
+      auth.signOut();
+      document.getElementById("formPanel").style.display = "none";
+      document.getElementById("successPanel").style.display = "";
     })
     .catch(err => {
       if (err.code === "auth/email-already-in-use") {

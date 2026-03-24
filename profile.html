@@ -992,9 +992,12 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       profileData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     }
 
-    // Set email on first save or when viewing own profile
+    // Only store email if user gave consent at registration
     if (viewingUid === currentUser.uid) {
-      profileData.email = currentUser.email;
+      const existing = await db.collection("profiles").doc(viewingUid).get();
+      if (existing.exists && existing.data().emailConsent) {
+        profileData.email = currentUser.email;
+      }
     }
 
     const batch = db.batch();
