@@ -353,8 +353,8 @@ body{
   background:rgba(0,255,65,.08);
 }
 .user-entry.selected{
-  color:var(--yellow);
-  background:rgba(255,230,0,.08);
+  color:#ffff00;
+  background:rgba(255,255,0,.12);
 }
 .user-entry.self{
   opacity:.5;
@@ -363,11 +363,11 @@ body{
 .user-lang{
   font-size:9px;
   font-weight:normal;
-  color:#555;
+  color:#ffffff;
   letter-spacing:.5px;
 }
 .user-entry.selected .user-lang{
-  color:#887700;
+  color:#ffff00;
 }
 
 .users-empty{
@@ -702,7 +702,7 @@ function selectUser(uid) {
   renderOnlineUsers();
   const userData = onlineUsers[uid];
   const name = userData ? userData.username : "User";
-  document.getElementById("terminalTitle").textContent = "CHAT — " + name.toUpperCase();
+  document.getElementById("terminalTitle").textContent = "You are chatting with " + name;
   document.getElementById("chatInput").disabled = false;
   document.getElementById("sendBtn").disabled = false;
   const chatEmptyEl = document.getElementById("chatEmpty");
