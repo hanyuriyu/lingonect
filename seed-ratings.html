@@ -296,7 +296,7 @@ auth.onAuthStateChanged(user => {
 
 // ── All supported languages ──
 const ALL_LANGUAGES = [
-  "English","Spanish","French","German","Italian","Portuguese",
+  "English","Spanish","French","German","Italian","Portuguese (Brazil)","Portuguese (Portugal)",
   "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
   "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
   "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
@@ -350,7 +350,7 @@ const MICROSOFT_PROXY  = "https://microsoft.hanyuriyu.workers.dev";
 // ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-PT","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
@@ -361,7 +361,7 @@ const GOOGLE_LANG_MAP = {
 };
 const DEEPL_LANG_MAP = {
   "English":"EN-US","Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
-  "Portuguese":"PT-BR","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
+  "Portuguese (Brazil)":"PT-BR","Portuguese (Portugal)":"PT-PT","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
   "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
   "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
   "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
@@ -372,7 +372,7 @@ const DEEPL_LANG_MAP = {
 };
 const TENCENT_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
@@ -383,7 +383,7 @@ const TENCENT_LANG_MAP = {
 };
 const MICROSOFT_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Portuguese":"pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
@@ -738,7 +738,7 @@ function populateDropdowns() {
     tgtSel.add(new Option(lang, lang));
   });
   srcSel.value = "English";
-  tgtSel.value = "Portuguese";
+  tgtSel.value = "Portuguese (Brazil)";
 }
 
 // ── UI: Build rater radio buttons ──

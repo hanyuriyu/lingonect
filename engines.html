@@ -537,7 +537,8 @@ body{
             <button class="lang-option" data-lang="French">French</button>
             <button class="lang-option" data-lang="German">German</button>
             <button class="lang-option" data-lang="Italian">Italian</button>
-            <button class="lang-option" data-lang="Portuguese">Portuguese</button>
+            <button class="lang-option" data-lang="Portuguese (Brazil)">Portuguese (Brazil)</button>
+            <button class="lang-option" data-lang="Portuguese (Portugal)">Portuguese (Portugal)</button>
             <button class="lang-option" data-lang="Swedish">Swedish</button>
             <button class="lang-option" data-lang="Norwegian">Norwegian</button>
             <button class="lang-option" data-lang="Danish">Danish</button>
@@ -591,7 +592,8 @@ body{
             <button class="lang-option" data-lang="French">French</button>
             <button class="lang-option active" data-lang="German">German</button>
             <button class="lang-option" data-lang="Italian">Italian</button>
-            <button class="lang-option" data-lang="Portuguese">Portuguese</button>
+            <button class="lang-option" data-lang="Portuguese (Brazil)">Portuguese (Brazil)</button>
+            <button class="lang-option" data-lang="Portuguese (Portugal)">Portuguese (Portugal)</button>
             <button class="lang-option" data-lang="Swedish">Swedish</button>
             <button class="lang-option" data-lang="Norwegian">Norwegian</button>
             <button class="lang-option" data-lang="Danish">Danish</button>
@@ -1029,7 +1031,8 @@ async function translateWithPerplexity(text) {
 // ── Google Translate ──
 const GOOGLE_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-PT",
+  "Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
@@ -1058,7 +1061,7 @@ async function translateWithGoogle(text) {
 // ── DeepL ──
 const DEEPL_LANG_MAP = {
   "English":"EN-US","Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
-  "Portuguese":"PT-BR","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
+  "Portuguese (Brazil)":"PT-BR","Portuguese (Portugal)":"PT-PT","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
   "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
   "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
   "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
@@ -1151,7 +1154,7 @@ const TENCENT_PROXY = "https://tencent.hanyuriyu.workers.dev";
 
 const TENCENT_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Portuguese":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
@@ -1205,7 +1208,7 @@ const MICROSOFT_PROXY = "https://microsoft.hanyuriyu.workers.dev";
 
 const MICROSOFT_LANG_MAP = {
   "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
-  "Portuguese":"pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
