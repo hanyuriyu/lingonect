@@ -132,6 +132,25 @@ body{
   gap:12px;
 }
 
+.profile-required{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:60vh;
+  text-align:center;
+  padding:40px;
+}
+.profile-required p{
+  font-size:16px;
+  color:#ccc;
+  line-height:1.6;
+  max-width:500px;
+}
+.profile-required a{
+  color:var(--green);
+  text-decoration:underline;
+}
+
 .terminal{
   flex:1;
   background:var(--terminal-bg);
@@ -503,7 +522,13 @@ body{
 
 <div class="page-wrap">
   <main class="stage">
-    <div class="chat-layout">
+
+    <!-- Shown when user has no username set -->
+    <div class="profile-required" id="profileRequired" style="display:none;">
+      <p>Chat is only available to users who have set up a username on the <a href="profile.html">Profile</a> page.</p>
+    </div>
+
+    <div class="chat-layout" id="chatLayout">
 
       <!-- Terminal + input -->
       <div class="terminal-wrap">
@@ -596,6 +621,13 @@ auth.onAuthStateChanged(async user => {
   // Load own profile
   const snap = await db.collection("profiles").doc(user.uid).get();
   myProfile = snap.exists ? snap.data() : {};
+
+  // Require username to access chat
+  if (!myProfile.username || !myProfile.username.trim()) {
+    document.getElementById("profileRequired").style.display = "flex";
+    document.getElementById("chatLayout").style.display = "none";
+    return;
+  }
 
   // Set presence
   setupPresence(user.uid);
