@@ -344,7 +344,8 @@ async function loadUsers() {
     allUsers.push({
       uid: doc.id,
       username: d.username || "",
-      email: d.email || "",
+      email: d.emailConsent ? (d.email || "") : "",
+      emailConsent: !!d.emailConsent,
       certification: d.certification || "Uncertified",
       createdAt: d.createdAt || d.updatedAt || null
     });
@@ -395,7 +396,7 @@ function renderList() {
         <span class="user-num">${i + 1}.</span>
         <div class="user-info">
           <div class="user-name">${escHtml(u.username) || "—"}</div>
-          <div class="user-email">${escHtml(u.email)}</div>
+          <div class="user-email">${u.email ? escHtml(u.email) : '<em style="color:#bbb;">Email withheld</em>'}</div>
         </div>
         <span class="badge ${badgeClass}">${badgeText}</span>
         <span class="user-date">${dateStr}</span>
