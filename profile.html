@@ -871,7 +871,8 @@ async function loadProfile() {
 
   if (doc.exists) {
     const data = doc.data();
-    profileSubmitted = true;
+    // Profile is only considered "submitted" if the user has set a username
+    profileSubmitted = !!data.username;
     savedUsername = data.username || "";
 
     // Admin can always edit; non-admin users see read-only after first save
@@ -898,9 +899,15 @@ async function loadProfile() {
       } else {
         createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS, false);
       }
-    } else {
-      // Non-admin: show read-only view
+    } else if (profileSubmitted) {
+      // Non-admin with completed profile: show read-only view
       showReadonly(data);
+    } else {
+      // Non-admin with incomplete profile (doc exists from registration but no username yet): show edit form
+      showEditForm();
+      renderCert(data.certification || "Uncertified");
+      createLangEntry("motherTongues", "", [], MOTHER_LEVELS, true);
+      createLangEntry("foreignLangs", "", "", FOREIGN_LEVELS, false);
     }
   } else {
     // New profile — show edit form for everyone
