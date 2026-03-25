@@ -364,7 +364,7 @@ document.getElementById("googleBtn").addEventListener("click", () => {
       await db.collection("profiles").doc(cred.user.uid).set(profileData, { merge: true });
       auth.signOut();
       document.getElementById("formPanel").style.display = "none";
-      document.getElementById("successPanel").style.display = "";
+      document.getElementById("successPanel").style.display = "block";
     })
     .catch(err => showError(err.message));
 });
@@ -398,7 +398,7 @@ document.getElementById("registerBtn").addEventListener("click", () => {
       await cred.user.sendEmailVerification();
       auth.signOut();
       document.getElementById("formPanel").style.display = "none";
-      document.getElementById("successPanel").style.display = "";
+      document.getElementById("successPanel").style.display = "block";
     })
     .catch(err => {
       if (err.code === "auth/email-already-in-use") {
