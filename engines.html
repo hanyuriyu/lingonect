@@ -529,7 +529,7 @@ body{
 
       <div class="input-actions">
         <!-- Source language selector -->
-        <span style="color:#2196F3;font-weight:600;margin-right:6px;">Source</span>
+        <div style="display:flex;align-items:center;gap:8px;">
         <div class="lang-select-wrap" id="srcLangSelectWrap">
           <button class="lang-btn" id="srcLangBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
             <span id="srcLangLabel">English</span>
@@ -583,9 +583,11 @@ body{
             <button class="lang-option" data-lang="Tagalog (Filipino)">Tagalog (Filipino)</button>
           </div>
         </div>
+        <span style="color:#2196F3;font-weight:600;">Source</span>
+        </div>
 
         <!-- Target language selector -->
-        <span style="color:#2196F3;font-weight:600;margin-right:6px;">Target</span>
+        <div style="display:flex;align-items:center;gap:8px;">
         <div class="lang-select-wrap" id="langSelectWrap">
           <button class="lang-btn" id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
             <span id="langLabel">German</span>
@@ -638,6 +640,8 @@ body{
             <button class="lang-option" data-lang="Malay">Malay</button>
             <button class="lang-option" data-lang="Tagalog (Filipino)">Tagalog (Filipino)</button>
           </div>
+        </div>
+        <span style="color:#2196F3;font-weight:600;">Target</span>
         </div>
 
         <button class="submit-btn" id="submitBtn" type="button" disabled>Submit</button>
