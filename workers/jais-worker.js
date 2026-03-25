@@ -1,5 +1,5 @@
 /**
- * Cloudflare Worker: Jais Translation Proxy (via Hugging Face Inference API)
+ * Cloudflare Worker: Jais Translation Proxy (via Hugging Face Inference Providers)
  *
  * Environment secrets required:
  *   Settings > Variables and Secrets > Add:
@@ -27,7 +27,7 @@ export default {
     try {
       const body = await request.json();
       const res = await fetch(
-        "https://api-inference.huggingface.co/models/inceptionai/jais-13b-chat",
+        "https://router.huggingface.co/hf-inference/models/inceptionai/Jais-2-8B-Chat/v1/chat/completions",
         {
           method: "POST",
           headers: {
@@ -35,8 +35,10 @@ export default {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            inputs: body.inputs,
-            parameters: body.parameters || { max_new_tokens: 1024, temperature: 0.3 },
+            model: "inceptionai/Jais-2-8B-Chat",
+            messages: body.messages,
+            max_tokens: body.max_tokens || 1024,
+            temperature: body.temperature || 0.3,
           }),
         }
       );

@@ -1236,27 +1236,25 @@ async function translateWithMicrosoft(text) {
   return data[0].translations[0].text.trim();
 }
 
-// ── Jais (via Cloudflare Worker → Hugging Face Inference API) ──
+// ── Jais (via Cloudflare Worker → Hugging Face Inference Providers) ──
 const JAIS_PROXY = "https://jais.hanyuriyu.workers.dev";
 
 async function translateWithJais(text) {
-  const prompt = `### Instruction: You are a translation engine. Translate the following text into ${targetLang}. Output ONLY the translated text, no explanation.\n\n${text}\n### Response:`;
   const res = await fetch(JAIS_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      inputs: prompt,
-      parameters: { max_new_tokens: 1024, temperature: 0.3 }
+      messages: [
+        { role: "system", content: "You are a translation engine. Output ONLY the translated text, no explanation." },
+        { role: "user", content: `Translate the following text into ${targetLang}:\n\n${text}` }
+      ],
+      max_tokens: 1024,
+      temperature: 0.3
     })
   });
   if (!res.ok) throw new Error(`Jais ${res.status}`);
   const data = await res.json();
-  const generated = Array.isArray(data) ? data[0].generated_text : data.generated_text || data[0]?.generated_text;
-  // Strip the prompt from the response if echoed back
-  const answer = generated.includes("### Response:")
-    ? generated.split("### Response:").pop().trim()
-    : generated.replace(prompt, "").trim();
-  return answer;
+  return data.choices[0].message.content.trim();
 }
 
 // ── Engine registry (add future engines here) ──
