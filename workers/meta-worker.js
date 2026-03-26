@@ -1,8 +1,8 @@
 /**
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
- * Uses the community-hosted NLLB API on Hugging Face Spaces.
- * No API key required — the model runs on a free HF Space.
+ * Uses the community-hosted NLLB API on Hugging Face Spaces (v4).
+ * No API key required.
  *
  * The worker will be available at:
  *   https://meta.hanyuriyu.workers.dev
@@ -10,16 +10,15 @@
 
 export default {
   async fetch(request, env) {
-    // Handle CORS preflight
+    const CORS = {
+      "Access-Control-Allow-Origin": "https://www.lingonect.com",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "86400",
+    };
+
     if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Max-Age": "86400",
-        },
-      });
+      return new Response(null, { headers: CORS });
     }
 
     if (request.method !== "POST") {
@@ -32,47 +31,31 @@ export default {
       if (!text || !target) {
         return new Response(
           JSON.stringify({ error: "Missing 'text' and/or 'target' fields" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "https://www.lingonect.com",
-            },
-          }
+          { status: 400, headers: { "Content-Type": "application/json", ...CORS } }
         );
       }
 
-      const params = new URLSearchParams({
-        text: text,
-        source: source || "eng_Latn",
-        target: target,
-      });
+      const url = `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?text=${encodeURIComponent(text)}&source=${encodeURIComponent(source || "eng_Latn")}&target=${encodeURIComponent(target)}`;
 
-      const res = await fetch(
-        `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?${params}`,
-        { method: "GET" }
-      );
+      const res = await fetch(url);
+      const raw = await res.text();
 
-      const data = await res.json();
+      // Try to parse as JSON; if not, wrap the raw text
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { result: raw };
+      }
 
-      // The API returns { result: "translated text" }
       return new Response(JSON.stringify(data), {
         status: res.status,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
-        },
+        headers: { "Content-Type": "application/json", ...CORS },
       });
     } catch (err) {
       return new Response(
         JSON.stringify({ error: err.message }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "https://www.lingonect.com",
-          },
-        }
+        { status: 500, headers: { "Content-Type": "application/json", ...CORS } }
       );
     }
   },
