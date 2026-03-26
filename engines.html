@@ -1272,8 +1272,31 @@ async function translateWithAmazon(text) {
 // ── Meta NLLB-200 (via Cloudflare Worker → Hugging Face Inference) ──
 const META_PROXY = "https://meta.hanyuriyu.workers.dev";
 
+const NLLB_LANG_MAP = {
+  "English":"eng_Latn","Spanish":"spa_Latn","French":"fra_Latn","German":"deu_Latn","Italian":"ita_Latn",
+  "Portuguese (Brazil)":"por_Latn","Portuguese (Portugal)":"por_Latn","Swedish":"swe_Latn","Norwegian":"nob_Latn","Danish":"dan_Latn","Finnish":"fin_Latn",
+  "Dutch":"nld_Latn","Polish":"pol_Latn","Russian":"rus_Cyrl","Ukrainian":"ukr_Cyrl","Turkish":"tur_Latn",
+  "Greek":"ell_Grek","Romanian":"ron_Latn","Hungarian":"hun_Latn","Czech":"ces_Latn","Slovak":"slk_Latn",
+  "Bulgarian":"bul_Cyrl","Croatian":"hrv_Latn","Serbian":"srp_Cyrl","Lithuanian":"lit_Latn",
+  "Latvian":"lvs_Latn","Estonian":"est_Latn","Slovenian":"slv_Latn","Catalan":"cat_Latn","Icelandic":"isl_Latn",
+  "Arabic":"arb_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
+  "Japanese":"jpn_Jpan","Chinese (Simplified)":"zho_Hans","Chinese (Traditional)":"zho_Hant","Korean":"kor_Hang",
+  "Thai":"tha_Thai","Vietnamese":"vie_Latn","Indonesian":"ind_Latn","Malay":"zsm_Latn","Tagalog (Filipino)":"tgl_Latn"
+};
+
 async function translateWithMeta(text) {
-  return "API implementation in progress";
+  const srcCode = NLLB_LANG_MAP[sourceLang];
+  const tgtCode = NLLB_LANG_MAP[targetLang];
+  if (!tgtCode) throw new Error(`Meta NLLB-200 does not support ${targetLang}.`);
+  const res = await fetch(META_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source: srcCode || "eng_Latn", target: tgtCode })
+  });
+  if (!res.ok) throw new Error(`Meta NLLB-200 ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(`Meta: ${data.error}`);
+  return data[0].translation_text.trim();
 }
 
 // ── Engine registry (add future engines here) ──
