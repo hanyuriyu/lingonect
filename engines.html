@@ -316,6 +316,7 @@ body{
 .engine-logo-badge.microsoft  { background:#00A4EF; }
 .engine-logo-badge.jais       { background:#00B4D8; }
 .engine-logo-badge.amazon     { background:#FF9900; }
+.engine-logo-badge.meta       { background:#0668E1; }
 
 .result-content{
   flex:1;
@@ -1268,6 +1269,13 @@ async function translateWithAmazon(text) {
   return "API implementation in progress";
 }
 
+// ── Meta NLLB-200 (via Cloudflare Worker → Hugging Face Inference) ──
+const META_PROXY = "https://meta.hanyuriyu.workers.dev";
+
+async function translateWithMeta(text) {
+  return "API implementation in progress";
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -1381,6 +1389,14 @@ const engines = [
     badgeClass: "amazon",
     badgeText:  "AM",
     translate:  translateWithAmazon
+  },
+  {
+    id:         "meta",
+    name:       "Meta (NLLB-200)",
+    logoUrl:    "meta_logo.png",
+    badgeClass: "meta",
+    badgeText:  "MT",
+    translate:  translateWithMeta
   }
 ];
 
