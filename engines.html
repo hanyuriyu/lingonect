@@ -315,6 +315,7 @@ body{
 .engine-logo-badge.alibaba    { background:#FF6A00; }
 .engine-logo-badge.microsoft  { background:#00A4EF; }
 .engine-logo-badge.jais       { background:#00B4D8; }
+.engine-logo-badge.amazon     { background:#FF9900; }
 
 .result-content{
   flex:1;
@@ -1260,6 +1261,13 @@ async function translateWithJais(text) {
   return "API implementation in progress";
 }
 
+// ── Amazon Translate (via Cloudflare Worker) ──
+const AMAZON_PROXY = "https://amazon.hanyuriyu.workers.dev";
+
+async function translateWithAmazon(text) {
+  return "API implementation in progress";
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -1365,6 +1373,14 @@ const engines = [
     badgeClass: "jais",
     badgeText:  "J",
     translate:  translateWithJais
+  },
+  {
+    id:         "amazon",
+    name:       "Amazon Translate",
+    logoUrl:    "Amazon_logo.png",
+    badgeClass: "amazon",
+    badgeText:  "AM",
+    translate:  translateWithAmazon
   }
 ];
 
