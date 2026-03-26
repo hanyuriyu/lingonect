@@ -49,7 +49,7 @@ export default {
       });
 
       const res = await fetch(
-        `https://winstxnhdw-nllb-api.hf.space/api/v3/translate?${params}`,
+        `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?${params}`,
         { method: "GET" }
       );
 
