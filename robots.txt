@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin.html
+Disallow: /seed-ratings.html
+Disallow: /workers/
+
+Sitemap: https://www.lingonect.com/sitemap.xml
