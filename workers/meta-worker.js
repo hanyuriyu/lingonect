@@ -1,11 +1,8 @@
 /**
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
- * Uses Hugging Face Inference API with the NLLB-200 model.
- *
- * Environment secrets required:
- *   Settings > Variables and Secrets > Add:
- *     HF_TOKEN (encrypt) — Hugging Face access token (free, read-only)
+ * Uses the community-hosted NLLB API on Hugging Face Spaces.
+ * No API key required — the model runs on a free HF Space.
  *
  * The worker will be available at:
  *   https://meta.hanyuriyu.workers.dev
@@ -45,37 +42,20 @@ export default {
         );
       }
 
-      // Try the new HF Inference Providers endpoint first, fall back to legacy
-      const endpoints = [
-        "https://router.huggingface.co/hf-inference/models/facebook/nllb-200-distilled-600M",
-        "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
-      ];
+      const params = new URLSearchParams({
+        text: text,
+        source: source || "eng_Latn",
+        target: target,
+      });
 
-      let res;
-      let data;
+      const res = await fetch(
+        `https://winstxnhdw-nllb-api.hf.space/api/v3/translate?${params}`,
+        { method: "GET" }
+      );
 
-      for (const endpoint of endpoints) {
-        res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.HF_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            inputs: text,
-            parameters: {
-              src_lang: source || "eng_Latn",
-              tgt_lang: target,
-            },
-          }),
-        });
+      const data = await res.json();
 
-        data = await res.json();
-
-        // If successful or a non-routing error, stop trying
-        if (res.ok || (res.status !== 410 && res.status !== 404)) break;
-      }
-
+      // The API returns { result: "translated text" }
       return new Response(JSON.stringify(data), {
         status: res.status,
         headers: {

@@ -1296,7 +1296,7 @@ async function translateWithMeta(text) {
   if (!res.ok) throw new Error(`Meta NLLB-200 ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(`Meta: ${data.error}`);
-  return data[0].translation_text.trim();
+  return (data.result || data[0]?.translation_text || "").trim();
 }
 
 // ── Engine registry (add future engines here) ──
