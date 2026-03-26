@@ -45,9 +45,17 @@ export default {
         );
       }
 
-      const res = await fetch(
+      // Try the new HF Inference Providers endpoint first, fall back to legacy
+      const endpoints = [
+        "https://router.huggingface.co/hf-inference/models/facebook/nllb-200-distilled-600M",
         "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
-        {
+      ];
+
+      let res;
+      let data;
+
+      for (const endpoint of endpoints) {
+        res = await fetch(endpoint, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${env.HF_TOKEN}`,
@@ -60,10 +68,13 @@ export default {
               tgt_lang: target,
             },
           }),
-        }
-      );
+        });
 
-      const data = await res.json();
+        data = await res.json();
+
+        // If successful or a non-routing error, stop trying
+        if (res.ok || (res.status !== 410 && res.status !== 404)) break;
+      }
 
       return new Response(JSON.stringify(data), {
         status: res.status,
