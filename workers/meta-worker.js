@@ -37,7 +37,15 @@ export default {
 
       const url = `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?text=${encodeURIComponent(text)}&source=${encodeURIComponent(source || "eng_Latn")}&target=${encodeURIComponent(target)}`;
 
-      const res = await fetch(url);
+      // Retry up to 3 times if the HF Space is sleeping (503)
+      let res;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        res = await fetch(url);
+        if (res.status !== 503) break;
+        // Wait before retrying (space is waking up)
+        await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
+      }
+
       const raw = await res.text();
 
       // Try to parse as JSON; if not, wrap the raw text
