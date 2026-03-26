@@ -279,153 +279,18 @@ html,body{
   <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
 </div>
 
-<!-- FORM -->
+<!-- CLOSED REGISTRATION MESSAGE -->
 <main class="stage">
-  <div id="formPanel">
+  <div style="text-align:center; line-height:1.9;">
     <p class="form-title">Register</p>
-
-    <!-- Google sign-up -->
-    <button class="google-btn" id="googleBtn" type="button">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path class="g-path" fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/></svg>
-      Sign up with Google
-    </button>
-
-    <div class="divider"><span>or</span></div>
-
-    <!-- Email/password form -->
-    <div class="input-group">
-      <label>Email</label>
-      <input type="text" id="email" autocomplete="email" />
-    </div>
-    <div class="input-group">
-      <label>Password</label>
-      <input type="password" id="password" autocomplete="new-password" />
-    </div>
-    <div class="input-group">
-      <label>Confirm Password</label>
-      <input type="password" id="password2" autocomplete="new-password" />
-    </div>
-    <div class="consent-group">
-      <label class="consent-label">
-        <input type="checkbox" id="emailConsent" />
-        <span>I consent to Lingonect storing my email address for account administration purposes. No other personal data is collected. You can withdraw consent at any time by contacting <a href="mailto:contact@lingonect.com">contact@lingonect.com</a>.</span>
-      </label>
-    </div>
-    <button class="submit-btn" id="registerBtn" type="button">Create Account</button>
-    <div class="error-msg" id="errorMsg"></div>
-
+    <p style="font-size:16px; color:#555; margin:30px 0;">
+      Registrations are not open at the moment. If you'd like to join, please reach out to us at
+      <a href="mailto:contact@lingonect.com" style="color:#111; border-bottom:1px solid #111; text-decoration:none;">contact@lingonect.com</a>
+      and we'll let you know when new sign-ups are available.
+    </p>
     <p class="form-footer">Already have an account? <a href="login.html">Login</a></p>
   </div>
-
-  <!-- Success panel (shown after registration) -->
-  <div class="success-panel" id="successPanel">
-    <div class="check">&#10003;</div>
-    <p id="successMsg">Account created! A verification email has been sent.<br>Please check your inbox and verify before logging in.</p>
-    <a href="login.html">Go to Login</a>
-  </div>
 </main>
-
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-<script>
-const firebaseConfig = {
-  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
-  authDomain:        "lingonect-4db51.firebaseapp.com",
-  projectId:         "lingonect-4db51",
-  storageBucket:     "lingonect-4db51.firebasestorage.app",
-  messagingSenderId: "97117277218",
-  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
-};
-
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
-
-const ALLOWED_REG_EMAILS = ["hanyuriyu@googlemail.com", "hob122020@gmail.com", "h.ben@lingonect.com"];
-
-function isRegAllowed(email) {
-  return ALLOWED_REG_EMAILS.includes(email.toLowerCase());
-}
-
-const errorEl  = document.getElementById("errorMsg");
-function showError(msg) { errorEl.textContent = msg; errorEl.style.display = "block"; }
-function clearError()   { errorEl.style.display = "none"; }
-
-// Google sign-up
-document.getElementById("googleBtn").addEventListener("click", () => {
-  clearError();
-  const emailConsent = document.getElementById("emailConsent").checked;
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider)
-    .then(async cred => {
-      if (!isRegAllowed(cred.user.email)) {
-        cred.user.delete().catch(() => {});
-        auth.signOut();
-        showError("Registration is restricted. This email is not allowed.");
-        return;
-      }
-      const profileData = {
-        emailConsent,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      if (emailConsent) profileData.email = cred.user.email;
-      await db.collection("profiles").doc(cred.user.uid).set(profileData, { merge: true });
-      auth.signOut();
-      document.getElementById("formPanel").style.display = "none";
-      document.getElementById("successMsg").innerHTML = "Account created!<br>You can now log in with your Google account.";
-      document.getElementById("successPanel").style.display = "block";
-    })
-    .catch(err => showError(err.message));
-});
-
-// Email/password registration
-document.getElementById("registerBtn").addEventListener("click", () => {
-  clearError();
-  const email    = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
-  const password2 = document.getElementById("password2").value;
-
-  if (!email || !password || !password2) { showError("Please fill in all fields."); return; }
-  if (password !== password2) { showError("Passwords do not match."); return; }
-  if (password.length < 6) { showError("Password must be at least 6 characters."); return; }
-
-  if (!isRegAllowed(email)) {
-    showError("Registration is restricted. This email is not allowed.");
-    return;
-  }
-
-  const emailConsent = document.getElementById("emailConsent").checked;
-
-  auth.createUserWithEmailAndPassword(email, password)
-    .then(async cred => {
-      const profileData = {
-        emailConsent,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      if (emailConsent) profileData.email = email;
-      await db.collection("profiles").doc(cred.user.uid).set(profileData, { merge: true });
-      await cred.user.sendEmailVerification();
-      auth.signOut();
-      document.getElementById("formPanel").style.display = "none";
-      document.getElementById("successPanel").style.display = "block";
-    })
-    .catch(err => {
-      if (err.code === "auth/email-already-in-use") {
-        showError("An account with this email already exists.");
-      } else {
-        showError(err.message);
-      }
-    });
-});
-
-// Submit on Enter key
-document.addEventListener("keydown", e => {
-  if (e.key === "Enter") document.getElementById("registerBtn").click();
-});
-</script>
 
 <footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
 </body>
