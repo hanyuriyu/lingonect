@@ -2,8 +2,8 @@
  * Cloudflare Worker: Baidu Translate Proxy
  *
  * Environment secrets required:
- *   npx wrangler secret put BAIDU_APP_ID
- *   npx wrangler secret put BAIDU_SECRET_KEY
+ *   BAIDU_APP_ID     – numeric App ID from 开发者信息
+ *   BAIDU_SECRET_KEY – secret key (密钥) from 开发者信息
  *
  * The worker will be available at:
  *   https://baidu.hanyuriyu.workers.dev
@@ -30,24 +30,24 @@ export default {
     try {
       const { text, from, to } = await request.json();
 
-      const appid = env.BAIDU_APP_ID;
-      const key = env.BAIDU_SECRET_KEY;
-      const salt = String(Date.now());
-      const sign = md5(appid + text + salt + key);
+      const appid = (env.BAIDU_APP_ID || "").trim();
+      const key = (env.BAIDU_SECRET_KEY || "").trim();
+      const salt = String(Math.floor(Math.random() * 1e10));
+      const signStr = appid + text + salt + key;
+      const sign = md5(signStr);
 
-      const params = new URLSearchParams({
-        q: text,
-        from: from || "auto",
-        to: to,
-        appid: appid,
-        salt: salt,
-        sign: sign,
+      const res = await fetch("https://fanyi-api.baidu.com/api/trans/vip/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          q: text,
+          from: from || "auto",
+          to: to,
+          appid: appid,
+          salt: salt,
+          sign: sign,
+        }).toString(),
       });
-
-      const res = await fetch(
-        `https://fanyi-api.baidu.com/api/trans/vip/translate?${params}`,
-        { method: "GET" }
-      );
 
       const data = await res.json();
 
@@ -73,90 +73,81 @@ export default {
   },
 };
 
-// ── Pure JS MD5 (crypto.subtle does not support MD5 in Workers) ──
+// ── MD5 (RFC 1321) pure-JS implementation ──
 
 function md5(string) {
-  function md5cycle(x, k) {
-    let a = x[0], b = x[1], c = x[2], d = x[3];
-    a = ff(a, b, c, d, k[0], 7, -680876936);   d = ff(d, a, b, c, k[1], 12, -389564586);
-    c = ff(c, d, a, b, k[2], 17, 606105819);    b = ff(b, c, d, a, k[3], 22, -1044525330);
-    a = ff(a, b, c, d, k[4], 7, -176418897);    d = ff(d, a, b, c, k[5], 12, 1200080426);
-    c = ff(c, d, a, b, k[6], 17, -1473231341);  b = ff(b, c, d, a, k[7], 22, -45705983);
-    a = ff(a, b, c, d, k[8], 7, 1770035416);    d = ff(d, a, b, c, k[9], 12, -1958414417);
-    c = ff(c, d, a, b, k[10], 17, -42063);      b = ff(b, c, d, a, k[11], 22, -1990404162);
-    a = ff(a, b, c, d, k[12], 7, 1804603682);   d = ff(d, a, b, c, k[13], 12, -40341101);
-    c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
-    a = gg(a, b, c, d, k[1], 5, -165796510);    d = gg(d, a, b, c, k[6], 9, -1069501632);
-    c = gg(c, d, a, b, k[11], 14, 643717713);   b = gg(b, c, d, a, k[0], 20, -373897302);
-    a = gg(a, b, c, d, k[5], 5, -701558691);    d = gg(d, a, b, c, k[10], 9, 38016083);
-    c = gg(c, d, a, b, k[15], 14, -660478335);  b = gg(b, c, d, a, k[4], 20, -405537848);
-    a = gg(a, b, c, d, k[9], 5, 568446438);     d = gg(d, a, b, c, k[14], 9, -1019803690);
-    c = gg(c, d, a, b, k[3], 14, -187363961);   b = gg(b, c, d, a, k[8], 20, 1163531501);
-    a = gg(a, b, c, d, k[13], 5, -1444681467);  d = gg(d, a, b, c, k[2], 9, -51403784);
-    c = gg(c, d, a, b, k[7], 14, 1735328473);   b = gg(b, c, d, a, k[12], 20, -1926607734);
-    a = hh(a, b, c, d, k[5], 4, -378558);       d = hh(d, a, b, c, k[8], 11, -2022574463);
-    c = hh(c, d, a, b, k[11], 16, 1839030562);  b = hh(b, c, d, a, k[14], 23, -35309556);
-    a = hh(a, b, c, d, k[1], 4, -1530992060);   d = hh(d, a, b, c, k[4], 11, 1272893353);
-    c = hh(c, d, a, b, k[7], 16, -155497632);   b = hh(b, c, d, a, k[10], 23, -1094730640);
-    a = hh(a, b, c, d, k[13], 4, 681279174);    d = hh(d, a, b, c, k[0], 11, -358537222);
-    c = hh(c, d, a, b, k[3], 16, -722521979);   b = hh(b, c, d, a, k[6], 23, 76029189);
-    a = hh(a, b, c, d, k[9], 4, -640364487);    d = hh(d, a, b, c, k[12], 11, -421815835);
-    c = hh(c, d, a, b, k[15], 16, 530742520);   b = hh(b, c, d, a, k[2], 23, -995338651);
-    a = ii(a, b, c, d, k[0], 6, -198630844);    d = ii(d, a, b, c, k[7], 10, 1126891415);
-    c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
-    a = ii(a, b, c, d, k[12], 6, 1700485571);   d = ii(d, a, b, c, k[3], 10, -1894986606);
-    c = ii(c, d, a, b, k[10], 15, -1051523);    b = ii(b, c, d, a, k[1], 21, -2054922799);
-    a = ii(a, b, c, d, k[8], 6, 1873313359);    d = ii(d, a, b, c, k[15], 10, -30611744);
-    c = ii(c, d, a, b, k[6], 15, -1560198380);  b = ii(b, c, d, a, k[13], 21, 1309151649);
-    a = ii(a, b, c, d, k[4], 6, -145523070);    d = ii(d, a, b, c, k[11], 10, -1120210379);
-    c = ii(c, d, a, b, k[2], 15, 718787259);    b = ii(b, c, d, a, k[9], 21, -343485551);
-    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]);
-    x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
+  const bytes = new TextEncoder().encode(string);
+
+  // Convert to array of 32-bit words (little-endian)
+  let len = bytes.length;
+  // Pad: append 0x80, then zeros, then 64-bit length
+  let paddedLen = ((len + 8) >>> 6 << 4) + 16;
+  let words = new Uint32Array(paddedLen);
+  for (let i = 0; i < len; i++) {
+    words[i >>> 2] |= bytes[i] << ((i & 3) << 3);
+  }
+  words[len >>> 2] |= 0x80 << ((len & 3) << 3);
+  words[paddedLen - 2] = (len * 8) & 0xFFFFFFFF;
+  words[paddedLen - 1] = Math.floor(len * 8 / 0x100000000);
+
+  // Constants
+  const S = [
+    7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22,
+    5, 9,14,20, 5, 9,14,20, 5, 9,14,20, 5, 9,14,20,
+    4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23,
+    6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21
+  ];
+  const K = new Uint32Array(64);
+  for (let i = 0; i < 64; i++) {
+    K[i] = Math.floor(0x100000000 * Math.abs(Math.sin(i + 1)));
   }
 
-  function cmn(q, a, b, x, s, t) {
-    a = add32(add32(a, q), add32(x, t));
-    return add32((a << s) | (a >>> (32 - s)), b);
-  }
-  function ff(a,b,c,d,x,s,t) { return cmn((b & c) | ((~b) & d), a, b, x, s, t); }
-  function gg(a,b,c,d,x,s,t) { return cmn((b & d) | (c & (~d)), a, b, x, s, t); }
-  function hh(a,b,c,d,x,s,t) { return cmn(b ^ c ^ d, a, b, x, s, t); }
-  function ii(a,b,c,d,x,s,t) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
+  let a0 = 0x67452301;
+  let b0 = 0xEFCDAB89;
+  let c0 = 0x98BADCFE;
+  let d0 = 0x10325476;
 
-  function md5blk(s) {
-    const md5blks = [];
-    for (let i = 0; i < 64; i += 4) {
-      md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i+1) << 8)
-        + (s.charCodeAt(i+2) << 16) + (s.charCodeAt(i+3) << 24);
+  for (let offset = 0; offset < paddedLen; offset += 16) {
+    let A = a0, B = b0, C = c0, D = d0;
+
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) {
+        F = (B & C) | (~B & D);
+        g = i;
+      } else if (i < 32) {
+        F = (D & B) | (~D & C);
+        g = (5 * i + 1) % 16;
+      } else if (i < 48) {
+        F = B ^ C ^ D;
+        g = (3 * i + 5) % 16;
+      } else {
+        F = C ^ (B | ~D);
+        g = (7 * i) % 16;
+      }
+
+      let temp = D;
+      D = C;
+      C = B;
+      let sum = (A + F + K[i] + words[offset + g]) | 0;
+      B = (B + ((sum << S[i]) | (sum >>> (32 - S[i])))) | 0;
+      A = temp;
     }
-    return md5blks;
+
+    a0 = (a0 + A) | 0;
+    b0 = (b0 + B) | 0;
+    c0 = (c0 + C) | 0;
+    d0 = (d0 + D) | 0;
   }
 
-  function add32(a, b) { return (a + b) & 0xFFFFFFFF; }
-
-  function rhex(n) {
-    const hex = "0123456789abcdef";
+  function toHex(n) {
     let s = "";
-    for (let j = 0; j < 4; j++)
-      s += hex.charAt((n >> (j * 8 + 4)) & 0x0F) + hex.charAt((n >> (j * 8)) & 0x0F);
+    for (let i = 0; i < 4; i++) {
+      s += ((n >> (i * 8 + 4)) & 0xF).toString(16);
+      s += ((n >> (i * 8)) & 0xF).toString(16);
+    }
     return s;
   }
 
-  // Encode to UTF-8 bytes then build a binary string
-  const bytes = new TextEncoder().encode(string);
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-
-  const n = s.length;
-  let state = [1732584193, -271733879, -1732584194, 271733878];
-  let i;
-  for (i = 64; i <= n; i += 64) md5cycle(state, md5blk(s.substring(i - 64, i)));
-  s = s.substring(i - 64);
-  const tail = new Array(16).fill(0);
-  for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
-  tail[i >> 2] |= 0x80 << ((i % 4) << 3);
-  if (i > 55) { md5cycle(state, tail); tail.fill(0); }
-  tail[14] = n * 8;
-  md5cycle(state, tail);
-  return rhex(state[0]) + rhex(state[1]) + rhex(state[2]) + rhex(state[3]);
+  return toHex(a0) + toHex(b0) + toHex(c0) + toHex(d0);
 }
