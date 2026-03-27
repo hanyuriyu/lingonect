@@ -317,6 +317,7 @@ body{
 .engine-logo-badge.jais       { background:#00B4D8; }
 .engine-logo-badge.amazon     { background:#FF9900; }
 .engine-logo-badge.meta       { background:#0668E1; }
+.engine-logo-badge.baidu      { background:#2932E1; }
 
 .result-content{
   flex:1;
@@ -1299,6 +1300,35 @@ async function translateWithMeta(text) {
   return (data.result || data[0]?.translation_text || "").trim();
 }
 
+// ── Baidu Translate (via Cloudflare Worker) ──
+const BAIDU_PROXY = "https://baidu.hanyuriyu.workers.dev";
+
+const BAIDU_LANG_MAP = {
+  "English":"en","Spanish":"spa","French":"fra","German":"de","Italian":"it",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"swe","Norwegian":"nor","Danish":"dan","Finnish":"fin",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"ukr","Turkish":"tr",
+  "Greek":"el","Romanian":"rom","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bul","Croatian":"hrv","Serbian":"srp","Lithuanian":"lit",
+  "Latvian":"lav","Estonian":"est","Slovenian":"slo","Catalan":"cat","Icelandic":"ice",
+  "Arabic":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
+  "Japanese":"jp","Chinese (Simplified)":"zh","Chinese (Traditional)":"cht","Korean":"kor",
+  "Thai":"th","Vietnamese":"vie","Indonesian":"id","Malay":"may","Tagalog (Filipino)":"tl"
+};
+
+async function translateWithBaidu(text) {
+  const langCode = BAIDU_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Baidu Translate does not support ${targetLang}.`);
+  const res = await fetch(BAIDU_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, from: "auto", to: langCode })
+  });
+  if (!res.ok) throw new Error(`Baidu Translate ${res.status}`);
+  const data = await res.json();
+  if (data.error_code) throw new Error(`Baidu: ${data.error_msg}`);
+  return data.trans_result.map(r => r.dst).join("\n").trim();
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -1420,6 +1450,14 @@ const engines = [
     badgeClass: "meta",
     badgeText:  "MT",
     translate:  translateWithMeta
+  },
+  {
+    id:         "baidu",
+    name:       "Baidu Translate",
+    logoUrl:    "baidu_logo.png",
+    badgeClass: "baidu",
+    badgeText:  "BD",
+    translate:  translateWithBaidu
   }
 ];
 
