@@ -23,22 +23,6 @@ export default {
       });
     }
 
-    // Temporary debug endpoint — visit the worker URL in browser to check env vars
-    if (request.method === "GET") {
-      const appid = (env.BAIDU_APP_ID || "").trim();
-      const key = (env.BAIDU_SECRET_KEY || "").trim();
-      return new Response(JSON.stringify({
-        appid_set: !!appid,
-        appid_length: appid.length,
-        appid_first3: appid.slice(0, 3),
-        key_set: !!key,
-        key_length: key.length,
-        key_first3: key.slice(0, 3),
-        test_md5: md5("hello"),
-        expected_md5: "5d41402abc4b2a76b9719d911017c592",
-      }), { headers: { "Content-Type": "application/json" } });
-    }
-
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
