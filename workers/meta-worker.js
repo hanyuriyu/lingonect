@@ -1,8 +1,11 @@
 /**
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
- * Uses the community-hosted NLLB API on Hugging Face Spaces (v4).
- * No API key required.
+ * Uses the Hugging Face Inference API with the
+ * facebook/nllb-200-distilled-600M model.
+ *
+ * Environment secrets required:
+ *   HF_API_TOKEN – Hugging Face API token (free tier works)
  *
  * The worker will be available at:
  *   https://meta.hanyuriyu.workers.dev
@@ -35,28 +38,43 @@ export default {
         );
       }
 
-      const url = `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?text=${encodeURIComponent(text)}&source=${encodeURIComponent(source || "eng_Latn")}&target=${encodeURIComponent(target)}`;
+      const hfToken = (env.HF_API_TOKEN || "").trim();
 
-      // Retry up to 3 times if the HF Space is sleeping (503)
+      // Retry up to 3 times if the model is loading (503)
       let res;
       for (let attempt = 0; attempt < 3; attempt++) {
-        res = await fetch(url);
+        res = await fetch(
+          "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(hfToken ? { "Authorization": `Bearer ${hfToken}` } : {}),
+            },
+            body: JSON.stringify({
+              inputs: text,
+              parameters: {
+                src_lang: source || "eng_Latn",
+                tgt_lang: target,
+              },
+            }),
+          }
+        );
         if (res.status !== 503) break;
-        // Wait before retrying (space is waking up)
         await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
       }
 
-      const raw = await res.text();
+      const data = await res.json();
 
-      // Try to parse as JSON; if not, wrap the raw text
-      let data;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        data = { result: raw };
+      // Normalize response: HF returns [{ translation_text: "..." }]
+      let result;
+      if (Array.isArray(data) && data[0]?.translation_text) {
+        result = { result: data[0].translation_text };
+      } else {
+        result = data;
       }
 
-      return new Response(JSON.stringify(data), {
+      return new Response(JSON.stringify(result), {
         status: res.status,
         headers: { "Content-Type": "application/json", ...CORS },
       });
