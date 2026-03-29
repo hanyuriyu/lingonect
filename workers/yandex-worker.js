@@ -2,7 +2,8 @@
  * Cloudflare Worker: Yandex Translate Proxy
  *
  * Environment secrets required:
- *   YANDEX_API_KEY – IAM token or API key from Yandex Cloud
+ *   YANDEX_API_KEY   – API key from Yandex Cloud
+ *   YANDEX_FOLDER_ID – Folder ID from Yandex Cloud console
  *
  * The worker will be available at:
  *   https://yandex.hanyuriyu.workers.dev
@@ -38,6 +39,7 @@ export default {
             "Authorization": `Api-Key ${(env.YANDEX_API_KEY || "").trim()}`,
           },
           body: JSON.stringify({
+            folderId: (env.YANDEX_FOLDER_ID || "").trim(),
             texts: [text],
             sourceLanguageCode: source || "",
             targetLanguageCode: target,
