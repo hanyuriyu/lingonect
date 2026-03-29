@@ -64,7 +64,19 @@ export default {
         await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
       }
 
-      const data = await res.json();
+      const raw = await res.text();
+
+      let data;
+      try { data = JSON.parse(raw); } catch { data = { error: raw }; }
+
+      // If HF returned an error, surface it
+      if (!res.ok) {
+        const msg = data?.error || raw || `HF API ${res.status}`;
+        return new Response(
+          JSON.stringify({ error: msg }),
+          { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
+        );
+      }
 
       // Normalize response: HF returns [{ translation_text: "..." }]
       let result;
@@ -75,7 +87,7 @@ export default {
       }
 
       return new Response(JSON.stringify(result), {
-        status: res.status,
+        status: 200,
         headers: { "Content-Type": "application/json", ...CORS },
       });
     } catch (err) {
