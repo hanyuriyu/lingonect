@@ -318,6 +318,7 @@ body{
 .engine-logo-badge.amazon     { background:#FF9900; }
 .engine-logo-badge.meta       { background:#0668E1; }
 .engine-logo-badge.baidu      { background:#2932E1; }
+.engine-logo-badge.yandex     { background:#FC3F1D; }
 
 .result-content{
   flex:1;
@@ -1329,6 +1330,35 @@ async function translateWithBaidu(text) {
   return data.trans_result.map(r => r.dst).join("\n").trim();
 }
 
+// ── Yandex Translate (via Cloudflare Worker) ──
+const YANDEX_PROXY = "https://yandex.hanyuriyu.workers.dev";
+
+const YANDEX_LANG_MAP = {
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
+};
+
+async function translateWithYandex(text) {
+  const langCode = YANDEX_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Yandex Translate does not support ${targetLang}.`);
+  const res = await fetch(YANDEX_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, target: langCode })
+  });
+  if (!res.ok) throw new Error(`Yandex Translate ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(`Yandex: ${data.error.message}`);
+  return data.translations[0].text.trim();
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -1434,6 +1464,14 @@ const engines = [
     badgeClass: "baidu",
     badgeText:  "BD",
     translate:  translateWithBaidu
+  },
+  {
+    id:         "yandex",
+    name:       "Yandex Translate",
+    logoUrl:    "yandex_logo.png",
+    badgeClass: "yandex",
+    badgeText:  "Y",
+    translate:  translateWithYandex
   },
   {
     id:         "amazon",
