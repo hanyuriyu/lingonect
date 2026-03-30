@@ -13,7 +13,8 @@ const REGION = "us-east-1";
 const SERVICE = "bedrock";
 const HOST = `bedrock-runtime.${REGION}.amazonaws.com`;
 const MODEL_ID = "amazon.nova-lite-v1:0";
-const ENDPOINT = `https://${HOST}/model/${MODEL_ID}/invoke`;
+const CANONICAL_PATH = `/model/${encodeURIComponent(MODEL_ID)}/invoke`;
+const ENDPOINT = `https://${HOST}${CANONICAL_PATH}`;
 
 const encoder = new TextEncoder();
 
@@ -107,7 +108,7 @@ export default {
         messages: [{ role: "user", content: [{ text: body.prompt }] }],
       });
 
-      const path = `/model/${MODEL_ID}/invoke`;
+      const path = CANONICAL_PATH;
 
       const { authorization, amzDate } = await sign(
         env.AWS_SECRET_ACCESS_KEY,
