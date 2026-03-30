@@ -1267,8 +1267,33 @@ async function translateWithJais(text) {
 // ── Amazon Translate (via Cloudflare Worker) ──
 const AMAZON_PROXY = "https://amazon.hanyuriyu.workers.dev";
 
+const AMAZON_LANG_MAP = {
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
+};
+
 async function translateWithAmazon(text) {
-  return "API implementation in progress";
+  const langCode = AMAZON_LANG_MAP[targetLang];
+  if (!langCode) throw new Error(`Amazon Translate does not support ${targetLang}.`);
+  const srcCode = AMAZON_LANG_MAP[sourceLang] || "auto";
+  const res = await fetch(AMAZON_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, from: srcCode, to: langCode })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Amazon Translate: ${err.message || err.error?.message || res.status}`);
+  }
+  const data = await res.json();
+  return data.TranslatedText.trim();
 }
 
 // ── Meta NLLB-200 (via Cloudflare Worker → Hugging Face Inference) ──
