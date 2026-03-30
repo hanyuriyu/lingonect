@@ -1,15 +1,25 @@
 /**
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
- * Uses the community-hosted NLLB API on Hugging Face Spaces
- * (winstxnhdw/nllb-api) which runs facebook/nllb-200-distilled-600M
- * via CTranslate2.
- *
- * No API token required.
+ * Uses the MyMemory Translation API as the backend.
+ * No API token required (free tier: 5,000 chars/day anonymous).
  *
  * The worker will be available at:
  *   https://meta.hanyuriyu.workers.dev
  */
+
+// Map FLORES-200 codes (sent by frontend) to ISO-639 codes (used by MyMemory)
+const FLORES_TO_ISO = {
+  "eng_Latn": "en", "spa_Latn": "es", "fra_Latn": "fr", "deu_Latn": "de", "ita_Latn": "it",
+  "por_Latn": "pt", "swe_Latn": "sv", "nob_Latn": "no", "dan_Latn": "da", "fin_Latn": "fi",
+  "nld_Latn": "nl", "pol_Latn": "pl", "rus_Cyrl": "ru", "ukr_Cyrl": "uk", "tur_Latn": "tr",
+  "ell_Grek": "el", "ron_Latn": "ro", "hun_Latn": "hu", "ces_Latn": "cs", "slk_Latn": "sk",
+  "bul_Cyrl": "bg", "hrv_Latn": "hr", "srp_Cyrl": "sr", "lit_Latn": "lt",
+  "lvs_Latn": "lv", "est_Latn": "et", "slv_Latn": "sl", "cat_Latn": "ca", "isl_Latn": "is",
+  "arb_Arab": "ar", "heb_Hebr": "he", "pes_Arab": "fa", "hin_Deva": "hi", "urd_Arab": "ur", "ben_Beng": "bn",
+  "jpn_Jpan": "ja", "zho_Hans": "zh-CN", "zho_Hant": "zh-TW", "kor_Hang": "ko",
+  "tha_Thai": "th", "vie_Latn": "vi", "ind_Latn": "id", "zsm_Latn": "ms", "tgl_Latn": "tl",
+};
 
 export default {
   async fetch(request, env) {
@@ -38,44 +48,34 @@ export default {
         );
       }
 
-      const srcLang = source || "eng_Latn";
-      const url = `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?text=${encodeURIComponent(text)}&source=${encodeURIComponent(srcLang)}&target=${encodeURIComponent(target)}`;
+      const srcISO = FLORES_TO_ISO[source || "eng_Latn"];
+      const tgtISO = FLORES_TO_ISO[target];
 
-      // Retry up to 3 times if the Space is waking up (503)
-      let res;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        res = await fetch(url);
-        if (res.status !== 503) break;
-        await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
+      if (!tgtISO) {
+        return new Response(
+          JSON.stringify({ error: `Unsupported target language: ${target}` }),
+          { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
+        );
       }
 
-      const raw = await res.text();
+      const langpair = `${srcISO || "en"}|${tgtISO}`;
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langpair)}`;
 
-      let data;
-      try { data = JSON.parse(raw); } catch { data = { error: raw }; }
+      const res = await fetch(url);
+      const data = await res.json();
 
-      // If the API returned an error, surface it
-      if (!res.ok) {
-        const msg = data?.error || data?.detail || raw || `NLLB API ${res.status}`;
+      if (!res.ok || !data.responseData) {
+        const msg = data?.responseDetails || data?.error || `MyMemory API ${res.status}`;
         return new Response(
           JSON.stringify({ error: msg }),
           { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
         );
       }
 
-      // Normalize response: the API returns { result: "..." } or plain text
-      let result;
-      if (typeof data === "string") {
-        result = { result: data };
-      } else if (data?.result) {
-        result = { result: data.result };
-      } else if (Array.isArray(data) && data[0]?.translation_text) {
-        result = { result: data[0].translation_text };
-      } else {
-        result = { result: raw.trim() };
-      }
+      // MyMemory returns { responseData: { translatedText: "..." }, responseStatus: 200 }
+      const translated = data.responseData.translatedText || "";
 
-      return new Response(JSON.stringify(result), {
+      return new Response(JSON.stringify({ result: translated }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...CORS },
       });
