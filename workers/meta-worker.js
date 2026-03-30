@@ -44,7 +44,7 @@ export default {
       let res;
       for (let attempt = 0; attempt < 3; attempt++) {
         res = await fetch(
-          "https://router.huggingface.co/hf-inference/models/facebook/nllb-200-distilled-600M",
+          "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
           {
             method: "POST",
             headers: {
