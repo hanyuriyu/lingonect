@@ -1,15 +1,21 @@
 /**
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
- * Uses the community-hosted NLLB API on Hugging Face Spaces
- * (winstxnhdw/nllb-api) which runs facebook/nllb-200-distilled-600M
- * via CTranslate2.
+ * Uses community-hosted NLLB API Spaces on Hugging Face that run
+ * facebook/nllb-200-distilled-600M (or 1.3B) via CTranslate2.
  *
  * No API token required.
  *
  * The worker will be available at:
  *   https://meta.hanyuriyu.workers.dev
  */
+
+// NLLB API endpoints to try in order — put your own HF Space duplicate first
+const NLLB_ENDPOINTS = [
+  "https://hanyuriyu-nllb-api.hf.space/api/v4/translator",
+  "https://vutuka-fast-inference-nllb.hf.space/api/v4/translator",
+  "https://winstxnhdw-nllb-api.hf.space/api/v4/translator",
+];
 
 export default {
   async fetch(request, env) {
@@ -39,46 +45,63 @@ export default {
       }
 
       const srcLang = source || "eng_Latn";
-      const url = `https://winstxnhdw-nllb-api.hf.space/api/v4/translator?text=${encodeURIComponent(text)}&source=${encodeURIComponent(srcLang)}&target=${encodeURIComponent(target)}`;
+      let lastError = "";
 
-      // Retry up to 3 times if the Space is waking up (503)
-      let res;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        res = await fetch(url);
-        if (res.status !== 503) break;
-        await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
+      for (const endpoint of NLLB_ENDPOINTS) {
+        const url = `${endpoint}?text=${encodeURIComponent(text)}&source=${encodeURIComponent(srcLang)}&target=${encodeURIComponent(target)}`;
+
+        // Retry up to 3 times if the Space is waking up (503)
+        let res;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            res = await fetch(url);
+          } catch {
+            continue;
+          }
+          if (res.status !== 503) break;
+          await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
+        }
+
+        if (!res || !res.ok) {
+          lastError = res ? await res.text() : "fetch failed";
+          continue; // try next endpoint
+        }
+
+        const raw = await res.text();
+
+        let data;
+        try { data = JSON.parse(raw); } catch { data = null; }
+
+        // Normalize response
+        let result;
+        if (typeof data === "string") {
+          result = data;
+        } else if (data?.result) {
+          result = data.result;
+        } else if (Array.isArray(data) && data[0]?.translation_text) {
+          result = data[0].translation_text;
+        } else {
+          result = raw.trim();
+        }
+
+        return new Response(JSON.stringify({ result }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
       }
 
-      const raw = await res.text();
-
-      let data;
-      try { data = JSON.parse(raw); } catch { data = { error: raw }; }
-
-      // If the API returned an error, surface it
-      if (!res.ok) {
-        const msg = data?.error || data?.detail || raw || `NLLB API ${res.status}`;
-        return new Response(
-          JSON.stringify({ error: msg }),
-          { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
-        );
+      // All endpoints failed
+      let errorMsg;
+      try {
+        const parsed = JSON.parse(lastError);
+        errorMsg = parsed?.error || parsed?.detail || lastError;
+      } catch {
+        errorMsg = lastError;
       }
-
-      // Normalize response: the API returns { result: "..." } or plain text
-      let result;
-      if (typeof data === "string") {
-        result = { result: data };
-      } else if (data?.result) {
-        result = { result: data.result };
-      } else if (Array.isArray(data) && data[0]?.translation_text) {
-        result = { result: data[0].translation_text };
-      } else {
-        result = { result: raw.trim() };
-      }
-
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...CORS },
-      });
+      return new Response(
+        JSON.stringify({ error: errorMsg || "All NLLB endpoints unavailable" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
+      );
     } catch (err) {
       return new Response(
         JSON.stringify({ error: err.message }),
