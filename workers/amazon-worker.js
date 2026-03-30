@@ -9,50 +9,88 @@
  *   https://amazon.hanyuriyu.workers.dev
  */
 
-// AWS Signature V4 helpers
+const REGION = "us-east-1";
+const SERVICE = "translate";
+const HOST = `translate.${REGION}.amazonaws.com`;
+const ENDPOINT = `https://${HOST}/`;
+const TARGET = "AWSShineFrontendService_20170701.TranslateText";
 
-async function hmacSha256(key, message) {
+const encoder = new TextEncoder();
+
+async function hmac(key, msg) {
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    typeof key === "string" ? new TextEncoder().encode(key) : key,
-    { name: "HMAC", hash: "SHA-256" },
+    typeof key === "string" ? encoder.encode(key) : key,
+    { name: "HMAC", hash: { name: "SHA-256" } },
     false,
     ["sign"]
   );
-  return new Uint8Array(
-    await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(message))
-  );
+  return await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(msg));
 }
 
-async function sha256Hex(data) {
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
-  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+async function sha256(data) {
+  return await crypto.subtle.digest("SHA-256", encoder.encode(data));
 }
 
-function toHex(buffer) {
-  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
+function hex(buffer) {
+  return [...new Uint8Array(buffer)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-async function getSignatureKey(secretKey, dateStamp, region, service) {
-  let key = await hmacSha256("AWS4" + secretKey, dateStamp);
-  key = await hmacSha256(key, region);
-  key = await hmacSha256(key, service);
-  key = await hmacSha256(key, "aws4_request");
-  return key;
+async function sign(secretKey, accessKeyId, payload) {
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+
+  const payloadHash = hex(await sha256(payload));
+
+  // Only sign the three required headers
+  const signedHeaders = "content-type;host;x-amz-date";
+  const canonicalHeaders =
+    "content-type:application/x-amz-json-1.1\n" +
+    `host:${HOST}\n` +
+    `x-amz-date:${amzDate}\n`;
+
+  const canonicalRequest =
+    "POST\n" +
+    "/\n" +
+    "\n" +
+    canonicalHeaders + "\n" +
+    signedHeaders + "\n" +
+    payloadHash;
+
+  const credentialScope = `${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
+  const stringToSign =
+    "AWS4-HMAC-SHA256\n" +
+    amzDate + "\n" +
+    credentialScope + "\n" +
+    hex(await sha256(canonicalRequest));
+
+  // Derive signing key
+  const kDate = await hmac("AWS4" + secretKey, dateStamp);
+  const kRegion = await hmac(kDate, REGION);
+  const kService = await hmac(kRegion, SERVICE);
+  const kSigning = await hmac(kService, "aws4_request");
+  const signature = hex(await hmac(kSigning, stringToSign));
+
+  const authorization =
+    `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return { authorization, amzDate };
 }
+
+const CORS = {
+  "Access-Control-Allow-Origin": "https://www.lingonect.com",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 export default {
   async fetch(request, env) {
-    // Handle CORS preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Max-Age": "86400",
-        },
-      });
+      return new Response(null, { headers: { ...CORS, "Access-Control-Max-Age": "86400" } });
     }
 
     if (request.method !== "POST") {
@@ -61,10 +99,6 @@ export default {
 
     try {
       const { text, from, to } = await request.json();
-      const region = "us-east-1";
-      const service = "translate";
-      const host = `translate.${region}.amazonaws.com`;
-      const endpoint = `https://${host}/`;
 
       const payload = JSON.stringify({
         SourceLanguageCode: from || "auto",
@@ -72,49 +106,19 @@ export default {
         Text: text,
       });
 
-      const now = new Date();
-      const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-      const dateStamp = amzDate.slice(0, 8);
-
-      const payloadHash = await sha256Hex(payload);
-      const canonicalHeaders = `content-type:application/x-amz-json-1.1\nhost:${host}\nx-amz-date:${amzDate}\nx-amz-target:AWSShineFrontendService_20170701.TranslateText\n`;
-      const signedHeaders = "content-type;host;x-amz-date;x-amz-target";
-
-      const canonicalRequest = [
-        "POST",
-        "/",
-        "",
-        canonicalHeaders,
-        signedHeaders,
-        payloadHash,
-      ].join("\n");
-
-      const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-      const stringToSign = [
-        "AWS4-HMAC-SHA256",
-        amzDate,
-        credentialScope,
-        await sha256Hex(canonicalRequest),
-      ].join("\n");
-
-      const signingKey = await getSignatureKey(
+      const { authorization, amzDate } = await sign(
         env.AWS_SECRET_ACCESS_KEY,
-        dateStamp,
-        region,
-        service
+        env.AWS_ACCESS_KEY_ID,
+        payload
       );
-      const signature = toHex(await hmacSha256(signingKey, stringToSign));
 
-      const authHeader = `AWS4-HMAC-SHA256 Credential=${env.AWS_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-      const res = await fetch(endpoint, {
+      const res = await fetch(ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-amz-json-1.1",
           "X-Amz-Date": amzDate,
-          "X-Amz-Target": "AWSShineFrontendService_20170701.TranslateText",
-          Authorization: authHeader,
-          Host: host,
+          "X-Amz-Target": TARGET,
+          Authorization: authorization,
         },
         body: payload,
       });
@@ -123,21 +127,12 @@ export default {
 
       return new Response(JSON.stringify(data), {
         status: res.status,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
-        },
+        headers: { "Content-Type": "application/json", ...CORS },
       });
     } catch (err) {
       return new Response(
         JSON.stringify({ error: { message: err.message } }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "https://www.lingonect.com",
-          },
-        }
+        { status: 500, headers: { "Content-Type": "application/json", ...CORS } }
       );
     }
   },
