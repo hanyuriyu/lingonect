@@ -10,8 +10,10 @@
  *   https://meta.hanyuriyu.workers.dev
  */
 
-// NLLB API endpoints to try in order (add your own HF Space duplicate first)
+// NLLB API endpoints to try in order — put your own HF Space duplicate first
 const NLLB_ENDPOINTS = [
+  "https://hanyuriyu-nllb-api.hf.space/api/v4/translator",
+  "https://vutuka-fast-inference-nllb.hf.space/api/v4/translator",
   "https://winstxnhdw-nllb-api.hf.space/api/v4/translator",
 ];
 
