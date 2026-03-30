@@ -61,7 +61,7 @@ export default {
 
     try {
       const { text, from, to } = await request.json();
-      const region = "eu-west-1";
+      const region = "us-east-1";
       const service = "translate";
       const host = `translate.${region}.amazonaws.com`;
       const endpoint = `https://${host}/`;
