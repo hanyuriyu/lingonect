@@ -1,25 +1,19 @@
 /**
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
- * Uses the MyMemory Translation API as the backend.
- * No API token required (free tier: 5,000 chars/day anonymous).
+ * Uses community-hosted NLLB API Spaces on Hugging Face that run
+ * facebook/nllb-200-distilled-600M (or 1.3B) via CTranslate2.
+ *
+ * No API token required.
  *
  * The worker will be available at:
  *   https://meta.hanyuriyu.workers.dev
  */
 
-// Map FLORES-200 codes (sent by frontend) to ISO-639 codes (used by MyMemory)
-const FLORES_TO_ISO = {
-  "eng_Latn": "en", "spa_Latn": "es", "fra_Latn": "fr", "deu_Latn": "de", "ita_Latn": "it",
-  "por_Latn": "pt", "swe_Latn": "sv", "nob_Latn": "no", "dan_Latn": "da", "fin_Latn": "fi",
-  "nld_Latn": "nl", "pol_Latn": "pl", "rus_Cyrl": "ru", "ukr_Cyrl": "uk", "tur_Latn": "tr",
-  "ell_Grek": "el", "ron_Latn": "ro", "hun_Latn": "hu", "ces_Latn": "cs", "slk_Latn": "sk",
-  "bul_Cyrl": "bg", "hrv_Latn": "hr", "srp_Cyrl": "sr", "lit_Latn": "lt",
-  "lvs_Latn": "lv", "est_Latn": "et", "slv_Latn": "sl", "cat_Latn": "ca", "isl_Latn": "is",
-  "arb_Arab": "ar", "heb_Hebr": "he", "pes_Arab": "fa", "hin_Deva": "hi", "urd_Arab": "ur", "ben_Beng": "bn",
-  "jpn_Jpan": "ja", "zho_Hans": "zh-CN", "zho_Hant": "zh-TW", "kor_Hang": "ko",
-  "tha_Thai": "th", "vie_Latn": "vi", "ind_Latn": "id", "zsm_Latn": "ms", "tgl_Latn": "tl",
-};
+// NLLB API endpoints to try in order (add your own HF Space duplicate first)
+const NLLB_ENDPOINTS = [
+  "https://winstxnhdw-nllb-api.hf.space/api/v4/translator",
+];
 
 export default {
   async fetch(request, env) {
@@ -48,37 +42,64 @@ export default {
         );
       }
 
-      const srcISO = FLORES_TO_ISO[source || "eng_Latn"];
-      const tgtISO = FLORES_TO_ISO[target];
+      const srcLang = source || "eng_Latn";
+      let lastError = "";
 
-      if (!tgtISO) {
-        return new Response(
-          JSON.stringify({ error: `Unsupported target language: ${target}` }),
-          { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
-        );
+      for (const endpoint of NLLB_ENDPOINTS) {
+        const url = `${endpoint}?text=${encodeURIComponent(text)}&source=${encodeURIComponent(srcLang)}&target=${encodeURIComponent(target)}`;
+
+        // Retry up to 3 times if the Space is waking up (503)
+        let res;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            res = await fetch(url);
+          } catch {
+            continue;
+          }
+          if (res.status !== 503) break;
+          await new Promise(r => setTimeout(r, (attempt + 1) * 5000));
+        }
+
+        if (!res || !res.ok) {
+          lastError = res ? await res.text() : "fetch failed";
+          continue; // try next endpoint
+        }
+
+        const raw = await res.text();
+
+        let data;
+        try { data = JSON.parse(raw); } catch { data = null; }
+
+        // Normalize response
+        let result;
+        if (typeof data === "string") {
+          result = data;
+        } else if (data?.result) {
+          result = data.result;
+        } else if (Array.isArray(data) && data[0]?.translation_text) {
+          result = data[0].translation_text;
+        } else {
+          result = raw.trim();
+        }
+
+        return new Response(JSON.stringify({ result }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
       }
 
-      const langpair = `${srcISO || "en"}|${tgtISO}`;
-      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langpair)}`;
-
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (!res.ok || !data.responseData) {
-        const msg = data?.responseDetails || data?.error || `MyMemory API ${res.status}`;
-        return new Response(
-          JSON.stringify({ error: msg }),
-          { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
-        );
+      // All endpoints failed
+      let errorMsg;
+      try {
+        const parsed = JSON.parse(lastError);
+        errorMsg = parsed?.error || parsed?.detail || lastError;
+      } catch {
+        errorMsg = lastError;
       }
-
-      // MyMemory returns { responseData: { translatedText: "..." }, responseStatus: 200 }
-      const translated = data.responseData.translatedText || "";
-
-      return new Response(JSON.stringify({ result: translated }), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...CORS },
-      });
+      return new Response(
+        JSON.stringify({ error: errorMsg || "All NLLB endpoints unavailable" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
+      );
     } catch (err) {
       return new Response(
         JSON.stringify({ error: err.message }),
