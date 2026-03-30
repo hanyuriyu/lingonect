@@ -2,7 +2,7 @@
  * Cloudflare Worker: Meta NLLB-200 Translation Proxy
  *
  * Uses the Hugging Face Inference API with the
- * facebook/nllb-200-distilled-600M model.
+ * facebook/nllb-200-1.3B model.
  *
  * Environment secrets required:
  *   HF_API_TOKEN – Hugging Face API token (free tier works)
@@ -44,7 +44,7 @@ export default {
       let res;
       for (let attempt = 0; attempt < 3; attempt++) {
         res = await fetch(
-          "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
+          "https://router.huggingface.co/hf-inference/models/facebook/nllb-200-1.3B",
           {
             method: "POST",
             headers: {
