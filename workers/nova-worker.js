@@ -13,8 +13,8 @@ const REGION = "us-east-1";
 const SERVICE = "bedrock";
 const HOST = `bedrock-runtime.${REGION}.amazonaws.com`;
 const MODEL_ID = "amazon.nova-lite-v1:0";
-const CANONICAL_PATH = `/model/${encodeURIComponent(MODEL_ID)}/invoke`;
-const ENDPOINT = `https://${HOST}${CANONICAL_PATH}`;
+const ENDPOINT = `https://${HOST}/model/${MODEL_ID}/invoke`;
+const CANONICAL_PATH = "/model/amazon.nova-lite-v1%3A0/invoke";
 
 const encoder = new TextEncoder();
 
@@ -101,7 +101,7 @@ export default {
 
       const payload = JSON.stringify({
         inferenceConfig: {
-          maxNewTokens: 1024,
+          max_new_tokens: 1024,
           temperature: 0.1,
         },
         system: [{ text: body.system }],
