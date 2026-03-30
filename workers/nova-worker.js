@@ -101,7 +101,7 @@ export default {
 
       const payload = JSON.stringify({
         inferenceConfig: {
-          maxNewTokens: 1024,
+          max_new_tokens: 1024,
           temperature: 0.1,
         },
         system: [{ text: body.system }],
