@@ -1320,8 +1320,7 @@ async function translateWithNova(text) {
   return data.output.message.content[0].text.trim();
 }
 
-// ── Meta NLLB-200 (via Cloudflare Worker → Hugging Face Inference) ──
-const META_PROXY = "https://meta.hanyuriyu.workers.dev";
+// ── Meta NLLB-200 (in-browser via Transformers.js) ──
 
 const NLLB_LANG_MAP = {
   "English":"eng_Latn","Spanish":"spa_Latn","French":"fra_Latn","German":"deu_Latn","Italian":"ita_Latn",
@@ -1335,19 +1334,43 @@ const NLLB_LANG_MAP = {
   "Thai":"tha_Thai","Vietnamese":"vie_Latn","Indonesian":"ind_Latn","Malay":"zsm_Latn","Tagalog (Filipino)":"tgl_Latn"
 };
 
+let metaTranslator = null;
+let metaModelLoading = false;
+
+async function loadMetaModel() {
+  if (metaTranslator) return metaTranslator;
+  if (metaModelLoading) {
+    // Another call is already loading — wait for it
+    while (metaModelLoading) await new Promise(r => setTimeout(r, 200));
+    return metaTranslator;
+  }
+  metaModelLoading = true;
+  try {
+    const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3");
+    const el = document.getElementById("result-meta");
+    metaTranslator = await pipeline("translation", "Xenova/nllb-200-distilled-600M", {
+      progress_callback: (p) => {
+        if (el && p.status === "download" && p.total) {
+          const pct = Math.round((p.loaded / p.total) * 100);
+          el.textContent = `Loading model… ${pct}%`;
+        } else if (el && p.status === "ready") {
+          el.textContent = "Translating…";
+        }
+      }
+    });
+    return metaTranslator;
+  } finally {
+    metaModelLoading = false;
+  }
+}
+
 async function translateWithMeta(text) {
   const srcCode = NLLB_LANG_MAP[sourceLang];
   const tgtCode = NLLB_LANG_MAP[targetLang];
   if (!tgtCode) throw new Error(`Meta NLLB-200 does not support ${targetLang}.`);
-  const res = await fetch(META_PROXY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, source: srcCode || "eng_Latn", target: tgtCode })
-  });
-  if (!res.ok) throw new Error(`Meta NLLB-200 ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(`Meta: ${data.error}`);
-  return (data.result || data[0]?.translation_text || "").trim();
+  const translator = await loadMetaModel();
+  const result = await translator(text, { src_lang: srcCode || "eng_Latn", tgt_lang: tgtCode });
+  return result[0].translation_text;
 }
 
 // ── Baidu Translate (via Cloudflare Worker) ──
