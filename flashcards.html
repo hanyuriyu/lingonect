@@ -828,7 +828,7 @@ document.getElementById("createBtn").addEventListener("click", async () => {
 
   } catch (err) {
     console.error("Flashcard generation failed:", err);
-    alert("Failed to generate flashcards. Please try again.");
+    alert("Failed to generate flashcards: " + err.message);
   } finally {
     createBtn.disabled = false;
     loading.classList.remove("show");
@@ -866,13 +866,27 @@ ${numbered}`;
       })
     });
 
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Claude API error:", res.status, errText);
+      throw new Error("API error " + res.status + ": " + errText);
+    }
+
     const data = await res.json();
+    console.log("Claude response:", data);
+
+    if (data.error) {
+      throw new Error("Claude error: " + (data.error.message || JSON.stringify(data.error)));
+    }
     if (!data.content || !data.content[0]) throw new Error("Empty response from Claude");
 
     const text = data.content[0].text;
     // Extract JSON from response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error("No JSON found in response");
+    if (!jsonMatch) {
+      console.error("No JSON in response text:", text);
+      throw new Error("No JSON found in response");
+    }
 
     const cards = JSON.parse(jsonMatch[0]);
     allCards.push(...cards);
