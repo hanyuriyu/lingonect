@@ -932,11 +932,13 @@ function sendMessage() {
   const roomId = chatRoomId(currentUser.uid, selectedUid);
   const myName = (myProfile && myProfile.username) || "Anonymous";
 
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   db.collection("chats").doc(roomId).collection("messages").add({
     from: currentUser.uid,
     fromName: myName,
     text: text,
-    ts: firebase.firestore.FieldValue.serverTimestamp()
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+    expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt)
   });
 
   input.value = "";
