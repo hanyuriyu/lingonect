@@ -332,6 +332,15 @@ body{
   cursor:not-allowed;
 }
 
+.chat-retention-notice{
+  font-family:"Courier New",monospace;
+  font-size:9px;
+  color:#555;
+  text-align:center;
+  margin-top:4px;
+  letter-spacing:.3px;
+}
+
 /* ── ONLINE USERS PANEL ── */
 .users-panel{
   width:180px;
@@ -601,6 +610,7 @@ body{
                  placeholder="Type a message..." disabled />
           <button class="chat-send-btn" id="sendBtn" disabled>SEND</button>
         </div>
+        <div class="chat-retention-notice">Message history is automatically deleted after 30 days.</div>
       </div>
 
       <!-- Online users -->
