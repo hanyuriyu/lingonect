@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Flashcards — Lingonect</title>
+<meta name="description" content="Create flashcard stacks to learn vocabulary in any language. Powered by AI translations, transliterations, and example sentences.">
+<link rel="canonical" href="https://www.lingonect.com/flashcards.html">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.lingonect.com/flashcards.html">
+<meta property="og:title" content="Flashcards — Lingonect">
+<meta property="og:description" content="Create flashcard stacks to learn vocabulary in any language with AI-powered translations.">
+<meta property="og:image" content="https://www.lingonect.com/logo.png">
+<meta property="og:site_name" content="Lingonect">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --text-col:900px;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:130px;
+}
+
+html{ height:100%; zoom:0.75; }
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Special Elite","Courier New",monospace;
+  visibility:hidden;
+  overflow-y:auto;
+}
+
+/* ── LOGO RAIL ── */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - (var(--text-col) / 2));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  z-index:1;
+}
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+
+/* ── PAGE WRAPPER ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  padding:100px 0 60px;
+  box-sizing:border-box;
+}
+
+/* ── STAGE ── */
+.stage{
+  width:var(--text-col);
+  max-width:92vw;
+  margin:0 auto;
+  position:relative;
+  z-index:2;
+}
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); }
+
+/* ── LOGOUT ── */
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#000;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  transition:color .2s;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* ── PAGE TITLE ── */
+.page-title{
+  font-size:22px;
+  font-weight:800;
+  text-align:center;
+  margin:0 0 6px;
+  letter-spacing:.3px;
+}
+.page-sub{
+  font-size:14px;
+  color:#777;
+  text-align:center;
+  margin:0 0 30px;
+}
+
+/* ── FLASHCARD LAYOUT ── */
+.fc-layout{
+  display:flex;
+  gap:40px;
+  align-items:flex-start;
+}
+
+/* ── LEFT: CARD AREA ── */
+.fc-card-area{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-width:0;
+}
+
+/* ── CARD STACK ── */
+.card-stack{
+  position:relative;
+  width:320px;
+  height:440px;
+  perspective:1000px;
+  margin-bottom:20px;
+}
+
+/* Stacked cards behind */
+.card-stack::before,
+.card-stack::after{
+  content:"";
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:#f0f0f0;
+  border:2px solid #ddd;
+  border-radius:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.card-stack::before{
+  top:6px;
+  left:4px;
+  transform:rotate(1.5deg);
+  z-index:0;
+}
+.card-stack::after{
+  top:3px;
+  left:2px;
+  transform:rotate(0.7deg);
+  z-index:1;
+}
+
+/* Flip container */
+.card-flip{
+  width:100%;
+  height:100%;
+  position:relative;
+  z-index:2;
+  transition:transform 0.6s;
+  transform-style:preserve-3d;
+  cursor:pointer;
+}
+.card-flip.flipped{
+  transform:rotateY(180deg);
+}
+
+/* Card faces */
+.card-face{
+  position:absolute;
+  width:100%;
+  height:100%;
+  backface-visibility:hidden;
+  border-radius:16px;
+  border:2px solid #ddd;
+  background:#ffffff;
+  box-shadow:0 4px 20px rgba(0,0,0,.1);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:30px;
+  box-sizing:border-box;
+  overflow-y:auto;
+}
+
+.card-front{
+  background:#ffffff;
+}
+.card-front .card-word{
+  font-size:28px;
+  font-weight:800;
+  color:var(--text);
+  text-align:center;
+  line-height:1.4;
+}
+.card-front .card-lang{
+  font-size:12px;
+  color:#999;
+  margin-top:12px;
+  letter-spacing:1px;
+}
+.card-front .card-hint{
+  font-size:11px;
+  color:#bbb;
+  margin-top:auto;
+  padding-top:16px;
+}
+
+.card-back{
+  background:#fafafa;
+  transform:rotateY(180deg);
+  align-items:flex-start;
+  justify-content:flex-start;
+  padding:28px 30px;
+  gap:14px;
+}
+.card-back .back-section{
+  width:100%;
+}
+.card-back .back-label{
+  font-size:10px;
+  color:#999;
+  letter-spacing:1px;
+  margin-bottom:4px;
+  text-transform:uppercase;
+}
+.card-back .back-value{
+  font-size:16px;
+  color:var(--text);
+  line-height:1.5;
+}
+.card-back .back-value.transliteration{
+  font-size:14px;
+  color:#666;
+  font-style:italic;
+}
+.card-back .back-value.example{
+  font-size:13px;
+  color:#555;
+  line-height:1.6;
+  border-left:3px solid var(--cobalt);
+  padding-left:12px;
+  margin-top:4px;
+}
+
+/* Card counter */
+.card-counter{
+  font-size:13px;
+  color:#999;
+  margin-bottom:10px;
+}
+
+/* Card navigation */
+.card-nav{
+  display:flex;
+  gap:16px;
+  align-items:center;
+}
+.card-nav-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  background:none;
+  border:2px solid #ddd;
+  border-radius:8px;
+  padding:8px 20px;
+  cursor:pointer;
+  color:var(--text);
+  transition:border-color .2s, color .2s;
+}
+.card-nav-btn:hover{
+  border-color:var(--cobalt);
+  color:var(--cobalt);
+}
+.card-nav-btn:disabled{
+  opacity:.3;
+  cursor:not-allowed;
+}
+
+/* Empty state */
+.card-empty{
+  width:320px;
+  height:440px;
+  border:2px dashed #ddd;
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  color:#bbb;
+  font-size:14px;
+  padding:40px;
+  line-height:1.6;
+  margin-bottom:20px;
+}
+
+/* ── RIGHT: INPUT AREA ── */
+.fc-input-area{
+  width:340px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.fc-label{
+  font-size:12px;
+  font-weight:800;
+  color:#555;
+  letter-spacing:.5px;
+}
+
+.fc-name-input{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  width:100%;
+  padding:10px 14px;
+  border:2px solid #ddd;
+  border-radius:8px;
+  box-sizing:border-box;
+  outline:none;
+  transition:border-color .2s;
+}
+.fc-name-input:focus{
+  border-color:var(--cobalt);
+}
+
+.fc-lang-select{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:13px;
+  width:100%;
+  padding:10px 14px;
+  border:2px solid #ddd;
+  border-radius:8px;
+  box-sizing:border-box;
+  outline:none;
+  background:#fff;
+  cursor:pointer;
+  transition:border-color .2s;
+}
+.fc-lang-select:focus{
+  border-color:var(--cobalt);
+}
+
+.fc-textarea{
+  font-family:"Courier New",monospace;
+  font-size:13px;
+  width:100%;
+  height:200px;
+  padding:12px 14px;
+  border:2px solid #ddd;
+  border-radius:8px;
+  box-sizing:border-box;
+  outline:none;
+  resize:vertical;
+  line-height:1.6;
+  transition:border-color .2s;
+}
+.fc-textarea:focus{
+  border-color:var(--cobalt);
+}
+.fc-textarea::placeholder{
+  color:#bbb;
+}
+
+.fc-hint{
+  font-size:10px;
+  color:#aaa;
+  text-align:right;
+}
+
+.fc-or{
+  font-size:12px;
+  color:#aaa;
+  text-align:center;
+}
+
+.fc-upload-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:13px;
+  font-weight:800;
+  width:100%;
+  padding:10px;
+  border:2px dashed #ddd;
+  border-radius:8px;
+  background:none;
+  color:#888;
+  cursor:pointer;
+  transition:border-color .2s, color .2s;
+}
+.fc-upload-btn:hover{
+  border-color:var(--cobalt);
+  color:var(--cobalt);
+}
+
+.fc-create-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:15px;
+  font-weight:800;
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:8px;
+  background:var(--cobalt);
+  color:#fff;
+  cursor:pointer;
+  letter-spacing:.5px;
+  transition:opacity .2s;
+}
+.fc-create-btn:hover{
+  opacity:.85;
+}
+.fc-create-btn:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+}
+
+/* Loading spinner */
+.fc-loading{
+  display:none;
+  text-align:center;
+  padding:20px;
+  color:#888;
+  font-size:13px;
+}
+.fc-loading.show{
+  display:block;
+}
+
+/* ── SAVED STACKS ── */
+.fc-stacks-section{
+  margin-top:20px;
+  border-top:2px solid #eee;
+  padding-top:16px;
+}
+.fc-stacks-title{
+  font-size:12px;
+  font-weight:800;
+  color:#555;
+  letter-spacing:.5px;
+  margin-bottom:10px;
+}
+.fc-stack-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  max-height:200px;
+  overflow-y:auto;
+}
+.fc-stack-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px;
+  border:2px solid #eee;
+  border-radius:8px;
+  cursor:pointer;
+  transition:border-color .2s, background .2s;
+}
+.fc-stack-item:hover{
+  border-color:var(--cobalt);
+  background:rgba(0,71,255,.03);
+}
+.fc-stack-item.active{
+  border-color:var(--cobalt);
+  background:rgba(0,71,255,.06);
+}
+.fc-stack-name{
+  font-size:13px;
+  font-weight:800;
+  color:var(--text);
+}
+.fc-stack-meta{
+  font-size:10px;
+  color:#999;
+}
+.fc-stack-delete{
+  font-size:11px;
+  color:#ccc;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:2px 6px;
+  transition:color .2s;
+}
+.fc-stack-delete:hover{
+  color:#ff4444;
+}
+
+.fc-no-stacks{
+  font-size:12px;
+  color:#bbb;
+  text-align:center;
+  padding:10px;
+}
+
+/* ── MOBILE ── */
+@media(max-width:820px){
+  .logo-rail{
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
+    width:auto;
+    justify-content:center;
+    padding:32px 0 4px;
+    margin-bottom:10px;
+  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
+
+  .page-wrap{
+    justify-content:flex-start;
+    padding:0 0 60px;
+  }
+
+  .stage{
+    padding:0 16px;
+    box-sizing:border-box;
+  }
+
+  .fc-layout{
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .fc-input-area{
+    width:100%;
+    max-width:340px;
+  }
+
+  .card-stack,
+  .card-empty{
+    width:280px;
+    height:380px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html">Ratings</a>
+  <a href="chat.html">Chat</a>
+  <a href="flashcards.html" class="active">Flashcards</a>
+  <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
+  <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
+  <a href="profile.html">Profile</a>
+</nav>
+
+<!-- LOGO -->
+<div class="logo-rail">
+  <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
+
+<div class="page-wrap">
+  <main class="stage">
+
+    <p class="page-title">Flashcards</p>
+    <p class="page-sub">Create vocabulary stacks and learn with AI-powered flashcards</p>
+
+    <div class="fc-layout">
+
+      <!-- LEFT: Card display -->
+      <div class="fc-card-area">
+        <div class="card-empty" id="cardEmpty">
+          Create a card stack to start learning.<br>Enter words or phrases, pick a target language, and let Lingonect do the rest.
+        </div>
+
+        <div class="card-stack" id="cardStack" style="display:none">
+          <div class="card-flip" id="cardFlip">
+            <div class="card-face card-front">
+              <div class="card-word" id="cardWord"></div>
+              <div class="card-lang" id="cardLang"></div>
+              <div class="card-hint">Click to flip</div>
+            </div>
+            <div class="card-face card-back">
+              <div class="back-section">
+                <div class="back-label">Transliteration</div>
+                <div class="back-value transliteration" id="cardTranslit"></div>
+              </div>
+              <div class="back-section">
+                <div class="back-label">Translation</div>
+                <div class="back-value" id="cardTranslation"></div>
+              </div>
+              <div class="back-section">
+                <div class="back-label">Example</div>
+                <div class="back-value example" id="cardExample"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-counter" id="cardCounter" style="display:none"></div>
+
+        <div class="card-nav" id="cardNav" style="display:none">
+          <button class="card-nav-btn" id="prevBtn">&larr; Prev</button>
+          <button class="card-nav-btn" id="nextBtn">Next &rarr;</button>
+        </div>
+
+        <div class="fc-loading" id="fcLoading">Generating flashcards... This may take a moment.</div>
+      </div>
+
+      <!-- RIGHT: Input area -->
+      <div class="fc-input-area">
+        <label class="fc-label">Stack Name</label>
+        <input class="fc-name-input" id="stackName" type="text" placeholder="e.g. Kitchen Vocabulary" maxlength="60" />
+
+        <label class="fc-label">Target Language</label>
+        <select class="fc-lang-select" id="targetLang">
+          <option value="">Select a language...</option>
+        </select>
+
+        <label class="fc-label">Words or Phrases (one per line)</label>
+        <textarea class="fc-textarea" id="wordsInput" placeholder="apple&#10;good morning&#10;where is the train station?&#10;thank you very much"></textarea>
+        <div class="fc-hint" id="lineCount">0 / 500 lines</div>
+
+        <div class="fc-or">or</div>
+
+        <button class="fc-upload-btn" id="uploadBtn">Upload a text file (.txt)</button>
+        <input type="file" id="fileInput" accept=".txt" style="display:none" />
+
+        <button class="fc-create-btn" id="createBtn">Create Flashcards</button>
+
+        <!-- Saved stacks -->
+        <div class="fc-stacks-section">
+          <div class="fc-stacks-title">Your Card Stacks</div>
+          <div class="fc-stack-list" id="stackList">
+            <div class="fc-no-stacks" id="noStacks">No card stacks yet</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const CLAUDE_WORKER = "https://claudetranslate.hanyuriyu.workers.dev";
+const MAX_LINES = 500;
+
+const ALL_LANGUAGES = [
+  "English","Spanish","French","German","Italian","Portuguese (Brazil)","Portuguese (Portugal)",
+  "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
+  "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
+  "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
+  "Latvian","Estonian","Slovenian","Catalan","Icelandic",
+  "Arabic","Hebrew","Persian (Farsi)","Hindi","Urdu","Bengali",
+  "Japanese","Chinese (Simplified)","Chinese (Traditional)","Korean",
+  "Thai","Vietnamese","Indonesian","Malay","Tagalog (Filipino)"
+];
+
+let currentUser = null;
+let activeStack = null;   // { name, targetLang, cards: [{word, transliteration, translation, example}] }
+let activeIndex = 0;
+let savedStacks = [];     // loaded from Firestore
+
+// ── Populate language dropdown ──
+const langSelect = document.getElementById("targetLang");
+ALL_LANGUAGES.forEach(lang => {
+  const opt = document.createElement("option");
+  opt.value = lang;
+  opt.textContent = lang;
+  langSelect.appendChild(opt);
+});
+
+// ── Auth guard ──
+auth.onAuthStateChanged(async user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  currentUser = user;
+  if (user.email === ADMIN_EMAIL) {
+    document.getElementById("seedNavLink").style.display = "";
+    document.getElementById("adminNavLink").style.display = "";
+  }
+  document.body.style.visibility = "visible";
+
+  // Load saved stacks
+  await loadStacks();
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  auth.signOut().then(() => { window.location.href = "index.html"; });
+});
+
+// ── Line counter ──
+const wordsInput = document.getElementById("wordsInput");
+const lineCountEl = document.getElementById("lineCount");
+
+wordsInput.addEventListener("input", () => {
+  const lines = getLines();
+  lineCountEl.textContent = lines.length + " / " + MAX_LINES + " lines";
+  if (lines.length > MAX_LINES) {
+    lineCountEl.style.color = "#ff4444";
+  } else {
+    lineCountEl.style.color = "#aaa";
+  }
+});
+
+function getLines() {
+  return wordsInput.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+}
+
+// ── File upload ──
+document.getElementById("uploadBtn").addEventListener("click", () => {
+  document.getElementById("fileInput").click();
+});
+
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    wordsInput.value = ev.target.result;
+    wordsInput.dispatchEvent(new Event("input"));
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+// ── Create flashcards ──
+document.getElementById("createBtn").addEventListener("click", async () => {
+  const name = document.getElementById("stackName").value.trim();
+  const targetLang = document.getElementById("targetLang").value;
+  const lines = getLines();
+
+  if (!name) return alert("Please enter a stack name.");
+  if (!targetLang) return alert("Please select a target language.");
+  if (lines.length === 0) return alert("Please enter at least one word or phrase.");
+  if (lines.length > MAX_LINES) return alert("Maximum " + MAX_LINES + " lines per stack.");
+
+  const createBtn = document.getElementById("createBtn");
+  const loading = document.getElementById("fcLoading");
+  createBtn.disabled = true;
+  loading.classList.add("show");
+
+  try {
+    const cards = await generateFlashcards(lines, targetLang);
+    if (!cards || cards.length === 0) throw new Error("No cards generated");
+
+    // Save to Firestore
+    const stackDoc = {
+      name: name,
+      targetLang: targetLang,
+      cards: cards,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    const ref = await db.collection("flashcards").doc(currentUser.uid)
+      .collection("stacks").add(stackDoc);
+
+    // Activate the stack
+    activeStack = { id: ref.id, ...stackDoc, cards: cards };
+    activeIndex = 0;
+    showCard();
+
+    // Reload saved stacks list
+    await loadStacks();
+
+    // Clear inputs
+    document.getElementById("stackName").value = "";
+    wordsInput.value = "";
+    wordsInput.dispatchEvent(new Event("input"));
+
+  } catch (err) {
+    console.error("Flashcard generation failed:", err);
+    alert("Failed to generate flashcards. Please try again.");
+  } finally {
+    createBtn.disabled = false;
+    loading.classList.remove("show");
+  }
+});
+
+// ── Generate flashcards via Claude ──
+async function generateFlashcards(words, targetLang) {
+  // Process in batches of 25 to avoid token limits
+  const batchSize = 25;
+  const allCards = [];
+
+  for (let i = 0; i < words.length; i += batchSize) {
+    const batch = words.slice(i, i + batchSize);
+    const numbered = batch.map((w, idx) => (i + idx + 1) + ". " + w).join("\n");
+
+    const prompt = `You are a language learning assistant. Translate the following words/phrases into ${targetLang}. For each item, provide:
+1. The word/phrase in ${targetLang}
+2. A transliteration (romanization) if the target language uses a non-Latin script. If it uses Latin script, just repeat the word.
+3. The original English translation
+4. One useful example sentence in ${targetLang} with its English translation in parentheses
+
+Return ONLY a valid JSON array. Each element must have exactly these keys: "word", "transliteration", "translation", "example"
+
+Words/phrases to translate:
+${numbered}`;
+
+    const res = await fetch(CLAUDE_WORKER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250514",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    if (!data.content || !data.content[0]) throw new Error("Empty response from Claude");
+
+    const text = data.content[0].text;
+    // Extract JSON from response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON found in response");
+
+    const cards = JSON.parse(jsonMatch[0]);
+    allCards.push(...cards);
+  }
+
+  return allCards;
+}
+
+// ── Display card ──
+function showCard() {
+  if (!activeStack || !activeStack.cards.length) return;
+
+  document.getElementById("cardEmpty").style.display = "none";
+  document.getElementById("cardStack").style.display = "block";
+  document.getElementById("cardCounter").style.display = "block";
+  document.getElementById("cardNav").style.display = "flex";
+
+  const card = activeStack.cards[activeIndex];
+  const flip = document.getElementById("cardFlip");
+  flip.classList.remove("flipped");
+
+  document.getElementById("cardWord").textContent = card.word || "";
+  document.getElementById("cardLang").textContent = activeStack.targetLang;
+  document.getElementById("cardTranslit").textContent = card.transliteration || "";
+  document.getElementById("cardTranslation").textContent = card.translation || "";
+  document.getElementById("cardExample").textContent = card.example || "";
+
+  document.getElementById("cardCounter").textContent =
+    (activeIndex + 1) + " / " + activeStack.cards.length + "  \u2014  " + activeStack.name;
+
+  document.getElementById("prevBtn").disabled = activeIndex === 0;
+  document.getElementById("nextBtn").disabled = activeIndex === activeStack.cards.length - 1;
+}
+
+// ── Card flip ──
+document.getElementById("cardFlip").addEventListener("click", () => {
+  document.getElementById("cardFlip").classList.toggle("flipped");
+});
+
+// ── Card navigation ──
+document.getElementById("prevBtn").addEventListener("click", () => {
+  if (activeIndex > 0) {
+    activeIndex--;
+    showCard();
+  }
+});
+document.getElementById("nextBtn").addEventListener("click", () => {
+  if (activeStack && activeIndex < activeStack.cards.length - 1) {
+    activeIndex++;
+    showCard();
+  }
+});
+
+// Keyboard navigation
+document.addEventListener("keydown", e => {
+  if (!activeStack) return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowLeft") {
+    if (activeIndex > 0) { activeIndex--; showCard(); }
+  } else if (e.key === "ArrowRight") {
+    if (activeIndex < activeStack.cards.length - 1) { activeIndex++; showCard(); }
+  } else if (e.key === " " || e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("cardFlip").classList.toggle("flipped");
+  }
+});
+
+// ── Load saved stacks ──
+async function loadStacks() {
+  const snap = await db.collection("flashcards").doc(currentUser.uid)
+    .collection("stacks").orderBy("createdAt", "desc").get();
+
+  savedStacks = [];
+  snap.forEach(doc => {
+    savedStacks.push({ id: doc.id, ...doc.data() });
+  });
+
+  renderStackList();
+}
+
+function renderStackList() {
+  const container = document.getElementById("stackList");
+  const noStacks = document.getElementById("noStacks");
+
+  if (savedStacks.length === 0) {
+    container.innerHTML = "";
+    container.appendChild(noStacks);
+    noStacks.style.display = "block";
+    return;
+  }
+
+  noStacks.style.display = "none";
+  container.innerHTML = savedStacks.map(stack => {
+    const isActive = activeStack && activeStack.id === stack.id;
+    return `<div class="fc-stack-item${isActive ? " active" : ""}" data-id="${stack.id}">
+      <div>
+        <div class="fc-stack-name">${escHtml(stack.name)}</div>
+        <div class="fc-stack-meta">${stack.cards.length} cards &middot; ${escHtml(stack.targetLang)}</div>
+      </div>
+      <button class="fc-stack-delete" data-id="${stack.id}" title="Delete stack">&times;</button>
+    </div>`;
+  }).join("");
+
+  // Click to activate
+  container.querySelectorAll(".fc-stack-item").forEach(el => {
+    el.addEventListener("click", e => {
+      if (e.target.classList.contains("fc-stack-delete")) return;
+      const id = el.dataset.id;
+      const stack = savedStacks.find(s => s.id === id);
+      if (stack) {
+        activeStack = stack;
+        activeIndex = 0;
+        showCard();
+        renderStackList();
+      }
+    });
+  });
+
+  // Delete
+  container.querySelectorAll(".fc-stack-delete").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (!confirm("Delete this card stack?")) return;
+      await db.collection("flashcards").doc(currentUser.uid)
+        .collection("stacks").doc(id).delete();
+
+      if (activeStack && activeStack.id === id) {
+        activeStack = null;
+        activeIndex = 0;
+        document.getElementById("cardEmpty").style.display = "flex";
+        document.getElementById("cardStack").style.display = "none";
+        document.getElementById("cardCounter").style.display = "none";
+        document.getElementById("cardNav").style.display = "none";
+      }
+      await loadStacks();
+    });
+  });
+}
+
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+
+</body>
+</html>
