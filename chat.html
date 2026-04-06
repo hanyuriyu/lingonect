@@ -420,6 +420,37 @@ body{
   padding:20px 10px;
 }
 
+/* ── COLOR LEGEND ── */
+.users-legend{
+  background:var(--terminal-bg);
+  border:3px solid var(--terminal-border);
+  border-radius:12px;
+  padding:10px 14px;
+  box-shadow:0 0 20px rgba(0,255,65,.08);
+}
+.legend-title{
+  font-size:10px;
+  color:#666;
+  letter-spacing:1px;
+  text-align:center;
+  margin-bottom:8px;
+}
+.legend-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-family:"Courier New",monospace;
+  font-size:10px;
+  color:#aaa;
+  padding:2px 0;
+}
+.legend-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
 /* ── INCOMING CHAT NOTIFICATION ── */
 .incoming-toast{
   display:none;
@@ -579,6 +610,14 @@ body{
           <div class="users-list" id="usersList">
             <div class="users-empty">No users online</div>
           </div>
+        </div>
+        <div class="users-legend">
+          <div class="legend-title">LEGEND</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--cobalt)"></span>You</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Online</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--yellow)"></span>In chat with you</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#ffffff"></span>Offline</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#ff4444"></span>In chat with others</div>
         </div>
       </div>
 
