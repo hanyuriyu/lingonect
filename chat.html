@@ -332,6 +332,15 @@ body{
   cursor:not-allowed;
 }
 
+.chat-retention-notice{
+  font-family:"Courier New",monospace;
+  font-size:9px;
+  color:#555;
+  text-align:center;
+  margin-top:4px;
+  letter-spacing:.3px;
+}
+
 /* ── ONLINE USERS PANEL ── */
 .users-panel{
   width:180px;
@@ -601,6 +610,7 @@ body{
                  placeholder="Type a message..." disabled />
           <button class="chat-send-btn" id="sendBtn" disabled>SEND</button>
         </div>
+        <div class="chat-retention-notice">Message history is automatically deleted after 24 hours.</div>
       </div>
 
       <!-- Online users -->
@@ -865,12 +875,27 @@ function chatRoomId(uidA, uidB) {
   return uidA < uidB ? uidA + "_" + uidB : uidB + "_" + uidA;
 }
 
+// ── Purge messages older than 24 hours ──
+function purgeOldMessages(roomId) {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  db.collection("chats").doc(roomId).collection("messages")
+    .where("ts", "<", cutoff)
+    .get()
+    .then(snap => {
+      const batch = db.batch();
+      snap.forEach(doc => batch.delete(doc.ref));
+      if (!snap.empty) batch.commit();
+    })
+    .catch(err => console.warn("Purge failed:", err));
+}
+
 // ── Listen to chat messages ──
 function listenChat(otherUid) {
   // Unsubscribe previous listener
   if (chatListener) chatListener();
 
   const roomId = chatRoomId(currentUser.uid, otherUid);
+  purgeOldMessages(roomId);
   const messagesEl = document.getElementById("chatMessages");
   messagesEl.innerHTML = "";
 
@@ -907,11 +932,13 @@ function sendMessage() {
   const roomId = chatRoomId(currentUser.uid, selectedUid);
   const myName = (myProfile && myProfile.username) || "Anonymous";
 
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   db.collection("chats").doc(roomId).collection("messages").add({
     from: currentUser.uid,
     fromName: myName,
     text: text,
-    ts: firebase.firestore.FieldValue.serverTimestamp()
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+    expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt)
   });
 
   input.value = "";
