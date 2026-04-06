@@ -875,12 +875,27 @@ function chatRoomId(uidA, uidB) {
   return uidA < uidB ? uidA + "_" + uidB : uidB + "_" + uidA;
 }
 
+// ── Purge messages older than 24 hours ──
+function purgeOldMessages(roomId) {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  db.collection("chats").doc(roomId).collection("messages")
+    .where("ts", "<", cutoff)
+    .get()
+    .then(snap => {
+      const batch = db.batch();
+      snap.forEach(doc => batch.delete(doc.ref));
+      if (!snap.empty) batch.commit();
+    })
+    .catch(err => console.warn("Purge failed:", err));
+}
+
 // ── Listen to chat messages ──
 function listenChat(otherUid) {
   // Unsubscribe previous listener
   if (chatListener) chatListener();
 
   const roomId = chatRoomId(currentUser.uid, otherUid);
+  purgeOldMessages(roomId);
   const messagesEl = document.getElementById("chatMessages");
   messagesEl.innerHTML = "";
 
