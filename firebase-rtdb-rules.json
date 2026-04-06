@@ -12,6 +12,12 @@
         ".write": "auth !== null"
       }
     },
+    "activeChats": {
+      ".read": true,
+      "$uid": {
+        ".write": "$uid === auth.uid"
+      }
+    },
     "$other": {
       ".read": false,
       ".write": false
