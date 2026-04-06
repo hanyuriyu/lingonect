@@ -401,6 +401,17 @@ body{
   color:#ffff00;
   background:rgba(255,255,0,.12);
 }
+.user-entry.busy{
+  color:#ff4444;
+  cursor:not-allowed;
+  opacity:.7;
+}
+.user-entry.busy:hover{
+  background:transparent;
+}
+.user-entry.busy .user-lang{
+  color:#ff4444;
+}
 .user-entry.self{
   color:var(--cobalt);
   cursor:default;
@@ -624,6 +635,7 @@ body{
           <button class="chat-send-btn" id="sendBtn" disabled>SEND</button>
         </div>
         <div class="chat-retention-notice">Message history is automatically deleted after 24 hours.</div>
+        <div class="chat-retention-notice">You can chat with a maximum of 3 users at the same time.</div>
       </div>
 
       <!-- Online users -->
@@ -688,6 +700,8 @@ let currentUser  = null;
 let myProfile    = null;
 let selectedUid  = null;
 let chatListener = null;
+let activeChatsMap = {};  // uid -> { partnerUid: true, ... }
+const MAX_CHATS = 3;
 
 // ── Auth guard ──
 auth.onAuthStateChanged(async user => {
@@ -722,6 +736,9 @@ auth.onAuthStateChanged(async user => {
   // Listen for online users
   listenOnlineUsers();
 
+  // Listen for active chats
+  listenActiveChats();
+
   // Listen for incoming chat requests
   listenIncoming(user.uid);
 });
@@ -736,9 +753,12 @@ function setupPresence(uid) {
   const username = (myProfile && myProfile.username) || "Anonymous";
   const firstLang = getFirstLanguage(myProfile);
 
+  const activeChatsRef = rtdb.ref("activeChats/" + uid);
+
   rtdb.ref(".info/connected").on("value", snap => {
     if (snap.val() === true) {
       userStatusRef.onDisconnect().remove();
+      activeChatsRef.onDisconnect().remove();
       userStatusRef.set({
         online: true,
         username: username,
@@ -747,6 +767,27 @@ function setupPresence(uid) {
       });
     }
   });
+}
+
+// ── Active Chats Tracking ──
+function listenActiveChats() {
+  rtdb.ref("activeChats").on("value", snap => {
+    activeChatsMap = snap.val() || {};
+    renderUserList();
+  });
+}
+
+function getActiveChatCount(uid) {
+  const chats = activeChatsMap[uid];
+  return chats ? Object.keys(chats).length : 0;
+}
+
+function addActiveChat(myUid, otherUid) {
+  rtdb.ref("activeChats/" + myUid + "/" + otherUid).set(true);
+}
+
+function removeActiveChat(myUid, otherUid) {
+  rtdb.ref("activeChats/" + myUid + "/" + otherUid).remove();
 }
 
 function getFirstLanguage(profile) {
@@ -832,9 +873,11 @@ function renderUserList() {
   container.innerHTML = entries.map(([uid, data]) => {
     const isSelf = uid === currentUser.uid;
     const isSelected = uid === selectedUid;
+    const isBusy = !isSelf && !isSelected && data.isOnline && getActiveChatCount(uid) >= MAX_CHATS;
     let cls = "user-entry";
     if (isSelf) cls += " self";
     else if (isSelected) cls += " selected";
+    else if (isBusy) cls += " busy";
     else if (data.isOnline) cls += " online";
 
     return `<div class="${cls}" data-uid="${uid}">
@@ -843,8 +886,8 @@ function renderUserList() {
     </div>`;
   }).join("");
 
-  // Click handlers (not on self or offline users)
-  container.querySelectorAll(".user-entry:not(.self)").forEach(el => {
+  // Click handlers (not on self, offline, or busy users)
+  container.querySelectorAll(".user-entry:not(.self):not(.busy)").forEach(el => {
     el.addEventListener("click", () => {
       const uid = el.dataset.uid;
       const userData = combined[uid];
@@ -864,7 +907,18 @@ function escHtml(s) {
 // ── Select a user to chat with ──
 function selectUser(uid) {
   if (uid === selectedUid) return;
+
+  // Check if target user is at max capacity
+  if (getActiveChatCount(uid) >= MAX_CHATS) return;
+
+  // Check if current user is at max capacity (but allow if already chatting with this user)
+  const myChats = activeChatsMap[currentUser.uid] || {};
+  if (!myChats[uid] && getActiveChatCount(currentUser.uid) >= MAX_CHATS) return;
+
+  // Remove previous active chat and add new one
+  if (selectedUid) removeActiveChat(currentUser.uid, selectedUid);
   selectedUid = uid;
+  addActiveChat(currentUser.uid, uid);
 
   // Update UI
   renderUserList();
