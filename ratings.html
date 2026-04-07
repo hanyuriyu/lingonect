@@ -450,6 +450,9 @@ async function loadRatings() {
 
     const ratings = d.ratings || {};
     for (const [engineId, value] of Object.entries(ratings)) {
+      // Jais API key is not yet available — keep its column N/A regardless
+      // of any legacy seeded ratings still in Firestore.
+      if (engineId === "jais") continue;
       if (!ratingsData[key][engineId]) {
         ratingsData[key][engineId] = { sum: 0, count: 0 };
       }
