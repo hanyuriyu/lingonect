@@ -761,6 +761,10 @@ body{
                   <div class="back-label">Translation</div>
                   <div class="back-value" id="cardTranslation"></div>
                 </div>
+                <div class="back-section" id="definitionSection">
+                  <div class="back-label">Definition</div>
+                  <div class="back-value example" id="cardDefinition"></div>
+                </div>
                 <div class="back-section" id="example1Section">
                   <div class="back-label">Example</div>
                   <div class="back-value example" id="cardExample"></div>
@@ -1129,9 +1133,10 @@ async function generateFlashcards(words, targetLang) {
 1. The word/phrase in ${targetLang}
 2. A transliteration (romanization) if the target language uses a non-Latin script. If it uses Latin script, just repeat the word.
 3. The original English translation
-4. One useful example sentence in ${targetLang} with its English translation in parentheses
+4. A short dictionary-style definition of the word written in ${targetLang}, followed by an English back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
+5. One useful example sentence in ${targetLang} with its English translation in parentheses
 
-Return ONLY a valid JSON array. Each element must have exactly these keys: "word", "transliteration", "translation", "example"
+Return ONLY a valid JSON array. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example"
 
 Words/phrases to translate:
 ${numbered}`;
@@ -1170,7 +1175,12 @@ ${numbered}`;
 
     const cards = JSON.parse(jsonMatch[0]);
     // Initialize correctCount for spaced-repetition tracking
-    cards.forEach(c => { c.correctCount = 0; c.example2 = ""; c.example3 = ""; });
+    cards.forEach(c => {
+      c.correctCount = 0;
+      c.definition = c.definition || "";
+      c.example2 = "";
+      c.example3 = "";
+    });
 
     // Fetch a second example sentence per card from OpenAI.
     const targetWords = cards.map(c => c.word || "");
@@ -1261,6 +1271,9 @@ function showCard() {
   document.getElementById("cardLang").textContent = activeStack.targetLang;
   document.getElementById("cardTranslit").textContent = card.transliteration || "";
   document.getElementById("cardTranslation").textContent = card.translation || "";
+  const def = card.definition || "";
+  document.getElementById("cardDefinition").textContent = def;
+  document.getElementById("definitionSection").style.display = def ? "block" : "none";
   document.getElementById("cardExample").textContent = card.example || "";
   const ex2 = card.example2 || "";
   document.getElementById("cardExample2").textContent = ex2;
