@@ -495,6 +495,13 @@ body{
   color:#555;
   letter-spacing:.5px;
 }
+.fc-help{
+  font-size:10px;
+  color:#999;
+  margin-top:-8px;
+  margin-bottom:2px;
+  line-height:1.4;
+}
 
 .fc-name-input{
   font-family:"Special Elite","Courier New",monospace;
@@ -840,12 +847,20 @@ body{
         <label class="fc-label">Stack Name</label>
         <input class="fc-name-input" id="stackName" type="text" placeholder="e.g. Kitchen Vocabulary" maxlength="60" />
 
+        <label class="fc-label">Source Language</label>
+        <div class="fc-help">The language you learn with.</div>
+        <select class="fc-lang-select" id="sourceLang">
+          <option value="">Select a language...</option>
+        </select>
+
         <label class="fc-label">Target Language</label>
+        <div class="fc-help">The language you learn.</div>
         <select class="fc-lang-select" id="targetLang">
           <option value="">Select a language...</option>
         </select>
 
         <label class="fc-label">Words or Phrases (one per line)</label>
+        <div class="fc-help">Add lists of words in your source language that you want to learn in a target language.</div>
         <textarea class="fc-textarea" id="wordsInput" placeholder="apple&#10;good morning&#10;where is the train station?&#10;thank you very much"></textarea>
         <div class="fc-hint" id="lineCount">0 / 500 lines</div>
 
@@ -1110,14 +1125,22 @@ function isAnswerCorrect(userInput, translation){
   return alts.some(a => a === u);
 }
 
-// ── Populate language dropdown ──
+// ── Populate language dropdowns ──
 const langSelect = document.getElementById("targetLang");
+const sourceLangSelect = document.getElementById("sourceLang");
 ALL_LANGUAGES.forEach(lang => {
-  const opt = document.createElement("option");
-  opt.value = lang;
-  opt.textContent = lang;
-  langSelect.appendChild(opt);
+  const opt1 = document.createElement("option");
+  opt1.value = lang;
+  opt1.textContent = lang;
+  langSelect.appendChild(opt1);
+
+  const opt2 = document.createElement("option");
+  opt2.value = lang;
+  opt2.textContent = lang;
+  sourceLangSelect.appendChild(opt2);
 });
+// Default the source language to English — most common case
+sourceLangSelect.value = "English";
 
 // ── Auth guard ──
 auth.onAuthStateChanged(async user => {
@@ -1178,11 +1201,14 @@ document.getElementById("fileInput").addEventListener("change", e => {
 // ── Create flashcards ──
 document.getElementById("createBtn").addEventListener("click", async () => {
   const name = document.getElementById("stackName").value.trim();
+  const sourceLang = document.getElementById("sourceLang").value;
   const targetLang = document.getElementById("targetLang").value;
   const lines = getLines();
 
   if (!name) return alert("Please enter a stack name.");
+  if (!sourceLang) return alert("Please select a source language.");
   if (!targetLang) return alert("Please select a target language.");
+  if (sourceLang === targetLang) return alert("Source and target languages must be different.");
   if (lines.length === 0) return alert("Please enter at least one word or phrase.");
   if (lines.length > MAX_LINES) return alert("Maximum " + MAX_LINES + " lines per stack.");
 
@@ -1192,12 +1218,13 @@ document.getElementById("createBtn").addEventListener("click", async () => {
   loading.classList.add("show");
 
   try {
-    const cards = await generateFlashcards(lines, targetLang);
+    const cards = await generateFlashcards(lines, sourceLang, targetLang);
     if (!cards || cards.length === 0) throw new Error("No cards generated");
 
     // Save to Firestore
     const stackDoc = {
       name: name,
+      sourceLang: sourceLang,
       targetLang: targetLang,
       cards: cards,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1230,7 +1257,7 @@ document.getElementById("createBtn").addEventListener("click", async () => {
 });
 
 // ── Generate flashcards via Claude ──
-async function generateFlashcards(words, targetLang) {
+async function generateFlashcards(words, sourceLang, targetLang) {
   // Process in batches of 25 to avoid token limits
   const batchSize = 25;
   const allCards = [];
@@ -1239,12 +1266,12 @@ async function generateFlashcards(words, targetLang) {
     const batch = words.slice(i, i + batchSize);
     const numbered = batch.map((w, idx) => (i + idx + 1) + ". " + w).join("\n");
 
-    const prompt = `You are a language learning assistant. Translate the following words/phrases into ${targetLang}. For each item, provide:
+    const prompt = `You are a language learning assistant. The user's source language is ${sourceLang}. Translate the following ${sourceLang} words/phrases into ${targetLang}. For each item, provide:
 1. The word/phrase in ${targetLang}
 2. A transliteration (romanization) if the target language uses a non-Latin script. If it uses Latin script, just repeat the word.
-3. The original English translation
-4. A short dictionary-style definition of the word written in ${targetLang}, followed by an English back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
-5. One useful example sentence in ${targetLang} with its English translation in parentheses
+3. The original ${sourceLang} translation
+4. A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
+5. One useful example sentence in ${targetLang} with its ${sourceLang} translation in parentheses
 
 Return ONLY a valid JSON array. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example"
 
@@ -1296,7 +1323,7 @@ ${numbered}`;
     const targetWords = cards.map(c => c.word || "");
     try {
       const openaiExamples = await generateExampleBatch(
-        targetWords, targetLang, OPENAI_WORKER, "gpt-4o-mini"
+        targetWords, sourceLang, targetLang, OPENAI_WORKER, "gpt-4o-mini"
       );
       cards.forEach((c, idx) => { c.example2 = openaiExamples[idx] || ""; });
     } catch (err) {
@@ -1308,7 +1335,7 @@ ${numbered}`;
     if (isChineseLang(targetLang)) {
       try {
         const dsExamples = await generateExampleBatch(
-          targetWords, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+          targetWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
         );
         cards.forEach((c, idx) => { c.example3 = dsExamples[idx] || ""; });
       } catch (err) {
@@ -1324,11 +1351,11 @@ ${numbered}`;
 
 // Fetch one example sentence per word from an OpenAI-compatible chat worker.
 // Returns an array of strings in the same order as `words`.
-async function generateExampleBatch(words, targetLang, workerUrl, model) {
+async function generateExampleBatch(words, sourceLang, targetLang, workerUrl, model) {
   const numbered = words.map((w, i) => (i + 1) + ". " + w).join("\n");
-  const prompt = `For each of the following ${targetLang} words or phrases, write ONE natural, useful example sentence in ${targetLang}, followed by its English translation in parentheses on the same line.
+  const prompt = `For each of the following ${targetLang} words or phrases, write ONE natural, useful example sentence in ${targetLang}, followed by its ${sourceLang} translation in parentheses on the same line.
 
-Return ONLY a valid JSON array of strings, in the same order as the input. Each element must be the full example sentence string (including the English translation in parentheses). Do not add any commentary, numbering, or keys.
+Return ONLY a valid JSON array of strings, in the same order as the input. Each element must be the full example sentence string (including the ${sourceLang} translation in parentheses). Do not add any commentary, numbering, or keys.
 
 Words/phrases:
 ${numbered}`;
