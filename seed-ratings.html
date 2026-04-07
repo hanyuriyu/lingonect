@@ -863,9 +863,14 @@ function populateDropdowns() {
 }
 
 // ── UI: Build rater radio buttons ──
+// NMT engines can't follow rating prompts, so they're excluded from the rater list.
+const NMT_ENGINE_IDS = new Set([
+  "deepl", "google", "tencent", "alibaba", "microsoft", "amazon", "meta", "baidu"
+]);
+
 function buildRaterOptions() {
   const container = document.getElementById("raterOptions");
-  ENGINE_LIST.forEach(engine => {
+  ENGINE_LIST.filter(engine => !NMT_ENGINE_IDS.has(engine.id)).forEach(engine => {
     const id = `rater-${engine.id}`;
     const label = document.createElement("label");
     label.className = "rater-option";
