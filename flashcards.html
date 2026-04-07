@@ -958,6 +958,9 @@ function currentCardIndex(){
 function normalizeAnswer(s){
   return (s || "")
     .toLowerCase()
+    // Drop any parenthesised / bracketed clarifications like "(bell pepper)"
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ")
     .trim()
     .replace(/^to\s+/, "")
     .replace(/^(a|an|the)\s+/, "")
@@ -968,8 +971,14 @@ function normalizeAnswer(s){
 function isAnswerCorrect(userInput, translation){
   const u = normalizeAnswer(userInput);
   if (!u) return false;
-  // Allow comma/slash separated alternatives in the stored translation
-  const alts = (translation || "").split(/[,/;]| or /).map(normalizeAnswer).filter(Boolean);
+  // Strip bracketed content first so things like "Pepper (bell pepper / capsicum)"
+  // or "Zucchini (UK: courgette)" aren't split on the "/" inside the brackets,
+  // and only the primary word(s) outside the brackets are required.
+  const stripped = (translation || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ");
+  // Allow comma / slash / semicolon / "or" separated alternatives
+  const alts = stripped.split(/[,/;]| or /).map(normalizeAnswer).filter(Boolean);
   return alts.some(a => a === u);
 }
 
