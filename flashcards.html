@@ -369,6 +369,29 @@ body{
 }
 .stack-star.show{ display:inline; }
 
+/* Speaker / pronunciation button on the card front */
+.card-speak{
+  position:absolute;
+  top:12px;
+  right:12px;
+  width:30px;
+  height:30px;
+  border-radius:50%;
+  border:1.5px solid #ddd;
+  background:#fff;
+  color:#666;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  transition:border-color .2s, color .2s, transform .15s;
+  z-index:3;
+}
+.card-speak:hover{ border-color:var(--cobalt); color:var(--cobalt); transform:scale(1.08); }
+.card-speak svg{ width:16px; height:16px; display:block; }
+.card-speak.playing{ border-color:var(--cobalt); color:var(--cobalt); }
+
 .card-back{
   background:#fafafa;
   transform:rotateY(180deg);
@@ -737,6 +760,9 @@ body{
           <div class="card-stack" id="cardStack" style="display:none">
             <div class="card-flip" id="cardFlip">
               <div class="card-face card-front">
+                <button class="card-speak" id="cardSpeak" type="button" title="Hear pronunciation" aria-label="Hear pronunciation">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                </button>
                 <div class="card-word" id="cardWord"></div>
                 <div class="card-lang" id="cardLang"></div>
 
@@ -873,6 +899,89 @@ const MAX_LINES = 500;
 
 function isChineseLang(lang){
   return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
+}
+
+// BCP-47 locales for the SpeechSynthesis API
+const LANG_LOCALE = {
+  "English": "en-US",
+  "Spanish": "es-ES",
+  "French": "fr-FR",
+  "German": "de-DE",
+  "Italian": "it-IT",
+  "Portuguese (Brazil)": "pt-BR",
+  "Portuguese (Portugal)": "pt-PT",
+  "Swedish": "sv-SE",
+  "Norwegian": "nb-NO",
+  "Danish": "da-DK",
+  "Finnish": "fi-FI",
+  "Dutch": "nl-NL",
+  "Polish": "pl-PL",
+  "Russian": "ru-RU",
+  "Ukrainian": "uk-UA",
+  "Turkish": "tr-TR",
+  "Greek": "el-GR",
+  "Romanian": "ro-RO",
+  "Hungarian": "hu-HU",
+  "Czech": "cs-CZ",
+  "Slovak": "sk-SK",
+  "Bulgarian": "bg-BG",
+  "Croatian": "hr-HR",
+  "Serbian": "sr-RS",
+  "Lithuanian": "lt-LT",
+  "Latvian": "lv-LV",
+  "Estonian": "et-EE",
+  "Slovenian": "sl-SI",
+  "Catalan": "ca-ES",
+  "Icelandic": "is-IS",
+  "Arabic": "ar-SA",
+  "Hebrew": "he-IL",
+  "Persian (Farsi)": "fa-IR",
+  "Hindi": "hi-IN",
+  "Urdu": "ur-PK",
+  "Bengali": "bn-BD",
+  "Japanese": "ja-JP",
+  "Chinese (Simplified)": "zh-CN",
+  "Chinese (Traditional)": "zh-TW",
+  "Korean": "ko-KR",
+  "Thai": "th-TH",
+  "Vietnamese": "vi-VN",
+  "Indonesian": "id-ID",
+  "Malay": "ms-MY",
+  "Tagalog (Filipino)": "fil-PH"
+};
+
+function pickVoice(locale){
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || !voices.length) return null;
+  // Exact match first, then language prefix match
+  return voices.find(v => v.lang === locale) ||
+         voices.find(v => v.lang && v.lang.toLowerCase().startsWith(locale.split("-")[0].toLowerCase())) ||
+         null;
+}
+
+function speakWord(text, lang){
+  if (!text || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const locale = LANG_LOCALE[lang] || "";
+    if (locale) utter.lang = locale;
+    const voice = pickVoice(locale);
+    if (voice) utter.voice = voice;
+    const btn = document.getElementById("cardSpeak");
+    if (btn) btn.classList.add("playing");
+    utter.onend = () => { if (btn) btn.classList.remove("playing"); };
+    utter.onerror = () => { if (btn) btn.classList.remove("playing"); };
+    window.speechSynthesis.speak(utter);
+  } catch (err) {
+    console.warn("Speech synthesis failed:", err);
+  }
+}
+
+// Some browsers populate voices asynchronously
+if ("speechSynthesis" in window && typeof speechSynthesis.onvoiceschanged !== "undefined") {
+  speechSynthesis.onvoiceschanged = () => {};
 }
 
 const ALL_LANGUAGES = [
@@ -1393,9 +1502,19 @@ async function persistActiveStack(){
 // ── Card flip (gated until cross/tick answered, unless in practice mode) ──
 document.getElementById("cardFlip").addEventListener("click", e => {
   if (e.target.closest(".card-action-btn") ||
-      e.target.closest(".card-translate-box")) return;
+      e.target.closest(".card-translate-box") ||
+      e.target.closest(".card-speak")) return;
   if (currentStatus() === "pending") return;
   document.getElementById("cardFlip").classList.toggle("flipped");
+});
+
+// ── Speaker button: pronounce the word in the target language ──
+document.getElementById("cardSpeak").addEventListener("click", e => {
+  e.stopPropagation();
+  if (!activeStack) return;
+  const card = activeStack.cards[currentCardIndex()];
+  if (!card) return;
+  speakWord(card.word || "", activeStack.targetLang);
 });
 
 // ── Cross button: mark as missed, unlock flip + next ──
