@@ -498,8 +498,9 @@ body{
 .fc-help{
   font-size:10px;
   color:#999;
-  margin-top:-8px;
-  margin-bottom:2px;
+  margin-left:8px;
+  font-weight:400;
+  letter-spacing:normal;
   line-height:1.4;
 }
 
@@ -847,20 +848,17 @@ body{
         <label class="fc-label">Stack Name</label>
         <input class="fc-name-input" id="stackName" type="text" placeholder="e.g. Kitchen Vocabulary" maxlength="60" />
 
-        <label class="fc-label">Source Language</label>
-        <div class="fc-help">The language you learn with.</div>
+        <label class="fc-label">Source Language<span class="fc-help">The language you learn with.</span></label>
         <select class="fc-lang-select" id="sourceLang">
           <option value="">Select a language...</option>
         </select>
 
-        <label class="fc-label">Target Language</label>
-        <div class="fc-help">The language you learn.</div>
+        <label class="fc-label">Target Language<span class="fc-help">The language you learn.</span></label>
         <select class="fc-lang-select" id="targetLang">
           <option value="">Select a language...</option>
         </select>
 
-        <label class="fc-label">Words or Phrases (one per line)</label>
-        <div class="fc-help">Add lists of words in your source language that you want to learn in a target language.</div>
+        <label class="fc-label">Words or Phrases<span class="fc-help">One per line. Add words in your source language to learn in a target language.</span></label>
         <textarea class="fc-textarea" id="wordsInput" placeholder="apple&#10;good morning&#10;where is the train station?&#10;thank you very much"></textarea>
         <div class="fc-hint" id="lineCount">0 / 500 lines</div>
 
