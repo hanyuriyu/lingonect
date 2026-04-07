@@ -882,6 +882,19 @@ function shuffleIndices(n){
   return arr;
 }
 
+// Shuffled list of indices of cards that are not yet mastered (correctCount < 5)
+function buildLearningOrder(stack){
+  const indices = [];
+  for (let i = 0; i < stack.cards.length; i++) {
+    if ((stack.cards[i].correctCount || 0) < 5) indices.push(i);
+  }
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices;
+}
+
 function isStackMastered(stack){
   if (!stack || !stack.cards || !stack.cards.length) return false;
   return stack.cards.every(c => (c.correctCount || 0) >= 5);
@@ -892,7 +905,7 @@ function initProgress(stack){
   const mastered = isStackMastered(stack);
   const n = stack.cards.length;
 
-  // Mastered stacks always start a fresh random practice run
+  // Mastered stacks always start a fresh random practice run over all cards
   if (mastered) {
     stack.progress = {
       order: shuffleIndices(n),
@@ -903,22 +916,34 @@ function initProgress(stack){
     return;
   }
 
-  // Resume an in-progress pass if the saved progress is still valid
+  // Resume a saved pass, but drop any cards that have become mastered since
   const p = stack.progress;
-  if (p && Array.isArray(p.order) && p.order.length === n &&
-      p.order.every(i => Number.isInteger(i) && i >= 0 && i < n)) {
-    stack.progress = {
-      order: p.order.slice(),
-      pos: Math.min(Math.max(p.pos || 0, 0), n - 1),
-      status: Object.assign({}, p.status || {}),
-      mastered: false
-    };
-    return;
+  if (p && Array.isArray(p.order)) {
+    const filtered = p.order.filter(i =>
+      Number.isInteger(i) && i >= 0 && i < n &&
+      (stack.cards[i].correctCount || 0) < 5
+    );
+    if (filtered.length > 0) {
+      // Clean status entries for cards no longer in the pass
+      const allowed = new Set(filtered);
+      const status = {};
+      Object.keys(p.status || {}).forEach(k => {
+        const idx = Number(k);
+        if (allowed.has(idx)) status[idx] = p.status[k];
+      });
+      stack.progress = {
+        order: filtered,
+        pos: Math.min(Math.max(p.pos || 0, 0), filtered.length - 1),
+        status: status,
+        mastered: false
+      };
+      return;
+    }
   }
 
-  // New pass
+  // New pass with only the non-mastered cards
   stack.progress = {
-    order: shuffleIndices(n),
+    order: buildLearningOrder(stack),
     pos: 0,
     status: {},
     mastered: false
@@ -1347,12 +1372,18 @@ async function advanceNext(){
   }
 
   // End of the current pass — reshuffle and start a new one.
-  // If the stack is now fully mastered, switch into practice mode.
+  // If the stack is now fully mastered, switch into practice mode over all
+  // cards. Otherwise, the new pass only contains cards that aren't mastered.
   const nowMastered = isStackMastered(activeStack);
-  p.order = shuffleIndices(activeStack.cards.length);
+  if (nowMastered) {
+    p.order = shuffleIndices(activeStack.cards.length);
+    p.mastered = true;
+  } else {
+    p.order = buildLearningOrder(activeStack);
+    p.mastered = false;
+  }
   p.pos = 0;
   p.status = {};
-  p.mastered = nowMastered;
   showCard();
   await persistActiveStack();
 }
