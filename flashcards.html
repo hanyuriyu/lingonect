@@ -858,7 +858,7 @@ body{
           <option value="">Select a language...</option>
         </select>
 
-        <label class="fc-label">Words or Phrases<span class="fc-help">One per line. Add words in your source language to learn in a target language.</span></label>
+        <label class="fc-label">Words or Phrases<span class="fc-help">One per line. Words can be in your source or target language.</span></label>
         <textarea class="fc-textarea" id="wordsInput" placeholder="apple&#10;good morning&#10;where is the train station?&#10;thank you very much"></textarea>
         <div class="fc-hint" id="lineCount">0 / 500 lines</div>
 
@@ -1264,16 +1264,18 @@ async function generateFlashcards(words, sourceLang, targetLang) {
     const batch = words.slice(i, i + batchSize);
     const numbered = batch.map((w, idx) => (i + idx + 1) + ". " + w).join("\n");
 
-    const prompt = `You are a language learning assistant. The user's source language is ${sourceLang}. Translate the following ${sourceLang} words/phrases into ${targetLang}. For each item, provide:
-1. The word/phrase in ${targetLang}
-2. A transliteration (romanization) if the target language uses a non-Latin script. If it uses Latin script, just repeat the word.
-3. The original ${sourceLang} translation
-4. A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
-5. One useful example sentence in ${targetLang} with its ${sourceLang} translation in parentheses
+    const prompt = `You are a language learning assistant. The user's source language is ${sourceLang} and they are learning ${targetLang}. The list below may contain items written in either ${sourceLang} or ${targetLang}, possibly mixed. Decide for each item which language it is in.
 
-Return ONLY a valid JSON array. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example"
+For each item, provide:
+1. "word": The word/phrase in ${targetLang}. If the input item is already in ${targetLang}, use it as-is (correcting only obvious typos or normalising script). If the input item is in ${sourceLang}, translate it into ${targetLang}.
+2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word.
+3. "translation": The ${sourceLang} translation of the ${targetLang} word.
+4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
+5. "example": One useful example sentence in ${targetLang} with its ${sourceLang} translation in parentheses.
 
-Words/phrases to translate:
+Return ONLY a valid JSON array, one element per input item, in the same order. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example"
+
+Input items:
 ${numbered}`;
 
     const res = await fetch(CLAUDE_WORKER, {
