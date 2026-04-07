@@ -761,9 +761,17 @@ body{
                   <div class="back-label">Translation</div>
                   <div class="back-value" id="cardTranslation"></div>
                 </div>
-                <div class="back-section">
+                <div class="back-section" id="example1Section">
                   <div class="back-label">Example</div>
                   <div class="back-value example" id="cardExample"></div>
+                </div>
+                <div class="back-section" id="example2Section" style="display:none">
+                  <div class="back-label">Example 2</div>
+                  <div class="back-value example" id="cardExample2"></div>
+                </div>
+                <div class="back-section" id="example3Section" style="display:none">
+                  <div class="back-label">Example 3</div>
+                  <div class="back-value example" id="cardExample3"></div>
                 </div>
               </div>
             </div>
@@ -853,8 +861,14 @@ const auth = firebase.auth();
 const db   = firebase.firestore();
 
 const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
-const CLAUDE_WORKER = "https://claudetranslate.hanyuriyu.workers.dev";
+const CLAUDE_WORKER   = "https://claudetranslate.hanyuriyu.workers.dev";
+const OPENAI_WORKER   = "https://openai.hanyuriyu.workers.dev";
+const DEEPSEEK_WORKER = "https://deepseek.hanyuriyu.workers.dev";
 const MAX_LINES = 500;
+
+function isChineseLang(lang){
+  return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
+}
 
 const ALL_LANGUAGES = [
   "English","Spanish","French","German","Italian","Portuguese (Brazil)","Portuguese (Portugal)",
@@ -1156,11 +1170,75 @@ ${numbered}`;
 
     const cards = JSON.parse(jsonMatch[0]);
     // Initialize correctCount for spaced-repetition tracking
-    cards.forEach(c => { c.correctCount = 0; });
+    cards.forEach(c => { c.correctCount = 0; c.example2 = ""; c.example3 = ""; });
+
+    // Fetch a second example sentence per card from OpenAI.
+    const targetWords = cards.map(c => c.word || "");
+    try {
+      const openaiExamples = await generateExampleBatch(
+        targetWords, targetLang, OPENAI_WORKER, "gpt-4o-mini"
+      );
+      cards.forEach((c, idx) => { c.example2 = openaiExamples[idx] || ""; });
+    } catch (err) {
+      console.warn("OpenAI example generation failed:", err);
+    }
+
+    // For Chinese (Simplified/Traditional) stacks, also fetch a third example
+    // from DeepSeek.
+    if (isChineseLang(targetLang)) {
+      try {
+        const dsExamples = await generateExampleBatch(
+          targetWords, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+        );
+        cards.forEach((c, idx) => { c.example3 = dsExamples[idx] || ""; });
+      } catch (err) {
+        console.warn("DeepSeek example generation failed:", err);
+      }
+    }
+
     allCards.push(...cards);
   }
 
   return allCards;
+}
+
+// Fetch one example sentence per word from an OpenAI-compatible chat worker.
+// Returns an array of strings in the same order as `words`.
+async function generateExampleBatch(words, targetLang, workerUrl, model) {
+  const numbered = words.map((w, i) => (i + 1) + ". " + w).join("\n");
+  const prompt = `For each of the following ${targetLang} words or phrases, write ONE natural, useful example sentence in ${targetLang}, followed by its English translation in parentheses on the same line.
+
+Return ONLY a valid JSON array of strings, in the same order as the input. Each element must be the full example sentence string (including the English translation in parentheses). Do not add any commentary, numbering, or keys.
+
+Words/phrases:
+${numbered}`;
+
+  const res = await fetch(workerUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 4096,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error("API error " + res.status + ": " + errText);
+  }
+
+  const data = await res.json();
+  if (data.error) {
+    throw new Error(data.error.message || JSON.stringify(data.error));
+  }
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("No JSON array in example response");
+
+  const arr = JSON.parse(jsonMatch[0]);
+  if (!Array.isArray(arr)) throw new Error("Example response was not an array");
+  return arr.map(x => (typeof x === "string" ? x : (x && x.example) || ""));
 }
 
 // ── Display card ──
@@ -1184,6 +1262,12 @@ function showCard() {
   document.getElementById("cardTranslit").textContent = card.transliteration || "";
   document.getElementById("cardTranslation").textContent = card.translation || "";
   document.getElementById("cardExample").textContent = card.example || "";
+  const ex2 = card.example2 || "";
+  document.getElementById("cardExample2").textContent = ex2;
+  document.getElementById("example2Section").style.display = ex2 ? "block" : "none";
+  const ex3 = card.example3 || "";
+  document.getElementById("cardExample3").textContent = ex3;
+  document.getElementById("example3Section").style.display = ex3 ? "block" : "none";
 
   const p = activeStack.progress;
   document.getElementById("cardCounterText").textContent =
