@@ -1545,16 +1545,14 @@ async function loadStacks() {
 
 function renderStackList() {
   const container = document.getElementById("stackList");
-  const noStacks = document.getElementById("noStacks");
 
   if (savedStacks.length === 0) {
-    container.innerHTML = "";
-    container.appendChild(noStacks);
-    noStacks.style.display = "block";
+    // Rebuild the placeholder each time — a previous render may have replaced
+    // container.innerHTML and removed the original #noStacks element.
+    container.innerHTML = '<div class="fc-no-stacks" id="noStacks">No card stacks yet</div>';
     return;
   }
 
-  noStacks.style.display = "none";
   container.innerHTML = savedStacks.map(stack => {
     const isActive = activeStack && activeStack.id === stack.id;
     const mastered = isStackMastered(stack);
