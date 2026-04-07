@@ -243,6 +243,124 @@ body{
   padding-top:16px;
 }
 
+/* Cross/Tick action buttons inside the card */
+.card-actions{
+  display:flex;
+  gap:20px;
+  margin-top:18px;
+  justify-content:center;
+}
+.card-action-btn{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  border:none;
+  cursor:pointer;
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:inherit;
+  line-height:1;
+  padding:0;
+  transition:transform .15s ease, opacity .2s, box-shadow .2s;
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+}
+.card-action-btn:hover{ transform:scale(1.1); }
+.card-action-btn.cross{ background:#ff1f1f; }
+.card-action-btn.tick{ background:#1fcc3f; }
+.card-action-btn.selected{ outline:3px solid rgba(0,0,0,.25); }
+
+/* Translation input box (appears after tick) */
+.card-translate-box{
+  display:none;
+  margin-top:14px;
+  width:100%;
+  flex-direction:column;
+  gap:8px;
+  align-items:center;
+}
+.card-translate-box.show{ display:flex; }
+.card-translate-input{
+  font-family:"Courier New",monospace;
+  font-size:14px;
+  width:85%;
+  padding:8px 12px;
+  border:2px solid #ddd;
+  border-radius:8px;
+  outline:none;
+  text-align:center;
+  box-sizing:border-box;
+}
+.card-translate-input:focus{ border-color:var(--cobalt); }
+.card-translate-confirm{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:12px;
+  font-weight:800;
+  padding:6px 18px;
+  border:2px solid #1fcc3f;
+  border-radius:6px;
+  background:none;
+  color:#1fcc3f;
+  cursor:pointer;
+  transition:background .2s;
+}
+.card-translate-confirm:hover{ background:rgba(31,204,63,.1); }
+.card-translate-feedback{
+  font-size:11px;
+  font-weight:800;
+  min-height:14px;
+  text-align:center;
+}
+.card-translate-feedback.ok{ color:#1fcc3f; }
+.card-translate-feedback.bad{ color:#ff1f1f; }
+
+/* Row that puts the stack and stats side-by-side */
+.card-stack-row{
+  display:flex;
+  align-items:flex-start;
+  gap:28px;
+}
+
+/* Stats column next to the card stack */
+.stack-stats{
+  display:none;
+  flex-direction:column;
+  gap:16px;
+  padding-top:24px;
+  align-items:center;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.stack-stats.show{ display:flex; }
+.stat-num{
+  font-size:24px;
+  font-weight:800;
+  min-width:36px;
+  text-align:center;
+  line-height:1;
+}
+.stat-num.red{ color:#ff1f1f; }
+.stat-num.green{ color:#1fcc3f; }
+.stat-num.black{ color:#000; }
+.stat-label{
+  font-size:9px;
+  color:#aaa;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  margin-top:2px;
+  text-align:center;
+}
+.stack-star{
+  display:none;
+  font-size:22px;
+  color:#FFD700;
+  margin-left:6px;
+  text-shadow:0 0 4px rgba(255,215,0,.6);
+}
+.stack-star.show{ display:inline; }
+
 .card-back{
   background:#fafafa;
   transform:rotateY(180deg);
@@ -607,31 +725,60 @@ body{
           Create a card stack to start learning.<br>Enter words or phrases, pick a target language, and let Lingonect do the rest.
         </div>
 
-        <div class="card-stack" id="cardStack" style="display:none">
-          <div class="card-flip" id="cardFlip">
-            <div class="card-face card-front">
-              <div class="card-word" id="cardWord"></div>
-              <div class="card-lang" id="cardLang"></div>
-              <div class="card-hint">Click to flip</div>
+        <div class="card-stack-row">
+          <div class="card-stack" id="cardStack" style="display:none">
+            <div class="card-flip" id="cardFlip">
+              <div class="card-face card-front">
+                <div class="card-word" id="cardWord"></div>
+                <div class="card-lang" id="cardLang"></div>
+
+                <div class="card-actions" id="cardActions">
+                  <button class="card-action-btn cross" id="btnCross" type="button" title="I didn't know this">&#10005;</button>
+                  <button class="card-action-btn tick" id="btnTick" type="button" title="I know this">&#10003;</button>
+                </div>
+
+                <div class="card-translate-box" id="translateBox">
+                  <input class="card-translate-input" id="translateInput" type="text" placeholder="Type the translation..." />
+                  <button class="card-translate-confirm" id="translateConfirm" type="button">Confirm</button>
+                  <div class="card-translate-feedback" id="translateFeedback"></div>
+                </div>
+
+                <div class="card-hint" id="cardHint">Pick &#10005; or &#10003; to continue</div>
+              </div>
+              <div class="card-face card-back">
+                <div class="back-section">
+                  <div class="back-label">Transliteration</div>
+                  <div class="back-value transliteration" id="cardTranslit"></div>
+                </div>
+                <div class="back-section">
+                  <div class="back-label">Translation</div>
+                  <div class="back-value" id="cardTranslation"></div>
+                </div>
+                <div class="back-section">
+                  <div class="back-label">Example</div>
+                  <div class="back-value example" id="cardExample"></div>
+                </div>
+              </div>
             </div>
-            <div class="card-face card-back">
-              <div class="back-section">
-                <div class="back-label">Transliteration</div>
-                <div class="back-value transliteration" id="cardTranslit"></div>
-              </div>
-              <div class="back-section">
-                <div class="back-label">Translation</div>
-                <div class="back-value" id="cardTranslation"></div>
-              </div>
-              <div class="back-section">
-                <div class="back-label">Example</div>
-                <div class="back-value example" id="cardExample"></div>
-              </div>
+          </div>
+
+          <div class="stack-stats" id="stackStats">
+            <div>
+              <div class="stat-num red" id="statRed">0</div>
+              <div class="stat-label">missed</div>
+            </div>
+            <div>
+              <div class="stat-num green" id="statGreen">0</div>
+              <div class="stat-label">correct</div>
+            </div>
+            <div>
+              <div class="stat-num black" id="statBlack">0</div>
+              <div class="stat-label">mastered</div>
             </div>
           </div>
         </div>
 
-        <div class="card-counter" id="cardCounter" style="display:none"></div>
+        <div class="card-counter" id="cardCounter" style="display:none"><span id="cardCounterText"></span><span class="stack-star" id="stackStar" title="Mastered 5 times!">&#9733;</span></div>
 
         <div class="card-nav" id="cardNav" style="display:none">
           <button class="card-nav-btn" id="prevBtn">&larr; Prev</button>
@@ -713,9 +860,36 @@ const ALL_LANGUAGES = [
 ];
 
 let currentUser = null;
-let activeStack = null;   // { name, targetLang, cards: [{word, transliteration, translation, example}] }
+let activeStack = null;   // { name, targetLang, cards: [{word, transliteration, translation, example, correctCount}] }
 let activeIndex = 0;
 let savedStacks = [];     // loaded from Firestore
+let sessionState = null;  // { status: [], crossed: Set, ticked: Set }
+
+function resetSessionState(stack){
+  sessionState = {
+    status: stack ? stack.cards.map(() => "pending") : [],
+    crossed: new Set(),
+    ticked: new Set()
+  };
+}
+
+function normalizeAnswer(s){
+  return (s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/^to\s+/, "")
+    .replace(/^(a|an|the)\s+/, "")
+    .replace(/[.!?,;:"'()]+/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function isAnswerCorrect(userInput, translation){
+  const u = normalizeAnswer(userInput);
+  if (!u) return false;
+  // Allow comma/slash separated alternatives in the stored translation
+  const alts = (translation || "").split(/[,/;]| or /).map(normalizeAnswer).filter(Boolean);
+  return alts.some(a => a === u);
+}
 
 // ── Populate language dropdown ──
 const langSelect = document.getElementById("targetLang");
@@ -816,6 +990,7 @@ document.getElementById("createBtn").addEventListener("click", async () => {
     // Activate the stack
     activeStack = { id: ref.id, ...stackDoc, cards: cards };
     activeIndex = 0;
+    resetSessionState(activeStack);
     showCard();
 
     // Reload saved stacks list
@@ -889,6 +1064,8 @@ ${numbered}`;
     }
 
     const cards = JSON.parse(jsonMatch[0]);
+    // Initialize correctCount for spaced-repetition tracking
+    cards.forEach(c => { c.correctCount = 0; });
     allCards.push(...cards);
   }
 
@@ -903,6 +1080,7 @@ function showCard() {
   document.getElementById("cardStack").style.display = "block";
   document.getElementById("cardCounter").style.display = "block";
   document.getElementById("cardNav").style.display = "flex";
+  document.getElementById("stackStats").classList.add("show");
 
   const card = activeStack.cards[activeIndex];
   const flip = document.getElementById("cardFlip");
@@ -914,16 +1092,164 @@ function showCard() {
   document.getElementById("cardTranslation").textContent = card.translation || "";
   document.getElementById("cardExample").textContent = card.example || "";
 
-  document.getElementById("cardCounter").textContent =
-    (activeIndex + 1) + " / " + activeStack.cards.length + "  \u2014  " + activeStack.name;
+  document.getElementById("cardCounterText").textContent =
+    (activeIndex + 1) + " / " + activeStack.cards.length + "  \u2014  " + activeStack.name + " ";
 
   document.getElementById("prevBtn").disabled = activeIndex === 0;
-  document.getElementById("nextBtn").disabled = activeIndex === activeStack.cards.length - 1;
+
+  // Reset translate UI for the new card view
+  const translateBox = document.getElementById("translateBox");
+  const translateInput = document.getElementById("translateInput");
+  const translateFeedback = document.getElementById("translateFeedback");
+  translateBox.classList.remove("show");
+  translateInput.value = "";
+  translateFeedback.textContent = "";
+  translateFeedback.classList.remove("ok", "bad");
+
+  // Reflect this card's session status (gates flip + next button)
+  applyCardStatus();
+  updateStats();
 }
 
-// ── Card flip ──
-document.getElementById("cardFlip").addEventListener("click", () => {
+function currentStatus(){
+  if (!sessionState) return "pending";
+  return sessionState.status[activeIndex] || "pending";
+}
+
+function applyCardStatus(){
+  const status = currentStatus();
+  const btnCross = document.getElementById("btnCross");
+  const btnTick = document.getElementById("btnTick");
+  const nextBtn = document.getElementById("nextBtn");
+  const cardHint = document.getElementById("cardHint");
+
+  btnCross.classList.toggle("selected", status === "crossed");
+  btnTick.classList.toggle("selected", status === "ticked");
+
+  const unlocked = status === "crossed" || status === "ticked";
+  // Next button only available once the card has been answered
+  if (activeStack) {
+    nextBtn.disabled = !unlocked || activeIndex === activeStack.cards.length - 1;
+  }
+
+  if (status === "pending") {
+    cardHint.textContent = "Pick \u2715 or \u2713 to continue";
+  } else {
+    cardHint.textContent = "Click to flip";
+  }
+}
+
+function updateStats(){
+  if (!activeStack || !sessionState) return;
+  document.getElementById("statRed").textContent = sessionState.crossed.size;
+  document.getElementById("statGreen").textContent = sessionState.ticked.size;
+  const mastered = activeStack.cards.filter(c => (c.correctCount || 0) >= 5).length;
+  document.getElementById("statBlack").textContent = mastered;
+
+  const allMastered = activeStack.cards.length > 0 &&
+    activeStack.cards.every(c => (c.correctCount || 0) >= 5);
+  document.getElementById("stackStar").classList.toggle("show", allMastered);
+}
+
+async function persistActiveStackCards(){
+  if (!activeStack || !activeStack.id || !currentUser) return;
+  try {
+    await db.collection("flashcards").doc(currentUser.uid)
+      .collection("stacks").doc(activeStack.id)
+      .update({ cards: activeStack.cards });
+    // Sync local cache too
+    const local = savedStacks.find(s => s.id === activeStack.id);
+    if (local) local.cards = activeStack.cards;
+  } catch (err) {
+    console.error("Failed to persist card progress:", err);
+  }
+}
+
+// ── Card flip (gated until cross/tick answered) ──
+document.getElementById("cardFlip").addEventListener("click", e => {
+  // Don't flip when interacting with controls inside the card
+  if (e.target.closest(".card-action-btn") ||
+      e.target.closest(".card-translate-box")) return;
+  if (currentStatus() === "pending") return;
   document.getElementById("cardFlip").classList.toggle("flipped");
+});
+
+// ── Cross button: mark as missed, unlock flip + next ──
+document.getElementById("btnCross").addEventListener("click", e => {
+  e.stopPropagation();
+  if (!activeStack) return;
+  const prev = sessionState.status[activeIndex];
+  if (prev !== "crossed") {
+    // Switching from ticked → crossed: undo green count
+    if (prev === "ticked") sessionState.ticked.delete(activeIndex);
+    sessionState.status[activeIndex] = "crossed";
+    sessionState.crossed.add(activeIndex);
+  }
+  // Hide translate box if it was open
+  document.getElementById("translateBox").classList.remove("show");
+  applyCardStatus();
+  updateStats();
+});
+
+// ── Tick button: open translation input ──
+document.getElementById("btnTick").addEventListener("click", e => {
+  e.stopPropagation();
+  if (!activeStack) return;
+  const translateBox = document.getElementById("translateBox");
+  const translateInput = document.getElementById("translateInput");
+  const translateFeedback = document.getElementById("translateFeedback");
+  translateBox.classList.add("show");
+  translateFeedback.textContent = "";
+  translateFeedback.classList.remove("ok", "bad");
+  // If the card hasn't been ticked-correct yet, clear input; otherwise keep
+  if (sessionState.status[activeIndex] !== "ticked") {
+    translateInput.value = "";
+  }
+  setTimeout(() => translateInput.focus(), 0);
+});
+
+// Prevent the input/button area from triggering card flip
+["translateBox", "translateInput", "translateConfirm"].forEach(id => {
+  document.getElementById(id).addEventListener("click", e => e.stopPropagation());
+});
+
+// ── Confirm translation ──
+document.getElementById("translateConfirm").addEventListener("click", async e => {
+  e.stopPropagation();
+  if (!activeStack) return;
+  const card = activeStack.cards[activeIndex];
+  const translateInput = document.getElementById("translateInput");
+  const translateFeedback = document.getElementById("translateFeedback");
+
+  if (isAnswerCorrect(translateInput.value, card.translation)) {
+    translateFeedback.textContent = "Correct!";
+    translateFeedback.classList.remove("bad");
+    translateFeedback.classList.add("ok");
+
+    const prev = sessionState.status[activeIndex];
+    if (prev !== "ticked") {
+      // First correct tick for this card in this session
+      if (prev === "crossed") sessionState.crossed.delete(activeIndex);
+      sessionState.status[activeIndex] = "ticked";
+      sessionState.ticked.add(activeIndex);
+      card.correctCount = (card.correctCount || 0) + 1;
+      await persistActiveStackCards();
+    }
+    applyCardStatus();
+    updateStats();
+  } else {
+    translateFeedback.textContent = "Not quite — try again";
+    translateFeedback.classList.remove("ok");
+    translateFeedback.classList.add("bad");
+  }
+});
+
+// Submit translation on Enter inside the input
+document.getElementById("translateInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("translateConfirm").click();
+  }
 });
 
 // ── Card navigation ──
@@ -934,7 +1260,9 @@ document.getElementById("prevBtn").addEventListener("click", () => {
   }
 });
 document.getElementById("nextBtn").addEventListener("click", () => {
-  if (activeStack && activeIndex < activeStack.cards.length - 1) {
+  if (!activeStack) return;
+  if (currentStatus() === "pending") return; // gated
+  if (activeIndex < activeStack.cards.length - 1) {
     activeIndex++;
     showCard();
   }
@@ -947,8 +1275,10 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") {
     if (activeIndex > 0) { activeIndex--; showCard(); }
   } else if (e.key === "ArrowRight") {
+    if (currentStatus() === "pending") return;
     if (activeIndex < activeStack.cards.length - 1) { activeIndex++; showCard(); }
   } else if (e.key === " " || e.key === "Enter") {
+    if (currentStatus() === "pending") return;
     e.preventDefault();
     document.getElementById("cardFlip").classList.toggle("flipped");
   }
@@ -961,7 +1291,12 @@ async function loadStacks() {
 
   savedStacks = [];
   snap.forEach(doc => {
-    savedStacks.push({ id: doc.id, ...doc.data() });
+    const data = doc.data();
+    // Backfill correctCount for legacy stacks
+    if (Array.isArray(data.cards)) {
+      data.cards.forEach(c => { if (typeof c.correctCount !== "number") c.correctCount = 0; });
+    }
+    savedStacks.push({ id: doc.id, ...data });
   });
 
   renderStackList();
@@ -999,6 +1334,7 @@ function renderStackList() {
       if (stack) {
         activeStack = stack;
         activeIndex = 0;
+        resetSessionState(activeStack);
         showCard();
         renderStackList();
       }
@@ -1017,10 +1353,13 @@ function renderStackList() {
       if (activeStack && activeStack.id === id) {
         activeStack = null;
         activeIndex = 0;
+        sessionState = null;
         document.getElementById("cardEmpty").style.display = "flex";
         document.getElementById("cardStack").style.display = "none";
         document.getElementById("cardCounter").style.display = "none";
         document.getElementById("cardNav").style.display = "none";
+        document.getElementById("stackStats").classList.remove("show");
+        document.getElementById("stackStar").classList.remove("show");
       }
       await loadStacks();
     });
