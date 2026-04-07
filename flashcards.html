@@ -1279,6 +1279,9 @@ async function persistActiveStack(){
       local.cards = activeStack.cards;
       local.progress = activeStack.progress;
     }
+    // Refresh the saved stacks list so the mastery star appears as soon as
+    // the stack reaches its mastered state.
+    renderStackList();
   } catch (err) {
     console.error("Failed to persist stack progress:", err);
   }
