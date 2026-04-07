@@ -667,7 +667,7 @@ body{
         <button class="submit-btn" id="submitBtn" type="button" disabled>Submit</button>
       </div>
     </div>
-    <div class="word-count" id="wordCount">0 / 50 words</div>
+    <div class="word-count" id="wordCount">0 / 80 words</div>
 
     <!-- RESULTS -->
     <div id="ratingsHeader" class="ratings-header" style="display:none;">Please always rate<br>each engine output</div>
@@ -958,9 +958,9 @@ function countWords(text) {
 
 inputEl.addEventListener("input", () => {
   const n = countWords(inputEl.value);
-  countEl.textContent = `${n} / 50 words`;
-  countEl.classList.toggle("over", n > 50);
-  submitEl.disabled = n === 0 || n > 50;
+  countEl.textContent = `${n} / 80 words`;
+  countEl.classList.toggle("over", n > 80);
+  submitEl.disabled = n === 0 || n > 80;
 });
 
 // ── API keys (edit these values on GitHub) ──
@@ -1612,7 +1612,7 @@ function buildCard(engine) {
 // ── Submit ──
 submitEl.addEventListener("click", async () => {
   const text = inputEl.value.trim();
-  if (!text || countWords(text) > 50) return;
+  if (!text || countWords(text) > 80) return;
 
   const resultsArea = document.getElementById("resultsArea");
   resultsArea.innerHTML = "";
