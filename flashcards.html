@@ -868,17 +868,66 @@ const ALL_LANGUAGES = [
 ];
 
 let currentUser = null;
-let activeStack = null;   // { name, targetLang, cards: [{word, transliteration, translation, example, correctCount}] }
-let activeIndex = 0;
+let activeStack = null;   // { name, targetLang, cards: [{word, transliteration, translation, example, correctCount}], progress }
+let activeIndex = 0;      // current card's index into activeStack.cards (derived from progress)
 let savedStacks = [];     // loaded from Firestore
-let sessionState = null;  // { status: [], crossed: Set, ticked: Set }
 
-function resetSessionState(stack){
-  sessionState = {
-    status: stack ? stack.cards.map(() => "pending") : [],
-    crossed: new Set(),
-    ticked: new Set()
+// ── Progress / shuffle helpers ──
+function shuffleIndices(n){
+  const arr = Array.from({length: n}, (_, i) => i);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function isStackMastered(stack){
+  if (!stack || !stack.cards || !stack.cards.length) return false;
+  return stack.cards.every(c => (c.correctCount || 0) >= 5);
+}
+
+// Initialize or resume the learning progress for a stack
+function initProgress(stack){
+  const mastered = isStackMastered(stack);
+  const n = stack.cards.length;
+
+  // Mastered stacks always start a fresh random practice run
+  if (mastered) {
+    stack.progress = {
+      order: shuffleIndices(n),
+      pos: 0,
+      status: {},
+      mastered: true
+    };
+    return;
+  }
+
+  // Resume an in-progress pass if the saved progress is still valid
+  const p = stack.progress;
+  if (p && Array.isArray(p.order) && p.order.length === n &&
+      p.order.every(i => Number.isInteger(i) && i >= 0 && i < n)) {
+    stack.progress = {
+      order: p.order.slice(),
+      pos: Math.min(Math.max(p.pos || 0, 0), n - 1),
+      status: Object.assign({}, p.status || {}),
+      mastered: false
+    };
+    return;
+  }
+
+  // New pass
+  stack.progress = {
+    order: shuffleIndices(n),
+    pos: 0,
+    status: {},
+    mastered: false
   };
+}
+
+function currentCardIndex(){
+  if (!activeStack || !activeStack.progress) return 0;
+  return activeStack.progress.order[activeStack.progress.pos];
 }
 
 function normalizeAnswer(s){
@@ -997,8 +1046,8 @@ document.getElementById("createBtn").addEventListener("click", async () => {
 
     // Activate the stack
     activeStack = { id: ref.id, ...stackDoc, cards: cards };
-    activeIndex = 0;
-    resetSessionState(activeStack);
+    initProgress(activeStack);
+    await persistActiveStack();
     showCard();
 
     // Reload saved stacks list
@@ -1083,6 +1132,7 @@ ${numbered}`;
 // ── Display card ──
 function showCard() {
   if (!activeStack || !activeStack.cards.length) return;
+  if (!activeStack.progress) initProgress(activeStack);
 
   document.getElementById("cardEmpty").style.display = "none";
   document.getElementById("cardStack").style.display = "block";
@@ -1090,6 +1140,7 @@ function showCard() {
   document.getElementById("cardNav").style.display = "flex";
   document.getElementById("stackStats").classList.add("show");
 
+  activeIndex = currentCardIndex();
   const card = activeStack.cards[activeIndex];
   const flip = document.getElementById("cardFlip");
   flip.classList.remove("flipped");
@@ -1100,10 +1151,11 @@ function showCard() {
   document.getElementById("cardTranslation").textContent = card.translation || "";
   document.getElementById("cardExample").textContent = card.example || "";
 
+  const p = activeStack.progress;
   document.getElementById("cardCounterText").textContent =
-    (activeIndex + 1) + " / " + activeStack.cards.length + "  \u2014  " + activeStack.name + " ";
+    (p.pos + 1) + " / " + p.order.length + "  \u2014  " + activeStack.name + " ";
 
-  document.getElementById("prevBtn").disabled = activeIndex === 0;
+  document.getElementById("prevBtn").disabled = p.pos === 0;
 
   // Reset translate UI for the new card view
   const translateBox = document.getElementById("translateBox");
@@ -1114,31 +1166,43 @@ function showCard() {
   translateFeedback.textContent = "";
   translateFeedback.classList.remove("ok", "bad");
 
-  // Reflect this card's session status (gates flip + next button)
   applyCardStatus();
   updateStats();
 }
 
 function currentStatus(){
-  if (!sessionState) return "pending";
-  return sessionState.status[activeIndex] || "pending";
+  if (!activeStack || !activeStack.progress) return "pending";
+  if (activeStack.progress.mastered) return "free";
+  return activeStack.progress.status[currentCardIndex()] || "pending";
 }
 
 function applyCardStatus(){
+  const p = activeStack ? activeStack.progress : null;
+  const mastered = !!(p && p.mastered);
   const status = currentStatus();
   const btnCross = document.getElementById("btnCross");
   const btnTick = document.getElementById("btnTick");
   const nextBtn = document.getElementById("nextBtn");
   const cardHint = document.getElementById("cardHint");
+  const cardActions = document.getElementById("cardActions");
 
+  if (mastered) {
+    // Practice mode: no gating, no cross/tick needed
+    cardActions.style.display = "none";
+    nextBtn.disabled = false;
+    cardHint.textContent = "Practice mode \u2014 click to flip";
+    btnCross.classList.remove("selected");
+    btnTick.classList.remove("selected");
+    return;
+  }
+
+  cardActions.style.display = "flex";
   btnCross.classList.toggle("selected", status === "crossed");
   btnTick.classList.toggle("selected", status === "ticked");
 
   const unlocked = status === "crossed" || status === "ticked";
-  // Next button only available once the card has been answered
-  if (activeStack) {
-    nextBtn.disabled = !unlocked || activeIndex === activeStack.cards.length - 1;
-  }
+  // Next is always enabled once answered — at the last pos it triggers a new shuffled pass
+  nextBtn.disabled = !unlocked;
 
   if (status === "pending") {
     cardHint.textContent = "Pick \u2715 or \u2713 to continue";
@@ -1148,34 +1212,46 @@ function applyCardStatus(){
 }
 
 function updateStats(){
-  if (!activeStack || !sessionState) return;
-  document.getElementById("statRed").textContent = sessionState.crossed.size;
-  document.getElementById("statGreen").textContent = sessionState.ticked.size;
-  const mastered = activeStack.cards.filter(c => (c.correctCount || 0) >= 5).length;
-  document.getElementById("statBlack").textContent = mastered;
+  if (!activeStack || !activeStack.progress) return;
+  const statuses = Object.values(activeStack.progress.status || {});
+  document.getElementById("statRed").textContent =
+    statuses.filter(s => s === "crossed").length;
+  document.getElementById("statGreen").textContent =
+    statuses.filter(s => s === "ticked").length;
+  const masteredCount = activeStack.cards.filter(c => (c.correctCount || 0) >= 5).length;
+  document.getElementById("statBlack").textContent = masteredCount;
 
-  const allMastered = activeStack.cards.length > 0 &&
-    activeStack.cards.every(c => (c.correctCount || 0) >= 5);
-  document.getElementById("stackStar").classList.toggle("show", allMastered);
+  document.getElementById("stackStar").classList.toggle("show", isStackMastered(activeStack));
 }
 
-async function persistActiveStackCards(){
+async function persistActiveStack(){
   if (!activeStack || !activeStack.id || !currentUser) return;
   try {
+    const p = activeStack.progress || {};
     await db.collection("flashcards").doc(currentUser.uid)
       .collection("stacks").doc(activeStack.id)
-      .update({ cards: activeStack.cards });
-    // Sync local cache too
+      .update({
+        cards: activeStack.cards,
+        progress: {
+          order: p.order || [],
+          pos: p.pos || 0,
+          status: p.status || {},
+          mastered: !!p.mastered
+        }
+      });
+    // Sync local cache
     const local = savedStacks.find(s => s.id === activeStack.id);
-    if (local) local.cards = activeStack.cards;
+    if (local) {
+      local.cards = activeStack.cards;
+      local.progress = activeStack.progress;
+    }
   } catch (err) {
-    console.error("Failed to persist card progress:", err);
+    console.error("Failed to persist stack progress:", err);
   }
 }
 
-// ── Card flip (gated until cross/tick answered) ──
+// ── Card flip (gated until cross/tick answered, unless in practice mode) ──
 document.getElementById("cardFlip").addEventListener("click", e => {
-  // Don't flip when interacting with controls inside the card
   if (e.target.closest(".card-action-btn") ||
       e.target.closest(".card-translate-box")) return;
   if (currentStatus() === "pending") return;
@@ -1183,34 +1259,31 @@ document.getElementById("cardFlip").addEventListener("click", e => {
 });
 
 // ── Cross button: mark as missed, unlock flip + next ──
-document.getElementById("btnCross").addEventListener("click", e => {
+document.getElementById("btnCross").addEventListener("click", async e => {
   e.stopPropagation();
-  if (!activeStack) return;
-  const prev = sessionState.status[activeIndex];
-  if (prev !== "crossed") {
-    // Switching from ticked → crossed: undo green count
-    if (prev === "ticked") sessionState.ticked.delete(activeIndex);
-    sessionState.status[activeIndex] = "crossed";
-    sessionState.crossed.add(activeIndex);
+  if (!activeStack || activeStack.progress.mastered) return;
+  const idx = currentCardIndex();
+  if (activeStack.progress.status[idx] !== "crossed") {
+    activeStack.progress.status[idx] = "crossed";
   }
-  // Hide translate box if it was open
   document.getElementById("translateBox").classList.remove("show");
   applyCardStatus();
   updateStats();
+  await persistActiveStack();
 });
 
 // ── Tick button: open translation input ──
 document.getElementById("btnTick").addEventListener("click", e => {
   e.stopPropagation();
-  if (!activeStack) return;
+  if (!activeStack || activeStack.progress.mastered) return;
   const translateBox = document.getElementById("translateBox");
   const translateInput = document.getElementById("translateInput");
   const translateFeedback = document.getElementById("translateFeedback");
   translateBox.classList.add("show");
   translateFeedback.textContent = "";
   translateFeedback.classList.remove("ok", "bad");
-  // If the card hasn't been ticked-correct yet, clear input; otherwise keep
-  if (sessionState.status[activeIndex] !== "ticked") {
+  const idx = currentCardIndex();
+  if (activeStack.progress.status[idx] !== "ticked") {
     translateInput.value = "";
   }
   setTimeout(() => translateInput.focus(), 0);
@@ -1224,8 +1297,9 @@ document.getElementById("btnTick").addEventListener("click", e => {
 // ── Confirm translation ──
 document.getElementById("translateConfirm").addEventListener("click", async e => {
   e.stopPropagation();
-  if (!activeStack) return;
-  const card = activeStack.cards[activeIndex];
+  if (!activeStack || activeStack.progress.mastered) return;
+  const idx = currentCardIndex();
+  const card = activeStack.cards[idx];
   const translateInput = document.getElementById("translateInput");
   const translateFeedback = document.getElementById("translateFeedback");
 
@@ -1234,14 +1308,10 @@ document.getElementById("translateConfirm").addEventListener("click", async e =>
     translateFeedback.classList.remove("bad");
     translateFeedback.classList.add("ok");
 
-    const prev = sessionState.status[activeIndex];
-    if (prev !== "ticked") {
-      // First correct tick for this card in this session
-      if (prev === "crossed") sessionState.crossed.delete(activeIndex);
-      sessionState.status[activeIndex] = "ticked";
-      sessionState.ticked.add(activeIndex);
+    if (activeStack.progress.status[idx] !== "ticked") {
+      activeStack.progress.status[idx] = "ticked";
       card.correctCount = (card.correctCount || 0) + 1;
-      await persistActiveStackCards();
+      await persistActiveStack();
     }
     applyCardStatus();
     updateStats();
@@ -1260,31 +1330,54 @@ document.getElementById("translateInput").addEventListener("keydown", e => {
   }
 });
 
+// ── Advance to the next card, reshuffling when a pass ends ──
+async function advanceNext(){
+  if (!activeStack) return;
+  const p = activeStack.progress;
+  const masteredNow = !!p.mastered;
+
+  // In learning mode, the current card must be answered before moving on
+  if (!masteredNow && currentStatus() === "pending") return;
+
+  if (p.pos < p.order.length - 1) {
+    p.pos++;
+    showCard();
+    await persistActiveStack();
+    return;
+  }
+
+  // End of the current pass — reshuffle and start a new one.
+  // If the stack is now fully mastered, switch into practice mode.
+  const nowMastered = isStackMastered(activeStack);
+  p.order = shuffleIndices(activeStack.cards.length);
+  p.pos = 0;
+  p.status = {};
+  p.mastered = nowMastered;
+  showCard();
+  await persistActiveStack();
+}
+
 // ── Card navigation ──
 document.getElementById("prevBtn").addEventListener("click", () => {
-  if (activeIndex > 0) {
-    activeIndex--;
-    showCard();
-  }
-});
-document.getElementById("nextBtn").addEventListener("click", () => {
   if (!activeStack) return;
-  if (currentStatus() === "pending") return; // gated
-  if (activeIndex < activeStack.cards.length - 1) {
-    activeIndex++;
+  const p = activeStack.progress;
+  if (p.pos > 0) {
+    p.pos--;
     showCard();
+    persistActiveStack();
   }
 });
+document.getElementById("nextBtn").addEventListener("click", advanceNext);
 
 // Keyboard navigation
 document.addEventListener("keydown", e => {
   if (!activeStack) return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+  const p = activeStack.progress;
   if (e.key === "ArrowLeft") {
-    if (activeIndex > 0) { activeIndex--; showCard(); }
+    if (p.pos > 0) { p.pos--; showCard(); persistActiveStack(); }
   } else if (e.key === "ArrowRight") {
-    if (currentStatus() === "pending") return;
-    if (activeIndex < activeStack.cards.length - 1) { activeIndex++; showCard(); }
+    advanceNext();
   } else if (e.key === " " || e.key === "Enter") {
     if (currentStatus() === "pending") return;
     e.preventDefault();
@@ -1324,9 +1417,11 @@ function renderStackList() {
   noStacks.style.display = "none";
   container.innerHTML = savedStacks.map(stack => {
     const isActive = activeStack && activeStack.id === stack.id;
+    const mastered = isStackMastered(stack);
+    const starHtml = mastered ? ' <span style="color:#FFD700;text-shadow:0 0 3px rgba(255,215,0,.6);">&#9733;</span>' : "";
     return `<div class="fc-stack-item${isActive ? " active" : ""}" data-id="${stack.id}">
       <div>
-        <div class="fc-stack-name">${escHtml(stack.name)}</div>
+        <div class="fc-stack-name">${escHtml(stack.name)}${starHtml}</div>
         <div class="fc-stack-meta">${stack.cards.length} cards &middot; ${escHtml(stack.targetLang)}</div>
       </div>
       <button class="fc-stack-delete" data-id="${stack.id}" title="Delete stack">&times;</button>
@@ -1341,8 +1436,7 @@ function renderStackList() {
       const stack = savedStacks.find(s => s.id === id);
       if (stack) {
         activeStack = stack;
-        activeIndex = 0;
-        resetSessionState(activeStack);
+        initProgress(activeStack);
         showCard();
         renderStackList();
       }
@@ -1361,7 +1455,6 @@ function renderStackList() {
       if (activeStack && activeStack.id === id) {
         activeStack = null;
         activeIndex = 0;
-        sessionState = null;
         document.getElementById("cardEmpty").style.display = "flex";
         document.getElementById("cardStack").style.display = "none";
         document.getElementById("cardCounter").style.display = "none";
