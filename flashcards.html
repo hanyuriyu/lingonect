@@ -268,10 +268,11 @@ body{
   transition:transform .15s ease, opacity .2s, box-shadow .2s;
   box-shadow:0 2px 6px rgba(0,0,0,.15);
 }
-.card-action-btn:hover{ transform:scale(1.1); }
+.card-action-btn:hover:not(:disabled){ transform:scale(1.1); }
 .card-action-btn.cross{ background:#ff1f1f; }
 .card-action-btn.tick{ background:#1fcc3f; }
 .card-action-btn.selected{ outline:3px solid rgba(0,0,0,.25); }
+.card-action-btn:disabled{ opacity:.35; cursor:not-allowed; box-shadow:none; }
 
 /* Translation input box (appears after tick) */
 .card-translate-box{
@@ -1331,6 +1332,11 @@ function applyCardStatus(){
   btnCross.classList.toggle("selected", status === "crossed");
   btnTick.classList.toggle("selected", status === "ticked");
 
+  // Once a decision is locked in, the opposite button is disabled so the
+  // user can't change their mind after unlocking flip/next.
+  btnCross.disabled = status === "ticked";
+  btnTick.disabled = status === "crossed";
+
   const unlocked = status === "crossed" || status === "ticked";
   // Next is always enabled once answered — at the last pos it triggers a new shuffled pass
   nextBtn.disabled = !unlocked;
@@ -1397,9 +1403,9 @@ document.getElementById("btnCross").addEventListener("click", async e => {
   e.stopPropagation();
   if (!activeStack || activeStack.progress.mastered) return;
   const idx = currentCardIndex();
-  if (activeStack.progress.status[idx] !== "crossed") {
-    activeStack.progress.status[idx] = "crossed";
-  }
+  // Decision is locked once ticked correctly
+  if (activeStack.progress.status[idx] === "ticked") return;
+  activeStack.progress.status[idx] = "crossed";
   document.getElementById("translateBox").classList.remove("show");
   applyCardStatus();
   updateStats();
@@ -1410,6 +1416,8 @@ document.getElementById("btnCross").addEventListener("click", async e => {
 document.getElementById("btnTick").addEventListener("click", e => {
   e.stopPropagation();
   if (!activeStack || activeStack.progress.mastered) return;
+  // Decision is locked once the card has been crossed
+  if (activeStack.progress.status[currentCardIndex()] === "crossed") return;
   const translateBox = document.getElementById("translateBox");
   const translateInput = document.getElementById("translateInput");
   const translateFeedback = document.getElementById("translateFeedback");
