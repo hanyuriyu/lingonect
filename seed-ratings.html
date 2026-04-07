@@ -919,10 +919,20 @@ function log(msg) {
 
 // ── Main seeding function ──
 document.getElementById("startBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("startBtn");
+
+  // If the button is in "Done!" state, reset the UI instead of re-running.
+  if (btn.dataset.state === "done") {
+    btn.dataset.state = "";
+    btn.textContent = "Start Seeding";
+    document.getElementById("progressBar").style.width = "0%";
+    statusEl.textContent = 'Ready. Configure sentences, language pairs, and rater above, then click "Start Seeding".';
+    return;
+  }
+
   if (sentences.length === 0) { alert("Add at least one sentence."); return; }
   if (langPairs.length === 0) { alert("Add at least one language pair."); return; }
 
-  const btn = document.getElementById("startBtn");
   btn.disabled = true;
 
   const raterName = ENGINE_LIST.find(e => e.id === selectedRater)?.name || selectedRater;
@@ -1008,6 +1018,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
 
   btn.disabled = false;
   btn.textContent = "Done!";
+  btn.dataset.state = "done";
 });
 
 // ── Init UI ──
