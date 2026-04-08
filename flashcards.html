@@ -1318,18 +1318,45 @@ async function generateFlashcards(words, sourceLang, targetLang) {
     const batch = words.slice(i, i + batchSize);
     const numbered = batch.map((w, idx) => (i + idx + 1) + ". " + w).join("\n");
 
+    const ukrainianStressBlock = targetLang === "Ukrainian" ? `
+
+============================================================
+ABSOLUTELY CRITICAL RULE FOR UKRAINIAN TRANSLITERATIONS
+============================================================
+Every single Ukrainian transliteration in the "transliteration" field MUST mark the stressed syllable with an acute accent on the stressed vowel. This is NOT optional. A Ukrainian transliteration without a stress mark is WRONG and must be rewritten before you return it.
+
+Use ONLY these precomposed Unicode characters for stressed vowels: á é í ó ú ý (and their uppercase Á É Í Ó Ú Ý). Do NOT use combining diacritics.
+
+Worked examples (study these carefully):
+- "привіт" → "pryvít" (stress on і)
+- "дякую" → "dyákuyu" (stress on я)
+- "дивитися" → "dyvýtysya" (stress on и, second syllable)
+- "українська" → "ukrayíns'ka" (stress on ї)
+- "мова" → "móva" (stress on о)
+- "добре" → "dóbre" (stress on о)
+- "будь ласка" → "bud' láska" (stress on á in láska)
+- "читати" → "chytáty" (stress on á)
+- "розмовляти" → "rozmovlyáty" (stress on я)
+- "книга" → "knýha" (stress on и)
+
+Before you emit each Ukrainian transliteration, check: does it contain at least one of á é í ó ú ý? If not, you have made a mistake — fix it. Single-syllable words still get a stress mark on their one vowel.
+
+If you genuinely do not know the stress placement for a word, consult your knowledge of Ukrainian pronunciation — do NOT return an unstressed transliteration as a fallback.
+============================================================
+` : "";
+
     const prompt = `You are a language learning assistant. The user's source language is ${sourceLang} and they are learning ${targetLang}. The list below may contain items written in either ${sourceLang} or ${targetLang}, possibly mixed. Decide for each item which language it is in.
 
 For each item, provide:
 1. "word": The word/phrase in ${targetLang}. If the input item is already in ${targetLang}, use it as-is (correcting only obvious typos or normalising script). If the input item is in ${sourceLang}, translate it into ${targetLang}.
-2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word. IMPORTANT: For Ukrainian, you MUST always mark the stress accent by placing an acute accent (´) over the stressed vowel in the transliteration (e.g. "приві́т" -> "pryvít", "дя́кую" -> "dyákuyu", "украї́нська" -> "ukrayíns'ka"). Every multi-syllable Ukrainian transliteration must have exactly one stressed vowel marked. This is required — do not omit it.
+2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word.
 3. "translation": The ${sourceLang} translation of the ${targetLang} word.
 4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
 5. "example": One useful example sentence in ${targetLang} with its ${sourceLang} translation in parentheses.
 6. "emoji": A simple, clear visualization of the word or phrase using 1-3 emojis. Pick the most concrete, recognisable emoji(s) that will help the learner visually remember the meaning. For abstract concepts, pick the most evocative symbol available (e.g. "freedom" -> "🕊️", "idea" -> "💡", "love" -> "❤️"). Always return at least one emoji.
 
 Return ONLY a valid JSON array, one element per input item, in the same order. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example", "emoji"
-
+${ukrainianStressBlock}
 Input items:
 ${numbered}`;
 
@@ -1374,6 +1401,18 @@ ${numbered}`;
       c.example2 = "";
       c.example3 = "";
     });
+
+    // Safety net: Claude sometimes forgets to add stress marks to Ukrainian
+    // transliterations even with the explicit prompt instruction. Detect any
+    // that are missing the acute accent and re-fetch just those in a targeted
+    // follow-up call.
+    if (targetLang === "Ukrainian") {
+      try {
+        await fixUkrainianStress(cards, sourceLang);
+      } catch (err) {
+        console.warn("Ukrainian stress fix pass failed:", err);
+      }
+    }
 
     // Fetch a second example sentence per card from OpenAI.
     const targetWords = cards.map(c => c.word || "");
@@ -1444,7 +1483,72 @@ ${numbered}`;
   return arr.map(x => (typeof x === "string" ? x : (x && x.example) || ""));
 }
 
+// A Ukrainian transliteration is considered stressed if it contains at least
+// one precomposed acute-accented Latin vowel (á é í ó ú ý, upper or lower).
+function hasUkrainianStressMark(s) {
+  return /[áéíóúýÁÉÍÓÚÝ]/.test(s || "");
+}
+
+// Re-fetch Ukrainian transliterations that came back without a stress mark.
+// Mutates `cards` in place, filling in the stressed versions.
+async function fixUkrainianStress(cards, sourceLang) {
+  const missing = [];
+  cards.forEach((c, idx) => {
+    if (!hasUkrainianStressMark(c.transliteration)) {
+      missing.push({ idx: idx, word: c.word || "" });
+    }
+  });
+  if (missing.length === 0) return;
+
+  console.log("Ukrainian stress fix: retrying", missing.length, "transliterations");
+
+  const numbered = missing.map((m, i) => (i + 1) + ". " + m.word).join("\n");
+  const prompt = `You are a Ukrainian pronunciation expert. For each Ukrainian word or phrase below, return its Latin-alphabet transliteration WITH the stressed vowel marked using a precomposed acute accent: á é í ó ú ý (or uppercase Á É Í Ó Ú Ý). Every transliteration you return MUST contain at least one of those accented vowels — no exceptions.
+
+Examples:
+- "привіт" → "pryvít"
+- "дякую" → "dyákuyu"
+- "дивитися" → "dyvýtysya"
+- "українська" → "ukrayíns'ka"
+- "мова" → "móva"
+- "читати" → "chytáty"
+
+Return ONLY a valid JSON array of strings in the same order as the input. No commentary, no keys, no numbering — just the stressed transliterations.
+
+Words:
+${numbered}`;
+
+  const res = await fetch(CLAUDE_WORKER, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  if (!res.ok) throw new Error("Stress fix API error " + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "Stress fix failed");
+  const text = (data.content && data.content[0] && data.content[0].text) || "";
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("No JSON in stress fix response");
+  const arr = JSON.parse(jsonMatch[0]);
+  if (!Array.isArray(arr)) throw new Error("Stress fix response was not an array");
+
+  missing.forEach((m, i) => {
+    const fixed = typeof arr[i] === "string" ? arr[i] : "";
+    if (fixed && hasUkrainianStressMark(fixed)) {
+      cards[m.idx].transliteration = fixed;
+    } else {
+      console.warn("Stress fix still missing for:", m.word, "got:", fixed);
+    }
+  });
+}
+
 // ── Display card ──
+let pendingBackUpdate = null;
+
 function showCard() {
   if (!activeStack || !activeStack.cards.length) return;
   if (!activeStack.progress) initProgress(activeStack);
@@ -1458,25 +1562,49 @@ function showCard() {
   activeIndex = currentCardIndex();
   const card = activeStack.cards[activeIndex];
   const flip = document.getElementById("cardFlip");
+  const wasFlipped = flip.classList.contains("flipped");
   flip.classList.remove("flipped");
 
   document.getElementById("cardWord").textContent = card.word || "";
   document.getElementById("cardLang").textContent = activeStack.targetLang;
-  document.getElementById("cardTranslit").textContent = card.transliteration || "";
-  document.getElementById("cardTranslation").textContent = card.translation || "";
-  const emoji = card.emoji || "";
-  document.getElementById("cardVisualization").textContent = emoji;
-  document.getElementById("visualizationSection").style.display = emoji ? "block" : "none";
-  const def = card.definition || "";
-  document.getElementById("cardDefinition").textContent = def;
-  document.getElementById("definitionSection").style.display = def ? "block" : "none";
-  document.getElementById("cardExample").textContent = card.example || "";
-  const ex2 = card.example2 || "";
-  document.getElementById("cardExample2").textContent = ex2;
-  document.getElementById("example2Section").style.display = ex2 ? "block" : "none";
-  const ex3 = card.example3 || "";
-  document.getElementById("cardExample3").textContent = ex3;
-  document.getElementById("example3Section").style.display = ex3 ? "block" : "none";
+
+  // Update the back face content. If the card was flipped, delay the update
+  // until the flip-back animation is done — otherwise the first half of the
+  // rotation (while the back is still facing us) would briefly show the next
+  // card's back and cause a visible flash.
+  const updateBackContent = () => {
+    document.getElementById("cardTranslit").textContent = card.transliteration || "";
+    document.getElementById("cardTranslation").textContent = card.translation || "";
+    const emoji = card.emoji || "";
+    document.getElementById("cardVisualization").textContent = emoji;
+    document.getElementById("visualizationSection").style.display = emoji ? "block" : "none";
+    const def = card.definition || "";
+    document.getElementById("cardDefinition").textContent = def;
+    document.getElementById("definitionSection").style.display = def ? "block" : "none";
+    document.getElementById("cardExample").textContent = card.example || "";
+    const ex2 = card.example2 || "";
+    document.getElementById("cardExample2").textContent = ex2;
+    document.getElementById("example2Section").style.display = ex2 ? "block" : "none";
+    const ex3 = card.example3 || "";
+    document.getElementById("cardExample3").textContent = ex3;
+    document.getElementById("example3Section").style.display = ex3 ? "block" : "none";
+    // Reset the back's scroll position so the next card's back starts at the top
+    const back = document.querySelector(".card-back");
+    if (back) back.scrollTop = 0;
+  };
+
+  if (pendingBackUpdate) {
+    clearTimeout(pendingBackUpdate);
+    pendingBackUpdate = null;
+  }
+  if (wasFlipped) {
+    pendingBackUpdate = setTimeout(() => {
+      updateBackContent();
+      pendingBackUpdate = null;
+    }, 600);
+  } else {
+    updateBackContent();
+  }
 
   const p = activeStack.progress;
   document.getElementById("cardCounterText").textContent =
