@@ -1008,22 +1008,98 @@ function pickVoice(locale){
          null;
 }
 
+// In-memory cache of OpenAI TTS playback URLs, keyed by `${locale}:${text}`.
+// Blob URLs are session-local, so this deliberately lives outside the card
+// objects (which get persisted to Firestore via persistActiveStack).
+const ttsBlobCache = new Map();
+// Tracks the currently playing OpenAI TTS HTMLAudioElement so a fresh click
+// or a card change can cancel it before starting a new one.
+let currentTtsAudio = null;
+
+function stopAllSpeech(){
+  if ("speechSynthesis" in window) {
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+  }
+  if (currentTtsAudio) {
+    try { currentTtsAudio.pause(); } catch (_) {}
+    currentTtsAudio = null;
+  }
+  const btn = document.getElementById("cardSpeak");
+  if (btn) btn.classList.remove("playing");
+}
+
 function speakWord(text, lang){
-  if (!text || !("speechSynthesis" in window)) return;
+  if (!text) return;
+  const locale = LANG_LOCALE[lang] || "";
+  const btn = document.getElementById("cardSpeak");
+
+  // Cancel anything in flight before starting a new playback.
+  stopAllSpeech();
+
+  // Prefer the native, offline SpeechSynthesis voice when the browser/OS has
+  // one installed for this locale — it's free and instant. Fall back to the
+  // OpenAI TTS worker when no local voice exists (e.g. Ukrainian on most
+  // default Chrome installs).
+  const voice = ("speechSynthesis" in window) ? pickVoice(locale) : null;
+  if (voice) {
+    try {
+      const utter = new SpeechSynthesisUtterance(text);
+      if (locale) utter.lang = locale;
+      utter.voice = voice;
+      if (btn) btn.classList.add("playing");
+      utter.onend   = () => { if (btn) btn.classList.remove("playing"); };
+      utter.onerror = () => { if (btn) btn.classList.remove("playing"); };
+      window.speechSynthesis.speak(utter);
+      return;
+    } catch (err) {
+      console.warn("Native speech synthesis failed, falling back to OpenAI TTS:", err);
+      if (btn) btn.classList.remove("playing");
+    }
+  }
+
+  speakWithOpenAI(text, locale, btn);
+}
+
+// Fetch an MP3 of `text` from the OpenAI TTS worker and play it. Results are
+// cached in-memory per `${locale}:${text}` so repeat clicks are free.
+async function speakWithOpenAI(text, locale, btn){
+  const cacheKey = locale + ":" + text;
+  if (btn) btn.classList.add("playing");
   try {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    const locale = LANG_LOCALE[lang] || "";
-    if (locale) utter.lang = locale;
-    const voice = pickVoice(locale);
-    if (voice) utter.voice = voice;
-    const btn = document.getElementById("cardSpeak");
-    if (btn) btn.classList.add("playing");
-    utter.onend = () => { if (btn) btn.classList.remove("playing"); };
-    utter.onerror = () => { if (btn) btn.classList.remove("playing"); };
-    window.speechSynthesis.speak(utter);
+    let objectUrl = ttsBlobCache.get(cacheKey);
+    if (!objectUrl) {
+      const res = await fetch(OPENAI_WORKER + "/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "tts-1",
+          input: text,
+          voice: "alloy",
+          response_format: "mp3"
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error("TTS worker error " + res.status + ": " + errText);
+      }
+      const blob = await res.blob();
+      objectUrl = URL.createObjectURL(blob);
+      ttsBlobCache.set(cacheKey, objectUrl);
+    }
+    const audio = new Audio(objectUrl);
+    currentTtsAudio = audio;
+    audio.onended = () => {
+      if (btn) btn.classList.remove("playing");
+      if (currentTtsAudio === audio) currentTtsAudio = null;
+    };
+    audio.onerror = () => {
+      if (btn) btn.classList.remove("playing");
+      if (currentTtsAudio === audio) currentTtsAudio = null;
+    };
+    await audio.play();
   } catch (err) {
-    console.warn("Speech synthesis failed:", err);
+    console.warn("OpenAI TTS playback failed:", err);
+    if (btn) btn.classList.remove("playing");
   }
 }
 
