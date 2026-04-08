@@ -932,6 +932,7 @@ const OPENAI_WORKER   = "https://openai.hanyuriyu.workers.dev";
 const DEEPSEEK_WORKER = "https://deepseek.hanyuriyu.workers.dev";
 const MAX_LINES = 500;
 const MAX_STACKS = 5;
+const STACK_SLOT_IDS = ["s1", "s2", "s3", "s4", "s5"];
 
 function isChineseLang(lang){
   return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
@@ -1256,8 +1257,22 @@ document.getElementById("createBtn").addEventListener("click", async () => {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    const ref = await db.collection("flashcards").doc(currentUser.uid)
-      .collection("stacks").add(stackDoc);
+    // Admin uses auto-generated IDs (unlimited stacks). Everyone else must
+    // write to one of five fixed slot IDs — the Firestore rules reject any
+    // other ID, which atomically caps non-admin users at 5 stacks.
+    const stacksCol = db.collection("flashcards").doc(currentUser.uid).collection("stacks");
+    let ref;
+    if (currentUser.email === ADMIN_EMAIL) {
+      ref = await stacksCol.add(stackDoc);
+    } else {
+      const usedIds = new Set(savedStacks.map(s => s.id));
+      const freeSlot = STACK_SLOT_IDS.find(id => !usedIds.has(id));
+      if (!freeSlot) {
+        throw new Error("You have reached the limit of " + MAX_STACKS + " card stacks. Please delete an existing stack before creating a new one.");
+      }
+      ref = stacksCol.doc(freeSlot);
+      await ref.set(stackDoc);
+    }
 
     // Activate the stack
     activeStack = { id: ref.id, ...stackDoc, cards: cards };
