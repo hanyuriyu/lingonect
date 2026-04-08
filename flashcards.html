@@ -1322,7 +1322,7 @@ async function generateFlashcards(words, sourceLang, targetLang) {
 
 For each item, provide:
 1. "word": The word/phrase in ${targetLang}. If the input item is already in ${targetLang}, use it as-is (correcting only obvious typos or normalising script). If the input item is in ${sourceLang}, translate it into ${targetLang}.
-2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word.
+2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word. IMPORTANT: For Ukrainian, you MUST always mark the stress accent by placing an acute accent (´) over the stressed vowel in the transliteration (e.g. "приві́т" -> "pryvít", "дя́кую" -> "dyákuyu", "украї́нська" -> "ukrayíns'ka"). Every multi-syllable Ukrainian transliteration must have exactly one stressed vowel marked. This is required — do not omit it.
 3. "translation": The ${sourceLang} translation of the ${targetLang} word.
 4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
 5. "example": One useful example sentence in ${targetLang} with its ${sourceLang} translation in parentheses.
