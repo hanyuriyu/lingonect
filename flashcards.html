@@ -688,6 +688,23 @@ body{
   padding:10px;
 }
 
+/* ── STACK LIMIT NOTICE ── */
+.fc-limit-notice{
+  max-width:720px;
+  margin:24px auto 0;
+  padding:14px 18px;
+  background:#fff8e1;
+  border:1px solid #f0d97a;
+  border-radius:10px;
+  font-size:13px;
+  color:#5a4a10;
+  text-align:center;
+  line-height:1.5;
+}
+.fc-limit-notice strong{
+  color:#3a3000;
+}
+
 /* ── MOBILE ── */
 @media(max-width:820px){
   .logo-rail{
@@ -880,6 +897,11 @@ body{
 
     </div>
 
+    <div class="fc-limit-notice" id="stackLimitNotice">
+      <strong>Card stack limit:</strong> Each user can create up to <strong>5 card stacks</strong>, with a maximum of <strong>500 words or phrases per stack</strong>. To make a new stack once you reach the limit, delete one of your existing stacks first.
+      <div id="stackLimitStatus" style="margin-top:6px;font-size:12px;color:#7a6720;"></div>
+    </div>
+
   </main>
 </div>
 
@@ -909,6 +931,7 @@ const CLAUDE_WORKER   = "https://claudetranslate.hanyuriyu.workers.dev";
 const OPENAI_WORKER   = "https://openai.hanyuriyu.workers.dev";
 const DEEPSEEK_WORKER = "https://deepseek.hanyuriyu.workers.dev";
 const MAX_LINES = 500;
+const MAX_STACKS = 5;
 
 function isChineseLang(lang){
   return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
@@ -1209,6 +1232,11 @@ document.getElementById("createBtn").addEventListener("click", async () => {
   if (sourceLang === targetLang) return alert("Source and target languages must be different.");
   if (lines.length === 0) return alert("Please enter at least one word or phrase.");
   if (lines.length > MAX_LINES) return alert("Maximum " + MAX_LINES + " lines per stack.");
+
+  // Enforce per-user stack limit (admin is exempt)
+  if (currentUser.email !== ADMIN_EMAIL && savedStacks.length >= MAX_STACKS) {
+    return alert("You have reached the limit of " + MAX_STACKS + " card stacks. Please delete an existing stack before creating a new one.");
+  }
 
   const createBtn = document.getElementById("createBtn");
   const loading = document.getElementById("fcLoading");
@@ -1695,6 +1723,17 @@ async function loadStacks() {
   });
 
   renderStackList();
+  updateStackLimitStatus();
+}
+
+function updateStackLimitStatus() {
+  const el = document.getElementById("stackLimitStatus");
+  if (!el || !currentUser) return;
+  if (currentUser.email === ADMIN_EMAIL) {
+    el.textContent = "Admin account: this limit does not apply to you.";
+  } else {
+    el.textContent = "You are using " + savedStacks.length + " of " + MAX_STACKS + " stacks.";
+  }
 }
 
 function renderStackList() {
