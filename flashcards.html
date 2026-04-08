@@ -898,7 +898,7 @@ body{
     </div>
 
     <div class="fc-limit-notice" id="stackLimitNotice">
-      <strong>Card stack limit:</strong> Each user can create up to <strong>5 card stacks</strong>, with a maximum of <strong>500 words or phrases per stack</strong>. To make a new stack once you reach the limit, delete one of your existing stacks first.
+      <strong>Card stack limit:</strong> Each user can create up to <strong>4 card stacks</strong>, with a maximum of <strong>500 words or phrases per stack</strong>. To make a new stack once you reach the limit, delete one of your existing stacks first.
       <div id="stackLimitStatus" style="margin-top:6px;font-size:12px;color:#7a6720;"></div>
     </div>
 
@@ -931,8 +931,8 @@ const CLAUDE_WORKER   = "https://claudetranslate.hanyuriyu.workers.dev";
 const OPENAI_WORKER   = "https://openai.hanyuriyu.workers.dev";
 const DEEPSEEK_WORKER = "https://deepseek.hanyuriyu.workers.dev";
 const MAX_LINES = 500;
-const MAX_STACKS = 5;
-const STACK_SLOT_IDS = ["s1", "s2", "s3", "s4", "s5"];
+const MAX_STACKS = 4;
+const STACK_SLOT_IDS = ["s1", "s2", "s3", "s4"];
 
 function isChineseLang(lang){
   return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
