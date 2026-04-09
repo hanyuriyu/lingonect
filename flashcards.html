@@ -892,7 +892,7 @@ body{
 
         <label class="fc-label">Words or Phrases<span class="fc-help">One per line. Words can be in your source or target language.</span></label>
         <textarea class="fc-textarea" id="wordsInput" placeholder="apple&#10;good morning&#10;where is the train station?&#10;thank you very much"></textarea>
-        <div class="fc-hint" id="lineCount">0 / 200 lines</div>
+        <div class="fc-hint" id="lineCount">0 / 100 lines</div>
 
         <div class="fc-or">or</div>
 
@@ -913,7 +913,7 @@ body{
     </div>
 
     <div class="fc-limit-notice" id="stackLimitNotice">
-      <strong>Card stack limit:</strong> Each user can create up to <strong>4 card stacks</strong>, with a maximum of <strong>200 words or phrases per stack</strong>. To make a new stack once you reach the limit, delete one of your existing stacks first.
+      <strong>Card stack limit:</strong> Each user can create up to <strong>4 card stacks</strong>, with a maximum of <strong>100 words or phrases per stack</strong>. To make a new stack once you reach the limit, delete one of your existing stacks first.
       <div id="stackLimitStatus" style="margin-top:6px;font-size:12px;color:#3a5bb0;"></div>
     </div>
 
@@ -945,7 +945,7 @@ const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
 const CLAUDE_WORKER   = "https://claudetranslate.hanyuriyu.workers.dev";
 const OPENAI_WORKER   = "https://openai.hanyuriyu.workers.dev";
 const DEEPSEEK_WORKER = "https://deepseek.hanyuriyu.workers.dev";
-const MAX_LINES = 200;
+const MAX_LINES = 100;
 const MAX_STACKS = 4;
 const STACK_SLOT_IDS = ["s1", "s2", "s3", "s4"];
 
