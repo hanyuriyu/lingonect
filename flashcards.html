@@ -2058,28 +2058,39 @@ async function regenerateExamples(stack) {
   statusEl.style.display = "block";
 
   try {
-    const words = stack.cards.map(c => c.word || "");
+    const cards = stack.cards;
     const sourceLang = stack.sourceLang;
     const targetLang = stack.targetLang;
+    const batchSize = 25;
 
-    // Regenerate example2 from DeepSeek
-    try {
-      const dsExamples = await generateExampleBatch(
-        words, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
-      );
-      stack.cards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
-    } catch (err) {
-      console.warn("DeepSeek example regeneration failed:", err);
-    }
+    // Process in batches of 25 to match card creation and avoid token limits
+    for (let i = 0; i < cards.length; i += batchSize) {
+      const batchCards = cards.slice(i, i + batchSize);
+      const batchWords = batchCards.map(c => c.word || "");
 
-    // Regenerate example3 from OpenAI
-    try {
-      const openaiExamples = await generateExampleBatch(
-        words, sourceLang, targetLang, OPENAI_WORKER, "gpt-4o-mini"
-      );
-      stack.cards.forEach((c, idx) => { c.example3 = openaiExamples[idx] || ""; });
-    } catch (err) {
-      console.warn("OpenAI example regeneration failed:", err);
+      statusEl.textContent = "Regenerating examples " + (i + 1) + "–" + Math.min(i + batchSize, cards.length) + " of " + cards.length + "…";
+
+      // Regenerate example2 from DeepSeek
+      try {
+        const dsExamples = await generateExampleBatch(
+          batchWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+        );
+        batchCards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
+      } catch (err) {
+        console.warn("DeepSeek example regeneration failed (batch " + i + "):", err);
+        statusEl.textContent = "DeepSeek failed for batch " + (i + 1) + "–" + Math.min(i + batchSize, cards.length) + ", continuing…";
+      }
+
+      // Regenerate example3 from OpenAI
+      try {
+        const openaiExamples = await generateExampleBatch(
+          batchWords, sourceLang, targetLang, OPENAI_WORKER, "gpt-4o-mini"
+        );
+        batchCards.forEach((c, idx) => { c.example3 = openaiExamples[idx] || ""; });
+      } catch (err) {
+        console.warn("OpenAI example regeneration failed (batch " + i + "):", err);
+        statusEl.textContent = "OpenAI failed for batch " + (i + 1) + "–" + Math.min(i + batchSize, cards.length) + ", continuing…";
+      }
     }
 
     // Save to Firebase
