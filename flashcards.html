@@ -1502,17 +1502,14 @@ ${numbered}`;
       console.warn("OpenAI example generation failed:", err);
     }
 
-    // For Chinese (Simplified/Traditional) stacks, also fetch a second example
-    // from DeepSeek.
-    if (isChineseLang(targetLang)) {
-      try {
-        const dsExamples = await generateExampleBatch(
-          targetWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
-        );
-        cards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
-      } catch (err) {
-        console.warn("DeepSeek example generation failed:", err);
-      }
+    // Fetch a second example sentence per card from DeepSeek.
+    try {
+      const dsExamples = await generateExampleBatch(
+        targetWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+      );
+      cards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
+    } catch (err) {
+      console.warn("DeepSeek example generation failed:", err);
     }
 
     allCards.push(...cards);
