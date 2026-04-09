@@ -675,6 +675,7 @@ body{
   font-size:10px;
   color:#999;
 }
+.fc-stack-regen,
 .fc-stack-delete{
   font-size:11px;
   color:#ccc;
@@ -683,6 +684,9 @@ body{
   cursor:pointer;
   padding:2px 6px;
   transition:color .2s;
+}
+.fc-stack-regen:hover{
+  color:#4488ff;
 }
 .fc-stack-delete:hover{
   color:#ff4444;
@@ -1990,14 +1994,17 @@ function renderStackList() {
         <div class="fc-stack-name">${escHtml(stack.name)}${starHtml}</div>
         <div class="fc-stack-meta">${stack.cards.length} cards &middot; ${escHtml(stack.targetLang)}</div>
       </div>
-      <button class="fc-stack-delete" data-id="${stack.id}" title="Delete stack">&times;</button>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <button class="fc-stack-regen" data-id="${stack.id}" title="Regenerate examples">&#x21bb;</button>
+        <button class="fc-stack-delete" data-id="${stack.id}" title="Delete stack">&times;</button>
+      </div>
     </div>`;
   }).join("");
 
   // Click to activate
   container.querySelectorAll(".fc-stack-item").forEach(el => {
     el.addEventListener("click", e => {
-      if (e.target.classList.contains("fc-stack-delete")) return;
+      if (e.target.classList.contains("fc-stack-delete") || e.target.classList.contains("fc-stack-regen")) return;
       const id = el.dataset.id;
       const stack = savedStacks.find(s => s.id === id);
       if (stack) {
@@ -2031,6 +2038,68 @@ function renderStackList() {
       await loadStacks();
     });
   });
+
+  // Regenerate examples
+  container.querySelectorAll(".fc-stack-regen").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const stack = savedStacks.find(s => s.id === id);
+      if (!stack) return;
+      if (!confirm("Regenerate example sentences for \"" + stack.name + "\"? This will replace example 2 and example 3 on all cards.")) return;
+      await regenerateExamples(stack);
+    });
+  });
+}
+
+async function regenerateExamples(stack) {
+  const statusEl = document.getElementById("createStatus");
+  statusEl.textContent = "Regenerating examples for \"" + stack.name + "\"…";
+  statusEl.style.display = "block";
+
+  try {
+    const words = stack.cards.map(c => c.word || "");
+    const sourceLang = stack.sourceLang;
+    const targetLang = stack.targetLang;
+
+    // Regenerate example2 from DeepSeek
+    try {
+      const dsExamples = await generateExampleBatch(
+        words, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+      );
+      stack.cards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
+    } catch (err) {
+      console.warn("DeepSeek example regeneration failed:", err);
+    }
+
+    // Regenerate example3 from OpenAI
+    try {
+      const openaiExamples = await generateExampleBatch(
+        words, sourceLang, targetLang, OPENAI_WORKER, "gpt-4o-mini"
+      );
+      stack.cards.forEach((c, idx) => { c.example3 = openaiExamples[idx] || ""; });
+    } catch (err) {
+      console.warn("OpenAI example regeneration failed:", err);
+    }
+
+    // Save to Firebase
+    await db.collection("flashcards").doc(currentUser.uid)
+      .collection("stacks").doc(stack.id)
+      .update({ cards: stack.cards });
+
+    // Refresh UI if this is the active stack
+    if (activeStack && activeStack.id === stack.id) {
+      activeStack.cards = stack.cards;
+      showCard();
+    }
+
+    statusEl.textContent = "Examples regenerated for \"" + stack.name + "\".";
+    setTimeout(() => { statusEl.style.display = "none"; }, 3000);
+  } catch (err) {
+    console.error("Regeneration failed:", err);
+    statusEl.textContent = "Regeneration failed: " + err.message;
+    setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+  }
 }
 
 function escHtml(s) {
