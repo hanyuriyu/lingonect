@@ -66,10 +66,6 @@ html,body{
   width:var(--text-col);
   height:70vh;
   overflow:hidden;
-  /* iOS Safari sometimes fails to clip transformed descendants of a
-     fixed+overflow:hidden parent. clip-path + isolation force a hard clip. */
-  clip-path:inset(0);
-  isolation:isolate;
   z-index:2;
 }
 
@@ -204,14 +200,16 @@ html,body{
     top:0;
     left:0;
     right:0;
-    padding:18px 0 6px;
+    /* The white bar must extend DOWN to where the stage starts so that
+       any text the typing animation pushes above the stage's overflow
+       boundary is visually covered. (iOS Safari sometimes fails to clip
+       transformed descendants of a fixed+overflow:hidden parent.) */
+    padding:18px 0 24px;
     transform:none;
     width:auto;
     height:auto;
     justify-content:center;
     align-items:center;
-    /* Sits above the stage so any iOS clipping leaks are hidden behind
-       the solid background, and the auth links stay tappable. */
     background:#fff;
     z-index:5;
   }
