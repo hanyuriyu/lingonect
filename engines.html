@@ -1256,9 +1256,13 @@ async function translateWithMicrosoft(text) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, to: langCode })
   });
-  if (!res.ok) throw new Error(`Microsoft Translate ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(`Microsoft: ${data.error.message}`);
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { data = null; }
+  if (!res.ok || data?.error) {
+    const msg = data?.error?.message || raw.slice(0, 200) || `HTTP ${res.status}`;
+    throw new Error(`Microsoft Translate ${res.status}: ${msg}`);
+  }
   return data[0].translations[0].text.trim();
 }
 
