@@ -48,12 +48,15 @@ export default {
         }
       );
 
-      const data = await res.json();
+      // Forward Azure's body verbatim so upstream error messages
+      // (e.g. "invalid subscription key", region mismatch) reach the client
+      // instead of being collapsed into a bare HTTP status.
+      const body = await res.text();
 
-      return new Response(JSON.stringify(data), {
+      return new Response(body, {
         status: res.status,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": res.headers.get("Content-Type") || "application/json",
           "Access-Control-Allow-Origin": "https://www.lingonect.com",
         },
       });
