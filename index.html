@@ -66,6 +66,10 @@ html,body{
   width:var(--text-col);
   height:70vh;
   overflow:hidden;
+  /* iOS Safari sometimes fails to clip transformed descendants of a
+     fixed+overflow:hidden parent. clip-path + isolation force a hard clip. */
+  clip-path:inset(0);
+  isolation:isolate;
   z-index:2;
 }
 
@@ -143,7 +147,7 @@ html,body{
 /* === LANGUAGE SWITCHER === */
 .language-switcher{
   position:fixed;
-  bottom:28px;
+  bottom:54px;
   left:0;
   right:0;
   display:flex;
@@ -153,6 +157,25 @@ html,body{
   padding:0 14px;
   flex-wrap:wrap;
   row-gap:10px;
+}
+
+/* === FOOTER (pinned to bottom) === */
+.site-footer{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  text-align:center;
+  padding:8px 12px 10px;
+  font-size:0.75rem;
+  color:#888;
+  background:#fff;
+  z-index:4;
+}
+.site-footer a{
+  color:#888;
+  text-decoration:none;
+  border-bottom:1px solid #ccc;
 }
 
 .lang-btn{
@@ -178,14 +201,19 @@ html,body{
   body{ overflow:hidden; }
 
   .logo-rail{
-    top:18px;
-    left:50%;
-    transform:translateX(-50%);
+    top:0;
+    left:0;
+    right:0;
+    padding:18px 0 6px;
+    transform:none;
     width:auto;
     height:auto;
     justify-content:center;
     align-items:center;
-    z-index:2;
+    /* Sits above the stage so any iOS clipping leaks are hidden behind
+       the solid background, and the auth links stay tappable. */
+    background:#fff;
+    z-index:5;
   }
   .logo{
     width:var(--mobile-logo);
@@ -194,11 +222,11 @@ html,body{
 
   .stage{
     left:50%;
-    top:240px;
+    top:260px;
     transform:translateX(-50%);
     width:min(92vw, 560px);
-    height:calc(100dvh - 300px);
-    height:calc(100vh - 300px);
+    height:calc(100dvh - 340px);
+    height:calc(100vh - 340px);
   }
 
   #typed{
@@ -210,7 +238,7 @@ html,body{
   .auth-link{ font-size:14px; line-height:2; }
 
   .language-switcher{
-    bottom:18px;
+    bottom:44px;
     gap:18px;
     font-size:13px;
   }
@@ -219,9 +247,9 @@ html,body{
 @media (max-width: 420px){
   .stage{
     width:92vw;
-    top:220px;
-    height:calc(100dvh - 280px);
-    height:calc(100vh - 280px);
+    top:240px;
+    height:calc(100dvh - 320px);
+    height:calc(100vh - 320px);
   }
   #typed{ font-size:17px; }
   .logo{ width:140px; height:140px; }
@@ -373,6 +401,6 @@ document.querySelectorAll(".lang-btn").forEach(btn=>{
 typeText("en");
 </script>
 
-<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+<footer class="site-footer">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html">Privacy Policy</a></footer>
 </body>
 </html>
