@@ -3,6 +3,7 @@
  *
  * Environment secrets required:
  *   npx wrangler secret put AZURE_TRANSLATOR_KEY
+ *   npx wrangler secret put AZURE_TRANSLATOR_REGION
  *
  * The worker will be available at:
  *   https://microsoft.hanyuriyu.workers.dev
@@ -41,7 +42,7 @@ export default {
           method: "POST",
           headers: {
             "Ocp-Apim-Subscription-Key": env.AZURE_TRANSLATOR_KEY,
-            "Ocp-Apim-Subscription-Region": "westeurope",
+            "Ocp-Apim-Subscription-Region": env.AZURE_TRANSLATOR_REGION,
             "Content-Type": "application/json",
           },
           body: JSON.stringify([{ Text: text }]),
