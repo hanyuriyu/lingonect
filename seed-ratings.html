@@ -353,6 +353,8 @@ const ALIBABA_PROXY    = "https://alibaba.hanyuriyu.workers.dev";
 const MICROSOFT_PROXY  = "https://microsoft.hanyuriyu.workers.dev";
 const AMAZON_PROXY     = "https://amazon.hanyuriyu.workers.dev";
 const NOVA_PROXY       = "https://nova.hanyuriyu.workers.dev";
+const HYPERCLOVAX_PROXY = "https://hyperclovax.hanyuriyu.workers.dev";
+const PAPAGO_PROXY     = "https://papago.hanyuriyu.workers.dev";
 const BAIDU_PROXY      = "https://baidu.hanyuriyu.workers.dev";
 
 // ── Full language code maps (all 20 languages) ──
@@ -432,6 +434,14 @@ const BAIDU_LANG_MAP = {
   "Arabic":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
   "Japanese":"jp","Chinese (Simplified)":"zh","Chinese (Traditional)":"cht","Korean":"kor",
   "Thai":"th","Vietnamese":"vie","Indonesian":"id","Malay":"may","Tagalog (Filipino)":"tl"
+};
+const PAPAGO_LANG_MAP = {
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt",
+  "Russian":"ru",
+  "Hindi":"hi",
+  "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id"
 };
 
 // ── Translation functions ──
@@ -684,6 +694,37 @@ async function translateWithMeta(text, targetLang, sourceLang) {
   return result[0].translation_text;
 }
 
+async function translateWithHyperCloveX(text, targetLang) {
+  const res = await fetch(HYPERCLOVAX_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ system: sysPrompt(targetLang), prompt: `<text>${text}</text>` })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`HyperCLOVA X: ${err.message || err.error?.message || res.status}`);
+  }
+  const data = await res.json();
+  return (data.result?.message?.content || "").trim();
+}
+
+async function translateWithPapago(text, targetLang, sourceLang) {
+  const tgtCode = PAPAGO_LANG_MAP[targetLang];
+  if (!tgtCode) throw new Error(`Papago does not support ${targetLang}.`);
+  const srcCode = PAPAGO_LANG_MAP[sourceLang] || "auto";
+  const res = await fetch(PAPAGO_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source: srcCode, target: tgtCode })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Papago: ${err.errorMessage || err.error?.message || res.status}`);
+  }
+  const data = await res.json();
+  return data.message.result.translatedText.trim();
+}
+
 async function translateWithBaidu(text, targetLang) {
   const langCode = BAIDU_LANG_MAP[targetLang];
   if (!langCode) throw new Error(`Baidu Translate does not support ${targetLang}.`);
@@ -715,6 +756,8 @@ const ENGINE_LIST = [
   { id: "amazon",     name: "Amazon Translate",     translate: translateWithAmazon },
   { id: "nova",       name: "Amazon Nova",          translate: translateWithNova },
   { id: "meta",       name: "Meta (NLLB-200)",      translate: translateWithMeta },
+  { id: "hyperclovex",name: "HyperCLOVA X",         translate: translateWithHyperCloveX },
+  { id: "papago",     name: "Naver Papago",         translate: translateWithPapago },
   { id: "baidu",      name: "Baidu Translate",      translate: translateWithBaidu }
 ];
 
@@ -731,7 +774,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
 
   // For API-based engines (not DeepL/Google/Tencent/Microsoft which are non-LLM),
   // we send a rating prompt. For non-LLM engines, fall back to Claude.
-  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "baidu"];
+  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "papago", "baidu"];
   const actualRater = NON_LLM.includes(raterEngine) ? "claude" : raterEngine;
 
   let rawScore;
