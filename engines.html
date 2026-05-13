@@ -1696,17 +1696,28 @@ submitEl.addEventListener("click", async () => {
   document.getElementById("ratingsHeader").style.display = "";
   document.getElementById("ratingsFooter").style.display = "";
 
-  // Fire all translations in parallel
+  // Fire all translations in parallel, each capped by a timeout so a
+  // hanging worker can never leave the card stuck on "Translating…".
+  const TRANSLATION_TIMEOUT_MS = 30000;
   engines.forEach(async engine => {
     const el = document.getElementById(`result-${engine.id}`);
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${engine.name} timed out after ${TRANSLATION_TIMEOUT_MS / 1000}s.`)),
+        TRANSLATION_TIMEOUT_MS
+      );
+    });
     try {
-      const translation = await engine.translate(text);
+      const translation = await Promise.race([engine.translate(text), timeout]);
       el.textContent = translation;
       el.classList.remove("loading");
     } catch (err) {
       el.textContent = err.message || "Translation failed.";
       el.classList.remove("loading");
       console.error(engine.name, err);
+    } finally {
+      clearTimeout(timer);
     }
   });
 
