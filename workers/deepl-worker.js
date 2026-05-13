@@ -20,21 +20,33 @@ export default {
         },
       });
     }
-    const body = await request.json();
-    const res = await fetch("https://api-free.deepl.com/v2/translate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `DeepL-Auth-Key ${env.DEEPL_API_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return new Response(JSON.stringify(data), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "https://www.lingonect.com",
-      },
-    });
+
+    const cors = {
+      "Content-Type":                "application/json",
+      "Access-Control-Allow-Origin": "https://www.lingonect.com",
+    };
+
+    if (request.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: cors });
+    }
+
+    try {
+      const body = await request.json();
+      const res = await fetch("https://api-free.deepl.com/v2/translate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `DeepL-Auth-Key ${env.DEEPL_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const text = await res.text();
+      return new Response(text, { status: res.status, headers: cors });
+    } catch (err) {
+      return new Response(
+        JSON.stringify({ error: err.message || "DeepL worker error" }),
+        { status: 500, headers: cors }
+      );
+    }
   },
 };
