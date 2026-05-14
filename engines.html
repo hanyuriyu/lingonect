@@ -1344,6 +1344,19 @@ const NLLB_LANG_MAP = {
 let metaTranslator = null;
 let metaModelLoading = false;
 
+// The NLLB-200 model is ~600M parameters and several hundred MB of WASM
+// weights. iOS Safari (iPhone/iPad) has a tight per-tab memory cap and will
+// kill the tab ("A problem repeatedly occurred") when the model loads, so we
+// skip the in-browser model on those devices.
+function isMobileLowMemoryDevice() {
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
+  const lowMem = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
+  return isIOS || isAndroid || lowMem;
+}
+
 async function loadMetaModel() {
   if (metaTranslator) return metaTranslator;
   if (metaModelLoading) {
@@ -1375,6 +1388,9 @@ async function translateWithMeta(text) {
   const srcCode = NLLB_LANG_MAP[sourceLang];
   const tgtCode = NLLB_LANG_MAP[targetLang];
   if (!tgtCode) throw new Error(`Meta NLLB-200 does not support ${targetLang}.`);
+  if (isMobileLowMemoryDevice()) {
+    throw new Error("Meta NLLB-200 runs in-browser and is not supported on mobile devices. Try on a desktop browser.");
+  }
   const translator = await loadMetaModel();
   const result = await translator(text, { src_lang: srcCode || "eng_Latn", tgt_lang: tgtCode });
   return result[0].translation_text;
