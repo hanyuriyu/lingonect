@@ -1384,12 +1384,30 @@ async function loadMetaModel() {
   }
 }
 
+// Mobile devices can't load the 600M model in-browser without crashing
+// Safari, so they call a Cloudflare Worker that proxies to a Hugging Face
+// Space running NLLB-200 server-side.
+const META_PROXY = "https://meta.hanyuriyu.workers.dev";
+
+async function translateWithMetaViaProxy(text, srcCode, tgtCode) {
+  const res = await fetch(META_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source: srcCode || "eng_Latn", target: tgtCode })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(`Meta NLLB-200: ${data.error || res.status}`);
+  }
+  return (data.result || "").trim();
+}
+
 async function translateWithMeta(text) {
   const srcCode = NLLB_LANG_MAP[sourceLang];
   const tgtCode = NLLB_LANG_MAP[targetLang];
   if (!tgtCode) throw new Error(`Meta NLLB-200 does not support ${targetLang}.`);
   if (isMobileLowMemoryDevice()) {
-    throw new Error("Meta NLLB-200 runs in-browser and is not supported on mobile devices. Try on a desktop browser.");
+    return translateWithMetaViaProxy(text, srcCode, tgtCode);
   }
   const translator = await loadMetaModel();
   const result = await translator(text, { src_lang: srcCode || "eng_Latn", tgt_lang: tgtCode });
