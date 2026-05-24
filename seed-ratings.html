@@ -305,7 +305,7 @@ const ALL_LANGUAGES = [
   "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
   "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
   "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
-  "Latvian","Estonian","Slovenian","Catalan","Icelandic",
+  "Latvian","Estonian","Slovenian","Catalan","Icelandic","Georgian",
   "Arabic","Hebrew","Persian (Farsi)","Hindi","Urdu","Bengali",
   "Japanese","Chinese (Simplified)","Chinese (Traditional)","Korean",
   "Thai","Vietnamese","Indonesian","Malay","Tagalog (Filipino)"
@@ -364,7 +364,7 @@ const GOOGLE_LANG_MAP = {
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
-  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
   "Arabic":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -375,7 +375,7 @@ const DEEPL_LANG_MAP = {
   "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
   "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
   "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
-  "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS",
+  "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS","Georgian":"KA",
   "Arabic":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
   "Japanese":"JA","Chinese (Simplified)":"ZH-HANS","Chinese (Traditional)":"ZH-HANT","Korean":"KO",
   "Thai":"TH","Vietnamese":"VI","Indonesian":"ID","Malay":"MS","Tagalog (Filipino)":"TL"
@@ -386,7 +386,7 @@ const TENCENT_LANG_MAP = {
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
-  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
   "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -397,7 +397,7 @@ const MICROSOFT_LANG_MAP = {
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
-  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
   "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh-Hans","Chinese (Traditional)":"zh-Hant","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"fil"
@@ -408,7 +408,7 @@ const AMAZON_LANG_MAP = {
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
-  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
   "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -419,7 +419,7 @@ const NLLB_LANG_MAP = {
   "Dutch":"nld_Latn","Polish":"pol_Latn","Russian":"rus_Cyrl","Ukrainian":"ukr_Cyrl","Turkish":"tur_Latn",
   "Greek":"ell_Grek","Romanian":"ron_Latn","Hungarian":"hun_Latn","Czech":"ces_Latn","Slovak":"slk_Latn",
   "Bulgarian":"bul_Cyrl","Croatian":"hrv_Latn","Serbian":"srp_Cyrl","Lithuanian":"lit_Latn",
-  "Latvian":"lvs_Latn","Estonian":"est_Latn","Slovenian":"slv_Latn","Catalan":"cat_Latn","Icelandic":"isl_Latn",
+  "Latvian":"lvs_Latn","Estonian":"est_Latn","Slovenian":"slv_Latn","Catalan":"cat_Latn","Icelandic":"isl_Latn","Georgian":"kat_Geor",
   "Arabic":"arb_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
   "Japanese":"jpn_Jpan","Chinese (Simplified)":"zho_Hans","Chinese (Traditional)":"zho_Hant","Korean":"kor_Hang",
   "Thai":"tha_Thai","Vietnamese":"vie_Latn","Indonesian":"ind_Latn","Malay":"zsm_Latn","Tagalog (Filipino)":"tgl_Latn"
@@ -430,7 +430,7 @@ const BAIDU_LANG_MAP = {
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"ukr","Turkish":"tr",
   "Greek":"el","Romanian":"rom","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bul","Croatian":"hrv","Serbian":"srp","Lithuanian":"lit",
-  "Latvian":"lav","Estonian":"est","Slovenian":"slo","Catalan":"cat","Icelandic":"ice",
+  "Latvian":"lav","Estonian":"est","Slovenian":"slo","Catalan":"cat","Icelandic":"ice","Georgian":"kat",
   "Arabic":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
   "Japanese":"jp","Chinese (Simplified)":"zh","Chinese (Traditional)":"cht","Korean":"kor",
   "Thai":"th","Vietnamese":"vie","Indonesian":"id","Malay":"may","Tagalog (Filipino)":"tl"
