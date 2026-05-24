@@ -970,6 +970,19 @@ inputEl.addEventListener("input", () => {
 // ── API keys (edit these values on GitHub) ──
 const GOOGLE_KEY      = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
 
+// Engines with a fixed language map throw this when the user picks a
+// source or target language the engine doesn't list. The catch handler
+// in the submit flow surfaces the message verbatim.
+class UnsupportedLanguageError extends Error {
+  constructor() {
+    super("Language not supported");
+    this.name = "UnsupportedLanguageError";
+  }
+}
+function assertLangSupported(map) {
+  if (!map[sourceLang] || !map[targetLang]) throw new UnsupportedLanguageError();
+}
+
 // ── Mistral AI ──
 const MISTRAL_PROXY = "https://mistral.hanyuriyu.workers.dev";
 async function translateWithMistral(text) {
@@ -1077,8 +1090,8 @@ const GOOGLE_LANG_MAP = {
 };
 
 async function translateWithGoogle(text) {
+  assertLangSupported(GOOGLE_LANG_MAP);
   const langCode = GOOGLE_LANG_MAP[targetLang];
-  if (!langCode) throw new Error(`Google Translate does not support ${targetLang}.`);
   const res = await fetch(
     `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
     {
@@ -1099,7 +1112,7 @@ const DEEPL_LANG_MAP = {
   "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
   "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
   "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
-  "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS","Georgian":"KA",
+  "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS",
   "Arabic":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
   "Japanese":"JA","Chinese (Simplified)":"ZH-HANS","Chinese (Traditional)":"ZH-HANT","Korean":"KO",
   "Thai":"TH","Vietnamese":"VI","Indonesian":"ID","Malay":"MS","Tagalog (Filipino)":"TL"
@@ -1108,8 +1121,8 @@ const DEEPL_LANG_MAP = {
 const DEEPL_PROXY = "https://deepl.hanyuriyu.workers.dev";
 
 async function translateWithDeepL(text) {
+  assertLangSupported(DEEPL_LANG_MAP);
   const langCode = DEEPL_LANG_MAP[targetLang];
-  if (!langCode) throw new Error(`DeepL does not support ${targetLang}.`);
   const res = await fetch(DEEPL_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1199,8 +1212,8 @@ const TENCENT_LANG_MAP = {
 };
 
 async function translateWithTencent(text) {
+  assertLangSupported(TENCENT_LANG_MAP);
   const langCode = TENCENT_LANG_MAP[targetLang];
-  if (!langCode) throw new Error(`Tencent Translate does not support ${targetLang}.`);
   const res = await fetch(TENCENT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1253,8 +1266,8 @@ const MICROSOFT_LANG_MAP = {
 };
 
 async function translateWithMicrosoft(text) {
+  assertLangSupported(MICROSOFT_LANG_MAP);
   const langCode = MICROSOFT_LANG_MAP[targetLang];
-  if (!langCode) throw new Error(`Microsoft Translate does not support ${targetLang}.`);
   const res = await fetch(MICROSOFT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1293,9 +1306,9 @@ const AMAZON_LANG_MAP = {
 };
 
 async function translateWithAmazon(text) {
+  assertLangSupported(AMAZON_LANG_MAP);
   const langCode = AMAZON_LANG_MAP[targetLang];
-  if (!langCode) throw new Error(`Amazon Translate does not support ${targetLang}.`);
-  const srcCode = AMAZON_LANG_MAP[sourceLang] || "auto";
+  const srcCode = AMAZON_LANG_MAP[sourceLang];
   const res = await fetch(AMAZON_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1405,14 +1418,14 @@ async function translateWithMetaViaProxy(text, srcCode, tgtCode) {
 }
 
 async function translateWithMeta(text) {
+  assertLangSupported(NLLB_LANG_MAP);
   const srcCode = NLLB_LANG_MAP[sourceLang];
   const tgtCode = NLLB_LANG_MAP[targetLang];
-  if (!tgtCode) throw new Error(`Meta NLLB-200 does not support ${targetLang}.`);
   if (isMobileLowMemoryDevice()) {
     return translateWithMetaViaProxy(text, srcCode, tgtCode);
   }
   const translator = await loadMetaModel();
-  const result = await translator(text, { src_lang: srcCode || "eng_Latn", tgt_lang: tgtCode });
+  const result = await translator(text, { src_lang: srcCode, tgt_lang: tgtCode });
   return result[0].translation_text;
 }
 
@@ -1436,6 +1449,7 @@ const PAPAGO_LANG_MAP = {
 };
 
 async function translateWithPapago(text) {
+  assertLangSupported(PAPAGO_LANG_MAP);
   return "API implementation in progress";
 }
 
@@ -1455,8 +1469,8 @@ const BAIDU_LANG_MAP = {
 };
 
 async function translateWithBaidu(text) {
+  assertLangSupported(BAIDU_LANG_MAP);
   const langCode = BAIDU_LANG_MAP[targetLang];
-  if (!langCode) throw new Error(`Baidu Translate does not support ${targetLang}.`);
   const res = await fetch(BAIDU_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1484,6 +1498,7 @@ const YANDEX_LANG_MAP = {
 };
 
 async function translateWithYandex(text) {
+  assertLangSupported(YANDEX_LANG_MAP);
   return "API implementation in progress";
 }
 
