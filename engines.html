@@ -220,8 +220,11 @@ body{
 .lang-scroll-track{
   display:none;
   position:absolute;
+  top:calc(100% + 12px);
   right:5px;
+  bottom:auto;
   width:6px;
+  max-height:min(268px, calc(100vh - 232px));
   background:rgba(0,0,0,.08);
   border-radius:3px;
   z-index:210;
@@ -1008,17 +1011,10 @@ function initDropdownScroll(dd) {
   const thumb = track ? track.querySelector(".lang-scroll-thumb") : null;
   if (!thumb || !track) return;
 
-  function positionTrack() {
-    const ddRect   = dd.getBoundingClientRect();
-    const wrapRect = wrap.getBoundingClientRect();
-    track.style.top    = (ddRect.top - wrapRect.top + 6) + "px";
-    track.style.height = (ddRect.height - 12) + "px";
-  }
-
   function updateThumb() {
     const ratio = dd.clientHeight / dd.scrollHeight;
     if (ratio >= 1) { track.style.display = "none"; return; }
-    positionTrack();
+    track.style.height = (dd.clientHeight - 12) + "px";
     const trackH = track.clientHeight;
     thumb.style.height = Math.max(20, trackH * ratio) + "px";
     const scrollRatio = dd.scrollTop / (dd.scrollHeight - dd.clientHeight);
