@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>About Lingonect — Where Human Linguistic Excellence Meets Machine Intelligence</title>
+<meta name="description" content="Learn about Lingonect: where human linguistic excellence meets machine intelligence. Rigorous AI translation evaluation by certified language professionals.">
+<link rel="canonical" href="https://www.lingonect.com/about.html">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.lingonect.com/about.html">
+<meta property="og:title" content="About Lingonect — Where Human Linguistic Excellence Meets Machine Intelligence">
+<meta property="og:description" content="Learn about Lingonect: where human linguistic excellence meets machine intelligence. Rigorous AI translation evaluation by certified language professionals.">
+<meta property="og:image" content="https://www.lingonect.com/logo.png">
+<meta property="og:site_name" content="Lingonect">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --text:#111;
+  --cobalt:#0047FF;
+  --text-col:680px;
+  --logo-size:240px;
+  --logo-opacity:0.9;
+  --mobile-logo:130px;
+}
+
+html{
+  height:100%;
+  zoom:0.75;
+}
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Special Elite","Courier New",monospace;
+  visibility:hidden;
+  overflow-y:auto;
+}
+
+/* ── LOGO RAIL ── */
+.logo-rail{
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  width:calc(50% - (var(--text-col) / 2));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  z-index:1;
+}
+
+.logo{
+  width:var(--logo-size);
+  height:var(--logo-size);
+  object-fit:contain;
+  opacity:var(--logo-opacity);
+}
+
+/* ── PAGE WRAPPER ── */
+.page-wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:80px 0 60px;
+  box-sizing:border-box;
+}
+
+/* ── STAGE ── */
+.stage{
+  width:var(--text-col);
+  max-width:92vw;
+  margin:0 auto;
+  position:relative;
+  z-index:2;
+}
+
+/* ── TYPOGRAPHY ── */
+.page-title{
+  font-size:26px;
+  font-weight:800;
+  line-height:1.4;
+  margin:0 0 6px;
+  letter-spacing:.2px;
+  text-align:center;
+}
+
+.page-subtitle{
+  font-size:15px;
+  font-style:italic;
+  font-weight:400;
+  line-height:1.6;
+  margin:0 0 40px;
+  color:#555;
+  text-align:center;
+}
+
+h2{
+  font-size:19px;
+  font-weight:800;
+  line-height:1.4;
+  margin:48px 0 14px;
+  color:var(--cobalt);
+  letter-spacing:.3px;
+}
+
+h2:first-of-type{
+  margin-top:0;
+}
+
+h3{
+  font-size:16px;
+  font-weight:800;
+  line-height:1.4;
+  margin:28px 0 10px;
+  color:var(--text);
+}
+
+p{
+  font-size:15px;
+  line-height:1.85;
+  margin:0 0 16px;
+}
+
+/* ── PULL QUOTE ── */
+.pull-quote{
+  border-left:3px solid var(--cobalt);
+  padding:2px 0 2px 20px;
+  margin:28px 0;
+  font-size:15px;
+  line-height:1.85;
+  color:#333;
+}
+
+/* ── BULLET LIST ── */
+ul.feature-list{
+  list-style:none;
+  padding:0;
+  margin:0 0 16px;
+}
+ul.feature-list li{
+  position:relative;
+  padding-left:22px;
+  margin-bottom:12px;
+  font-size:15px;
+  line-height:1.85;
+}
+ul.feature-list li::before{
+  content:"—";
+  position:absolute;
+  left:0;
+  color:var(--cobalt);
+  font-weight:800;
+}
+
+/* ── NOT-LIST ── */
+ul.not-list{
+  list-style:none;
+  padding:0;
+  margin:0 0 16px;
+}
+ul.not-list li{
+  position:relative;
+  padding-left:22px;
+  margin-bottom:8px;
+  font-size:15px;
+  line-height:1.85;
+}
+ul.not-list li::before{
+  content:"\2717";
+  position:absolute;
+  left:0;
+  color:#c00;
+  font-weight:800;
+}
+
+/* ── CLOSING ── */
+.closing{
+  margin-top:48px;
+  padding-top:28px;
+  border-top:2px solid var(--cobalt);
+  text-align:center;
+}
+
+.closing p{
+  font-size:16px;
+  line-height:1.85;
+}
+
+.closing .tagline{
+  font-size:15px;
+  font-weight:800;
+  color:var(--cobalt);
+  letter-spacing:.3px;
+  margin-top:20px;
+}
+
+/* ── SEPARATOR ── */
+.section-sep{
+  border:none;
+  border-top:1px solid #ddd;
+  margin:48px 0;
+}
+
+/* ── TOP NAV ── */
+.top-nav{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  background:var(--bg);
+  z-index:100;
+  font-family:"Special Elite","Courier New",monospace;
+}
+.top-nav a{
+  font-size:14px;
+  font-weight:800;
+  color:#999;
+  text-decoration:none;
+  letter-spacing:.5px;
+  transition:color .2s;
+}
+.top-nav a:hover{ color:var(--text); }
+.top-nav a.active{ color:var(--text); }
+
+/* ── LOGOUT ── */
+.logout-btn{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:14px;
+  font-weight:800;
+  color:#000;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  transition:color .2s;
+}
+.logout-btn:hover{ color:var(--cobalt); }
+
+/* ── MOBILE ── */
+@media (max-width:820px){
+  .logo-rail{
+    position:relative;
+    top:auto;
+    left:auto;
+    transform:none;
+    width:auto;
+    justify-content:center;
+    padding:32px 0 4px;
+    margin-bottom:10px;
+  }
+  .logo{ width:var(--mobile-logo); height:var(--mobile-logo); }
+
+  .page-wrap{
+    padding:0 0 60px;
+  }
+
+  .stage{
+    padding:0 16px;
+    box-sizing:border-box;
+  }
+
+  .page-title{ font-size:20px; }
+  .page-subtitle{ font-size:14px; }
+  h2{ font-size:17px; }
+}
+
+@media (max-width:420px){
+  .logo{ width:110px; height:110px; }
+  .page-title{ font-size:18px; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <a href="about.html" class="active">About</a>
+  <a href="engines.html">Engines</a>
+  <a href="ratings.html">Ratings</a>
+  <a href="chat.html">Chat</a>
+  <a href="flashcards.html">Flashcards</a>
+  <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
+  <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
+  <a href="profile.html">Profile</a>
+</nav>
+
+<!-- LOGO RAIL -->
+<div class="logo-rail">
+  <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+</div>
+
+<div class="page-wrap">
+<div class="stage">
+
+  <h1 class="page-title">About Lingonect</h1>
+  <p class="page-subtitle">Where human linguistic excellence meets machine intelligence, and both get better for it.</p>
+
+  <p>Lingonect is a place for anyone who lives in language. Professional linguists, researchers in language technology, learners chasing fluency, and anyone who simply cares about how meaning travels across cultures. It is also for anyone who needs advice about a language or a culture: a question about nuance, register, a regional variant, an idiom that will not sit still, or how a message will land somewhere it was not written for. If language or culture is on your mind, Lingonect is for you.</p>
+
+  <h2>Why Lingonect exists</h2>
+
+  <p>For the whole of human history, only a vanishing fraction of what humans create has ever been translated. By some estimates, traditional methods, which depend on enormous amounts of skilled human work, have managed to translate barely 1% of all content. Every day the world produces an ocean of writing, speech, and ideas, and almost none of it reaches most people in a language they truly understand. Roughly three-quarters of internet users do not speak English, yet the overwhelming majority of content is served to them in languages that are not their own. There has never been the human capacity to give every person, everywhere, every message, spoken, written, or heard, perfectly in their own tongue. We have barely managed a sliver.</p>
+
+  <p>Large language models change that arithmetic for the first time. They make possible something no generation of human translators, however gifted or numerous, could ever achieve alone: multilingual communication at the scale of human need.</p>
+
+  <div class="pull-quote">But scale is not the same as quality. And efficiency is not the same as understanding.</div>
+
+  <h2>What Lingonect believes</h2>
+
+  <p>AI does not kill languages. It maintains the languages already spoken, and it can help revive ones that have faded. Cornwall is a good example: Cornish had no native speakers left by the late twentieth century, and today its revival depends on learners, recorded material, dictionaries, and digital tools that put a small, scattered community in contact with its own language. Technology that can store, model, and teach a language at scale is exactly the kind of tool that work needs. With human insight layered in, AI can do more than maintain and revive. It can genuinely enrich.</p>
+
+  <p>Here is the distinction Lingonect builds everything around. Machines are extraordinary at what they do: retaining vocabulary, comparing structures across languages, catching inconsistencies, correcting at a speed no person can match. But machines do not live. Humans are born, we feel, we experience, we break the rules of language on purpose, and one day we die. That lived experience, the whole arc of it, is something AI will never have, and it is precisely that experience that shapes our words and gives language its meaning. A model can describe grief; it has never lost anyone. That gap is not a flaw to be fixed. It is the reason human judgement remains essential.</p>
+
+  <p>Neither half is complete on its own. Merge the human with the model, human creativity and cultural judgement with machine speed and recall, and the result is better than either: a way to enrich, learn, and grow languages faster than was ever possible before.</p>
+
+  <p>That combination is what Lingonect exists to find, test, and champion.</p>
+
+  <h2>What Lingonect actually does</h2>
+
+  <p>Lingonect connects tested, certified language professionals with the best AI translation and language tools, and rigorously rates the results.</p>
+
+  <h3>Truly professional, objectively verified</h3>
+
+  <p>Lingonect's reviewers are not graded by a standard proficiency test that returns an A1 to C2 score. Instead, several independent professionals, each a well-educated native speaker (WEN) or at first-language level, give their own independent review. Multiple expert eyes, working separately, rather than a single automated score. These reviewers are linguists, and where a task calls for it, language professionals and culturalists whose expertise goes beyond the purely linguistic into how meaning behaves inside a culture.</p>
+
+  <h3>The most comprehensive NMT and LLM comparison site anywhere</h3>
+
+  <p>Lingonect continuously evaluates, critiques, and optimises the output of leading NMT and LLM systems, and is always working to add more engines to the comparison. As these tools evolve, and they evolve weekly, the rankings evolve with them.</p>
+
+  <h3>A ground for real discussion</h3>
+
+  <p>Lingonect is also a place to compare engines, debate methodology, share what works, and learn from people who do this seriously.</p>
+
+  <hr class="section-sep">
+
+  <h2>NMT vs. LLM, and why the difference matters</h2>
+
+  <p>Most people lump all "AI translation" together. They should not, and understanding why is central to using these tools well.</p>
+
+  <p><strong>Neural Machine Translation (NMT)</strong> systems are purpose-built for one job: converting text from one language to another. They are trained on large bilingual corpora, parallel texts that have been approved as accurate translations of each other. Because of this, NMT output tends to be factually faithful to the source. It will not invent content that was not there. The trade-off is that the result is not always the most elegant or natural; it can read as flat or mechanical. But it stays anchored to what the source actually said.</p>
+
+  <p><strong>Large Language Models (LLMs)</strong> work very differently. They are general-purpose systems that generate language by predicting what is most plausible, not by mapping an approved source to an approved target. This makes them flexible and often remarkably fluent. It also creates two serious problems. The first is consistency: the same input can produce different output, and quality varies. The second, and more dangerous, is hallucination. An LLM can produce text that sounds completely natural and authoritative while including something that does not exist in the source at all. Because the output sounds so good, the error is easy to miss. Fluency disguises infidelity, and a confident, polished translation can quietly mislead the reader who trusts it.</p>
+
+  <p>There is a further control problem unique to LLMs. Because they are built to follow instructions, they can misread the very text they are meant to translate. Ask an LLM to translate a sentence into German, and if that sentence happens to read "Please translate this into Chinese," the model may obey the sentence instead of translating it, and hand back Chinese. The content to be translated and an instruction to the model look the same to it. Lingonect is constantly optimising how translation requests are framed and sent to LLMs to prevent exactly this kind of confusion, but the nature of these systems means the process is not always perfect.</p>
+
+  <p>Each approach has real strengths and real weaknesses, and which one wins depends entirely on the task, the language pair, and the stakes. That is exactly why rigorous, objective rating is not a nice-to-have. It is the whole point. You cannot choose the right tool if no one is honestly measuring them.</p>
+
+  <h2>What Lingonect is not</h2>
+
+  <ul class="not-list">
+    <li>Not a translation agency.</li>
+    <li>Not a bulk or volume translation tool.</li>
+    <li>Not a source of subjective, popularity-based ratings.</li>
+  </ul>
+
+  <p>Lingonect is a place for certified language professionals, honest engine evaluation, and serious discussion, built on objective testing and professional rigour.</p>
+
+  <hr class="section-sep">
+
+  <div class="closing">
+    <h2 style="text-align:center;">The invitation</h2>
+    <p>As AI grows, the temptation will be to let it work alone. That is a mistake. The future of language is not human <em>or</em> machine. It is human <em>and</em> machine, each doing what it does best.</p>
+    <p>Lingonect is where that future gets connected, compared, learned, and built.</p>
+    <p class="tagline">Connect. Share. Learn. Compare.<br>And help merge AI efficiency with human excellence.</p>
+  </div>
+
+</div>
+</div>
+
+<!-- Firebase (auth + nav visibility) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0",
+  authDomain:        "lingonect-4db51.firebaseapp.com",
+  projectId:         "lingonect-4db51",
+  storageBucket:     "lingonect-4db51.firebasestorage.app",
+  messagingSenderId: "97117277218",
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+auth.onAuthStateChanged(user => {
+  if (!user || !user.emailVerified) {
+    window.location.href = "login.html";
+    return;
+  }
+  if (user.email === "linguisticsconsulting@gmail.com") {
+    document.getElementById("seedNavLink").style.display = "";
+    document.getElementById("adminNavLink").style.display = "";
+  }
+  document.body.style.visibility = "visible";
+});
+</script>
+<footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
+</body>
+</html>
