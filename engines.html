@@ -198,9 +198,11 @@ body{
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
   box-shadow:0 6px 24px rgba(0,0,0,.11);
+  scrollbar-width:thin;
+  scrollbar-color:var(--cobalt) #f3f3f3;
 }
 
-/* Always-visible scrollbar so macOS users can see and use it */
+/* Chrome / Edge — always-visible scrollbar */
 .lang-dropdown::-webkit-scrollbar{
   width:10px;
   background:#f3f3f3;
@@ -213,9 +215,32 @@ body{
 .lang-dropdown::-webkit-scrollbar-thumb:hover{
   background:#0033cc;
 }
-.lang-dropdown{
-  scrollbar-width:thin;
-  scrollbar-color:var(--cobalt) #f3f3f3;
+
+/* Custom scroll track for Safari (sibling of dropdown, overlay) */
+.lang-scroll-track{
+  display:none;
+  position:absolute;
+  right:5px;
+  width:6px;
+  background:rgba(0,0,0,.08);
+  border-radius:3px;
+  z-index:210;
+  pointer-events:none;
+}
+.lang-select-wrap.open .lang-scroll-track{
+  display:block;
+}
+.lang-scroll-thumb{
+  position:absolute;
+  width:100%;
+  background:var(--cobalt);
+  border-radius:3px;
+  opacity:.7;
+  min-height:20px;
+  transition:opacity .15s;
+}
+.lang-select-wrap:hover .lang-scroll-thumb{
+  opacity:1;
 }
 
 .lang-select-wrap.open .lang-dropdown{
@@ -625,6 +650,7 @@ body{
             <button class="lang-option" data-lang="Malay">Malay</button>
             <button class="lang-option" data-lang="Tagalog (Filipino)">Tagalog (Filipino)</button>
           </div>
+          <div class="lang-scroll-track" id="srcScrollTrack"><div class="lang-scroll-thumb"></div></div>
         </div>
         <span style="color:#2196F3;font-weight:600;">Source</span>
         </div>
@@ -684,6 +710,7 @@ body{
             <button class="lang-option" data-lang="Malay">Malay</button>
             <button class="lang-option" data-lang="Tagalog (Filipino)">Tagalog (Filipino)</button>
           </div>
+          <div class="lang-scroll-track" id="tgtScrollTrack"><div class="lang-scroll-thumb"></div></div>
         </div>
         <span style="color:#2196F3;font-weight:600;">Target</span>
         </div>
@@ -973,6 +1000,46 @@ document.addEventListener("click", () => {
   langWrap.classList.remove("open");
   langBtn.setAttribute("aria-expanded", "false");
 });
+
+// Manual wheel scroll + custom scroll-thumb (Safari ignores ::-webkit-scrollbar)
+function initDropdownScroll(dd) {
+  const wrap  = dd.closest(".lang-select-wrap");
+  const track = wrap.querySelector(".lang-scroll-track");
+  const thumb = track ? track.querySelector(".lang-scroll-thumb") : null;
+  if (!thumb || !track) return;
+
+  function positionTrack() {
+    const ddRect   = dd.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    track.style.top    = (ddRect.top - wrapRect.top + 6) + "px";
+    track.style.height = (ddRect.height - 12) + "px";
+  }
+
+  function updateThumb() {
+    const ratio = dd.clientHeight / dd.scrollHeight;
+    if (ratio >= 1) { track.style.display = "none"; return; }
+    positionTrack();
+    const trackH = track.clientHeight;
+    thumb.style.height = Math.max(20, trackH * ratio) + "px";
+    const scrollRatio = dd.scrollTop / (dd.scrollHeight - dd.clientHeight);
+    thumb.style.top = (scrollRatio * (trackH - thumb.offsetHeight)) + "px";
+  }
+
+  dd.addEventListener("wheel", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dd.scrollTop += e.deltaY;
+    updateThumb();
+  }, { passive: false });
+
+  dd.addEventListener("scroll", updateThumb);
+
+  new MutationObserver(() => {
+    if (wrap.classList.contains("open")) requestAnimationFrame(updateThumb);
+  }).observe(wrap, { attributes: true, attributeFilter: ["class"] });
+}
+initDropdownScroll(srcLangDropdown);
+initDropdownScroll(langDropdown);
 
 // ── Word counter ──
 const inputEl  = document.getElementById("inputText");
