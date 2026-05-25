@@ -218,6 +218,14 @@ body{
   background:#f0e0d0;
   color:#8a6530;
 }
+.badge.sub-level{
+  background:#e0e8ff;
+  color:#0047FF;
+}
+.badge.sub-free{
+  background:#f0f0f0;
+  color:#888;
+}
 
 .empty-msg{
   text-align:center;
@@ -257,6 +265,7 @@ body{
   <a href="ratings.html">Ratings</a>
   <a href="chat.html">Chat</a>
   <a href="flashcards.html">Flashcards</a>
+  <a href="subscription.html">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink">Seed Ratings</a>
   <a href="admin.html" class="active" id="adminNavLink">Admin</a>
   <a href="profile.html">Profile</a>
@@ -351,6 +360,7 @@ async function loadUsers() {
       email: d.emailConsent ? (d.email || "") : "",
       emailConsent: !!d.emailConsent,
       certification: d.certification || "Uncertified",
+      subscriptionLevel: d.subscriptionLevel !== undefined ? d.subscriptionLevel : 3,
       createdAt: d.createdAt || d.updatedAt || null
     });
   });
@@ -393,6 +403,9 @@ function renderList() {
     const isCert = u.certification === "Lingonect Certified";
     const badgeClass = isCert ? "certified" : "uncertified";
     const badgeText = isCert ? "Certified" : "Uncertified";
+    const subLevel = u.subscriptionLevel;
+    const subBadgeClass = subLevel > 0 ? "sub-level" : "sub-free";
+    const subBadgeText = subLevel > 0 ? "L" + subLevel : "Free";
     const dateStr = u.createdAt ? formatDate(u.createdAt) : "—";
 
     return `
@@ -402,6 +415,7 @@ function renderList() {
           <div class="user-name">${escHtml(u.username) || "—"}</div>
           <div class="user-email">${u.email ? escHtml(u.email) : '<em style="color:#bbb;">Email withheld</em>'}</div>
         </div>
+        <span class="badge ${subBadgeClass}">${subBadgeText}</span>
         <span class="badge ${badgeClass}">${badgeText}</span>
         <span class="user-date">${dateStr}</span>
       </a>
