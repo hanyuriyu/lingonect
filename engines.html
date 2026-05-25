@@ -559,6 +559,34 @@ body{
   .logo{ width:110px; height:110px; }
   .hero-headline{ font-size:14px; }
 }
+
+/* ── LOCKED ENGINE ── */
+.result-card.locked{
+  opacity:0.55;
+  position:relative;
+}
+.result-card.locked .translation-text{
+  display:none;
+}
+.result-card.locked .star-rating{
+  display:none;
+}
+.lock-overlay{
+  font-size:12px;
+  color:#888;
+  padding:4px 0;
+  line-height:1.5;
+}
+.lock-overlay a{
+  color:var(--cobalt);
+  text-decoration:none;
+  font-weight:800;
+  border-bottom:1px solid var(--cobalt);
+}
+.lock-overlay a:hover{
+  color:#111;
+  border-bottom-color:#111;
+}
 </style>
 </head>
 
@@ -571,6 +599,7 @@ body{
   <a href="ratings.html">Ratings</a>
   <a href="chat.html">Chat</a>
   <a href="flashcards.html">Flashcards</a>
+  <a href="subscription.html">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="profile.html">Profile</a>
@@ -755,7 +784,27 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
-auth.onAuthStateChanged(user => {
+let userSubscriptionLevel = 3; // default for grandfathered users
+
+const ENGINE_TIERS = {
+  claude: 0, openai: 0, google: 0, gemini: 0,
+  deepl: 1, perplexity: 1, mistral: 1, deepseek: 1,
+  grok: 2, tencent: 2, alibaba: 2, microsoft: 2,
+  amazon: 3, nova: 3, meta: 3, baidu: 3,
+  hyperclovex: 0, papago: 0, yandex: 0, jais: 0
+};
+
+function engineRequiresLevel(engineId) {
+  return ENGINE_TIERS[engineId] || 0;
+}
+
+function isEngineLocked(engineId) {
+  return engineRequiresLevel(engineId) > userSubscriptionLevel;
+}
+
+const db = firebase.firestore();
+
+auth.onAuthStateChanged(async user => {
   if (!user || !user.emailVerified) {
     window.location.href = "login.html";
     return;
@@ -764,14 +813,18 @@ auth.onAuthStateChanged(user => {
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
   }
+
+  const profileDoc = await db.collection("profiles").doc(user.uid).get();
+  if (profileDoc.exists && profileDoc.data().subscriptionLevel !== undefined) {
+    userSubscriptionLevel = profileDoc.data().subscriptionLevel;
+  }
+
   document.body.style.visibility = "visible";
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
 });
-
-const db = firebase.firestore();
 
 // ── Star Rating System ──
 const currentRatings = {}; // { engineId: 0..5 in 0.5 steps }
@@ -1757,7 +1810,8 @@ const engines = [
 // ── Build a result card ──
 function buildCard(engine) {
   const card = document.createElement("div");
-  card.className = "result-card";
+  const locked = isEngineLocked(engine.id);
+  card.className = locked ? "result-card locked" : "result-card";
 
   const logoHtml = `
     <div class="engine-logo-wrap">
@@ -1770,15 +1824,27 @@ function buildCard(engine) {
       <div class="engine-logo-badge ${engine.badgeClass}" style="display:none">${engine.badgeText}</div>
     </div>`;
 
-  card.innerHTML = `
-    ${logoHtml}
-    <div class="result-content">
-      <p class="engine-name">${engine.name}</p>
-      <p class="translation-text loading" id="result-${engine.id}">Translating…</p>
-    </div>`;
+  const reqLevel = engineRequiresLevel(engine.id);
 
-  // Add star rating inline
-  card.appendChild(buildStarRow(engine.id));
+  if (locked) {
+    card.innerHTML = `
+      ${logoHtml}
+      <div class="result-content">
+        <p class="engine-name">${engine.name}</p>
+        <div class="lock-overlay">
+          Available with Level ${reqLevel} subscription.
+          <a href="subscription.html">Upgrade</a>
+        </div>
+      </div>`;
+  } else {
+    card.innerHTML = `
+      ${logoHtml}
+      <div class="result-content">
+        <p class="engine-name">${engine.name}</p>
+        <p class="translation-text loading" id="result-${engine.id}">Translating…</p>
+      </div>`;
+    card.appendChild(buildStarRow(engine.id));
+  }
 
   return card;
 }
@@ -1803,7 +1869,9 @@ submitEl.addEventListener("click", async () => {
   // hanging worker can never leave the card stuck on "Translating…".
   const TRANSLATION_TIMEOUT_MS = 30000;
   engines.forEach(async engine => {
+    if (isEngineLocked(engine.id)) return;
     const el = document.getElementById(`result-${engine.id}`);
+    if (!el) return;
     let timer;
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(
