@@ -1237,11 +1237,20 @@ async function translateWithGoogle(text) {
     `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
     {
       method: "POST",
+      // The Google Cloud key is locked to HTTP referrers. Browsers (and
+      // privacy/tracking-protection modes) increasingly strip the Referer on
+      // cross-origin requests, which arrives at Google as "<empty>" and is
+      // rejected with 403 API_KEY_HTTP_REFERRER_BLOCKED. Force the page URL to
+      // be sent so it matches the key's referrer allow-list.
+      referrerPolicy: "unsafe-url",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ q: text, target: langCode, format: "text" })
     }
   );
-  if (!res.ok) throw new Error(`Google Translate ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Google Translate ${res.status}: ${err.error?.message || res.statusText}`);
+  }
   const data = await res.json();
   return data.data.translations[0].translatedText;
 }
