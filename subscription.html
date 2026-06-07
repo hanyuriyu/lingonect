@@ -331,8 +331,8 @@ body{
       <!-- Level 1 -->
       <div class="tier-card" id="tierCard1">
         <p class="tier-header">Level 1</p>
-        <p class="tier-price" id="tierPrice1">$1<span style="font-size:14px;color:#888;">/mo</span></p>
-        <p class="tier-price-note" id="tierNote1"></p>
+        <p class="tier-price" id="tierPrice1">$1.50<span style="font-size:14px;color:#888;">/mo</span></p>
+        <p class="tier-price-note" id="tierNote1">Billed $9 every 6 months</p>
         <ul class="tier-engines">
           <li><span class="engine-dot" style="background:#0047FF;"></span> DeepL</li>
           <li><span class="engine-dot" style="background:#20B2AA;"></span> Perplexity</li>
@@ -345,8 +345,8 @@ body{
       <!-- Level 2 -->
       <div class="tier-card" id="tierCard2">
         <p class="tier-header">Level 2</p>
-        <p class="tier-price" id="tierPrice2">$2<span style="font-size:14px;color:#888;">/mo</span></p>
-        <p class="tier-price-note" id="tierNote2">$1/mo if you have Level 1</p>
+        <p class="tier-price" id="tierPrice2">$1.50<span style="font-size:14px;color:#888;">/mo</span></p>
+        <p class="tier-price-note" id="tierNote2">Billed $9 every 6 months</p>
         <ul class="tier-engines">
           <li><span class="engine-dot" style="background:#111;"></span> Grok</li>
           <li><span class="engine-dot" style="background:#0052D9;"></span> Tencent Translate</li>
@@ -359,8 +359,8 @@ body{
       <!-- Level 3 -->
       <div class="tier-card" id="tierCard3">
         <p class="tier-header">Level 3</p>
-        <p class="tier-price" id="tierPrice3">$3<span style="font-size:14px;color:#888;">/mo</span></p>
-        <p class="tier-price-note" id="tierNote3">$2/mo with Level 1 &middot; $1/mo with Level 2</p>
+        <p class="tier-price" id="tierPrice3">$1.50<span style="font-size:14px;color:#888;">/mo</span></p>
+        <p class="tier-price-note" id="tierNote3">Billed $9 every 6 months</p>
         <ul class="tier-engines">
           <li><span class="engine-dot" style="background:#FF9900;"></span> Amazon Translate</li>
           <li><span class="engine-dot" style="background:#FF9900;"></span> Amazon Nova</li>
@@ -372,9 +372,10 @@ body{
     </div>
 
     <div class="payment-info">
-      Payments are processed securely via <strong>Stripe</strong>.<br>
-      After payment, your access is activated automatically.<br>
-      Subscriptions renew monthly. Cancel anytime from this page.
+      <strong>Billing terms</strong><br>
+      Each level is charged in 6-month intervals at $9 per level ($1.50/month equivalent).<br>
+      Your access activates automatically after payment.<br>
+      You can cancel anytime, but the current 6-month period will continue until it ends — no refunds for unused time.
     </div>
   </main>
 </div>
@@ -443,72 +444,29 @@ function renderCurrentLevel(level) {
   if (level >= 3) {
     el.innerHTML = "Your plan: <strong>Level 3 (Full Access)</strong> — All engines unlocked";
   } else if (level === 2) {
-    el.innerHTML = "Your plan: <strong>Level 2</strong> — Upgrade to Level 3 for $1/mo more";
+    el.innerHTML = "Your plan: <strong>Level 2</strong> — Add Level 3 for $9 every 6 months";
   } else if (level === 1) {
-    el.innerHTML = "Your plan: <strong>Level 1</strong> — Upgrade to Level 2 for $1/mo or Level 3 for $2/mo";
+    el.innerHTML = "Your plan: <strong>Level 1</strong> — Add Level 2 or Level 3 for $9 every 6 months each";
   } else {
     el.innerHTML = "Your plan: <strong>Free</strong> — Subscribe to unlock more engines";
   }
 }
 
 function renderTierCards(level) {
-  // Level 1
-  const btn1 = document.getElementById("tierBtn1");
-  const card1 = document.getElementById("tierCard1");
-  if (level >= 1) {
-    card1.classList.add("owned");
-    btn1.textContent = "Owned";
-    btn1.classList.add("owned-btn");
-    btn1.removeAttribute("href");
-  } else {
-    btn1.href = STRIPE_LINKS[1];
-    btn1.textContent = "Subscribe — $1/mo";
-  }
-
-  // Level 2
-  const btn2 = document.getElementById("tierBtn2");
-  const card2 = document.getElementById("tierCard2");
-  const price2 = document.getElementById("tierPrice2");
-  const note2 = document.getElementById("tierNote2");
-  if (level >= 2) {
-    card2.classList.add("owned");
-    btn2.textContent = "Owned";
-    btn2.classList.add("owned-btn");
-    btn2.removeAttribute("href");
-  } else if (level === 1) {
-    price2.innerHTML = '$1<span style="font-size:14px;color:#888;">/mo</span>';
-    note2.textContent = "Discounted — you have Level 1";
-    btn2.href = STRIPE_LINKS[2];
-    btn2.textContent = "Subscribe — $1/mo";
-  } else {
-    btn2.href = STRIPE_LINKS[2];
-    btn2.textContent = "Subscribe — $2/mo";
-  }
-
-  // Level 3
-  const btn3 = document.getElementById("tierBtn3");
-  const card3 = document.getElementById("tierCard3");
-  const price3 = document.getElementById("tierPrice3");
-  const note3 = document.getElementById("tierNote3");
-  if (level >= 3) {
-    card3.classList.add("owned");
-    btn3.textContent = "Owned";
-    btn3.classList.add("owned-btn");
-    btn3.removeAttribute("href");
-  } else if (level === 2) {
-    price3.innerHTML = '$1<span style="font-size:14px;color:#888;">/mo</span>';
-    note3.textContent = "Discounted — you have Level 2";
-    btn3.href = STRIPE_LINKS[3];
-    btn3.textContent = "Subscribe — $1/mo";
-  } else if (level === 1) {
-    price3.innerHTML = '$2<span style="font-size:14px;color:#888;">/mo</span>';
-    note3.textContent = "Discounted — you have Level 1";
-    btn3.href = STRIPE_LINKS[3];
-    btn3.textContent = "Subscribe — $2/mo";
-  } else {
-    btn3.href = STRIPE_LINKS[3];
-    btn3.textContent = "Subscribe — $3/mo";
-  }
+  const tiers = [1, 2, 3];
+  tiers.forEach(n => {
+    const btn = document.getElementById("tierBtn" + n);
+    const card = document.getElementById("tierCard" + n);
+    if (level >= n) {
+      card.classList.add("owned");
+      btn.textContent = "Owned";
+      btn.classList.add("owned-btn");
+      btn.removeAttribute("href");
+    } else {
+      btn.href = STRIPE_LINKS[n];
+      btn.textContent = "Subscribe — $9 / 6 months";
+    }
+  });
 }
 </script>
 </body>
