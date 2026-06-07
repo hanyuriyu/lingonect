@@ -1111,6 +1111,24 @@ inputEl.addEventListener("input", () => {
 // ── API keys (edit these values on GitHub) ──
 const GOOGLE_KEY      = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
 
+// The Translation v2 API authenticates with an API key, so it has no per-user
+// identity. Without a quotaUser, every visitor's requests fall into one shared
+// per-user bucket and trip "userRateLimitExceeded" (403). A stable per-browser
+// id (<=40 chars) spreads load across separate per-user buckets.
+const GOOGLE_QUOTA_USER = (() => {
+  try {
+    let id = localStorage.getItem("lingonectQuotaUser");
+    if (!id) {
+      id = crypto.randomUUID ? crypto.randomUUID()
+                             : Date.now().toString(36) + Math.random().toString(36).slice(2);
+      localStorage.setItem("lingonectQuotaUser", id);
+    }
+    return id.slice(0, 40);
+  } catch {
+    return (Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 40);
+  }
+})();
+
 // Engines with a fixed language map throw this when the user picks a
 // source or target language the engine doesn't list. The catch handler
 // in the submit flow surfaces the message verbatim.
@@ -1234,7 +1252,7 @@ async function translateWithGoogle(text) {
   assertLangSupported(GOOGLE_LANG_MAP);
   const langCode = GOOGLE_LANG_MAP[targetLang];
   const res = await fetch(
-    `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
+    `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}&quotaUser=${encodeURIComponent(GOOGLE_QUOTA_USER)}`,
     {
       method: "POST",
       // The Google Cloud key is locked to HTTP referrers. Browsers (and
