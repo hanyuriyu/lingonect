@@ -1108,8 +1108,9 @@ inputEl.addEventListener("input", () => {
   submitEl.disabled = n === 0 || n > 80;
 });
 
-// ── API keys (edit these values on GitHub) ──
-const GOOGLE_KEY      = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
+// ── API keys ──
+// Google Translate now runs through its Cloudflare Worker (GOOGLE_PROXY); the
+// key lives server-side as the worker secret GOOGLE_TRANSLATE_KEY.
 
 // Engines with a fixed language map throw this when the user picks a
 // source or target language the engine doesn't list. The catch handler
@@ -1230,23 +1231,17 @@ const GOOGLE_LANG_MAP = {
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 
+// ── Google Translate (via Cloudflare Worker) ──
+const GOOGLE_PROXY = "https://googletranslate.hanyuriyu.workers.dev";
+
 async function translateWithGoogle(text) {
   assertLangSupported(GOOGLE_LANG_MAP);
   const langCode = GOOGLE_LANG_MAP[targetLang];
-  const res = await fetch(
-    `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
-    {
-      method: "POST",
-      // The Google Cloud key is locked to HTTP referrers. Browsers (and
-      // privacy/tracking-protection modes) increasingly strip the Referer on
-      // cross-origin requests, which arrives at Google as "<empty>" and is
-      // rejected with 403 API_KEY_HTTP_REFERRER_BLOCKED. Force the page URL to
-      // be sent so it matches the key's referrer allow-list.
-      referrerPolicy: "unsafe-url",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q: text, target: langCode, format: "text" })
-    }
-  );
+  const res = await fetch(GOOGLE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ q: text, target: langCode, format: "text" })
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(`Google Translate ${res.status}: ${err.error?.message || res.statusText}`);
