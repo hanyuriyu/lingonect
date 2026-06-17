@@ -9,10 +9,10 @@
  *     ARK_API_KEY (encrypt)   — your Volcengine Ark API key
  *
  * Notes:
- *   - `model` is sent by the client as "doubao-pro-32k". On Volcengine Ark you
- *     may instead need to pass your own inference Endpoint ID (e.g. "ep-2024...")
- *     depending on how your account is set up. If so, change the default below
- *     or the model name in engines.html accordingly.
+ *   - `model` is the Volcengine Ark inference Endpoint ID created for a Doubao
+ *     model (e.g. "ep-20260617224552-qpsmq" → Doubao-Seed-2.0-lite). The client
+ *     sends it; the default below is the same endpoint as a fallback. Swap it if
+ *     you create a new endpoint.
  *
  * The worker will be available at:
  *   https://doubao.hanyuriyu.workers.dev
@@ -42,7 +42,7 @@ export default {
           "Authorization": `Bearer ${env.ARK_API_KEY}`,
         },
         body: JSON.stringify({
-          model: body.model || "doubao-pro-32k",
+          model: body.model || "ep-20260617224552-qpsmq",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
