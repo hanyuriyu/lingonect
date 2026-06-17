@@ -1732,8 +1732,10 @@ async function translateWithDoubao(text) {
       ]
     })
   });
-  if (!res.ok) throw new Error(`Doubao ${res.status}`);
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(`Doubao ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
+  }
   return data.choices[0].message.content.trim();
 }
 
@@ -1868,6 +1870,14 @@ const engines = [
     translate:  translateWithBaidu
   },
   {
+    id:         "doubao",
+    name:       "Doubao",
+    logoUrl:    "doubao-logo.png",
+    badgeClass: "doubao",
+    badgeText:  "DB",
+    translate:  translateWithDoubao
+  },
+  {
     id:         "hyperclovex",
     name:       "HyperCLOVA X",
     logoUrl:    "hyperclovex_logo.webp",
@@ -1906,14 +1916,6 @@ const engines = [
     badgeClass: "alice",
     badgeText:  "AL",
     translate:  translateWithAlice
-  },
-  {
-    id:         "doubao",
-    name:       "Doubao",
-    logoUrl:    "doubao-logo.png",
-    badgeClass: "doubao",
-    badgeText:  "DB",
-    translate:  translateWithDoubao
   }
 ];
 
