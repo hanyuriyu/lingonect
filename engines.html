@@ -228,7 +228,8 @@ body{
   background:rgba(0,0,0,.08);
   border-radius:3px;
   z-index:210;
-  pointer-events:none;
+  pointer-events:auto;
+  cursor:pointer;
 }
 .lang-select-wrap.open .lang-scroll-track{
   display:block;
@@ -240,7 +241,11 @@ body{
   border-radius:3px;
   opacity:.7;
   min-height:20px;
+  cursor:grab;
   transition:opacity .15s;
+}
+.lang-scroll-thumb:active{
+  cursor:grabbing;
 }
 .lang-select-wrap:hover .lang-scroll-thumb{
   opacity:1;
@@ -1083,6 +1088,42 @@ function initDropdownScroll(dd) {
   }, { passive: false });
 
   dd.addEventListener("scroll", updateThumb);
+
+  // Drag the custom thumb (Safari doesn't let you grab the native scrollbar here).
+  let dragging = false, dragStartY = 0, dragStartScroll = 0;
+  thumb.addEventListener("mousedown", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = true;
+    dragStartY = e.clientY;
+    dragStartScroll = dd.scrollTop;
+    document.body.style.userSelect = "none";
+  });
+  window.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const maxThumbTravel = track.clientHeight - thumb.offsetHeight;
+    if (maxThumbTravel <= 0) return;
+    const scrollPerPx = (dd.scrollHeight - dd.clientHeight) / maxThumbTravel;
+    dd.scrollTop = dragStartScroll + (e.clientY - dragStartY) * scrollPerPx;
+    updateThumb();
+  });
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = "";
+  });
+
+  // Click anywhere on the track to jump-scroll, but keep the menu open.
+  track.addEventListener("mousedown", e => {
+    e.stopPropagation();
+    if (e.target === thumb) return;
+    e.preventDefault();
+    const rect = track.getBoundingClientRect();
+    const ratio = (e.clientY - rect.top) / track.clientHeight;
+    dd.scrollTop = ratio * (dd.scrollHeight - dd.clientHeight);
+    updateThumb();
+  });
+  track.addEventListener("click", e => e.stopPropagation());
 
   new MutationObserver(() => {
     if (wrap.classList.contains("open")) requestAnimationFrame(updateThumb);
