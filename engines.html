@@ -1688,7 +1688,23 @@ const YANDEX_LANG_MAP = {
 
 async function translateWithYandex(text) {
   assertLangSupported(YANDEX_LANG_MAP);
-  return "API implementation in progress";
+  const res = await fetch(YANDEX_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      source: YANDEX_LANG_MAP[sourceLang],
+      target: YANDEX_LANG_MAP[targetLang]
+    })
+  });
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { data = null; }
+  if (!res.ok || data?.message || !data?.translations) {
+    const msg = data?.message || raw.slice(0, 200) || `HTTP ${res.status}`;
+    throw new Error(`Yandex Translate ${res.status}: ${msg}`);
+  }
+  return data.translations[0].text.trim();
 }
 
 // ── Alice (via Cloudflare Worker) ──
