@@ -53,11 +53,15 @@ export default {
           max_tokens: body.max_tokens ?? 1024,
         }),
       });
-      const data = await res.json();
-      return new Response(JSON.stringify(data), {
+      // Forward the upstream body and status verbatim so real error
+      // messages (auth failures, missing role, region blocks, or a
+      // Cloudflare "error code: NNNN" page) reach the client instead of
+      // being collapsed into a JSON-parse error.
+      const body = await res.text();
+      return new Response(body, {
         status: res.status,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": res.headers.get("Content-Type") || "application/json",
           "Access-Control-Allow-Origin": "https://www.lingonect.com",
         },
       });
