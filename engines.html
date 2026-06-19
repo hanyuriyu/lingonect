@@ -1724,9 +1724,12 @@ async function translateWithAlice(text) {
       ]
     })
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error) {
-    throw new Error(`Alice ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { data = null; }
+  if (!res.ok || data?.error || !data?.choices) {
+    const msg = data?.error?.message || data?.error?.code || raw.slice(0, 200) || `HTTP ${res.status}`;
+    throw new Error(`Alice ${res.status}: ${msg}`);
   }
   return data.choices[0].message.content.trim();
 }
