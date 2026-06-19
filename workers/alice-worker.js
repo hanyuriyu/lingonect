@@ -57,8 +57,8 @@ export default {
       // messages (auth failures, missing role, region blocks, or a
       // Cloudflare "error code: NNNN" page) reach the client instead of
       // being collapsed into a JSON-parse error.
-      const body = await res.text();
-      return new Response(body, {
+      const responseBody = await res.text();
+      return new Response(responseBody, {
         status: res.status,
         headers: {
           "Content-Type": res.headers.get("Content-Type") || "application/json",
