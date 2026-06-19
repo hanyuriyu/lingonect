@@ -2172,7 +2172,9 @@ document.getElementById("resultsArea").addEventListener("click", e => {
   }).catch(err => console.error("Copy failed", err));
 });
 
-// ── Download all results as an Excel spreadsheet ──
+// ── Download all results as a real .xlsx spreadsheet ──
+// Builds an Office Open XML workbook (a ZIP of XML parts) with no external
+// library, so it opens natively in Excel, Numbers, Google Sheets, etc.
 function escapeXml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -2181,29 +2183,168 @@ function escapeXml(str) {
     .replace(/"/g, "&quot;");
 }
 
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = -1;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xFF];
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+// Minimal store-only (uncompressed) ZIP writer.
+function buildZip(files) {
+  const enc = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+
+  const u16 = (arr, v) => arr.push(v & 0xFF, (v >>> 8) & 0xFF);
+  const u32 = (arr, v) =>
+    arr.push(v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF);
+
+  files.forEach(f => {
+    const nameBytes = enc.encode(f.name);
+    const data = typeof f.data === "string" ? enc.encode(f.data) : f.data;
+    const crc = crc32(data);
+
+    const local = [];
+    u32(local, 0x04034b50);          // local file header signature
+    u16(local, 20);                  // version needed
+    u16(local, 0x0800);              // flags (UTF-8)
+    u16(local, 0);                   // method: store
+    u16(local, 0); u16(local, 0);    // mod time / date
+    u32(local, crc);
+    u32(local, data.length);         // compressed size
+    u32(local, data.length);         // uncompressed size
+    u16(local, nameBytes.length);
+    u16(local, 0);                   // extra length
+    nameBytes.forEach(b => local.push(b));
+    const localHeader = new Uint8Array(local);
+
+    chunks.push(localHeader, data);
+
+    const cd = [];
+    u32(cd, 0x02014b50);             // central directory header signature
+    u16(cd, 20);                     // version made by
+    u16(cd, 20);                     // version needed
+    u16(cd, 0x0800);                 // flags
+    u16(cd, 0);                      // method
+    u16(cd, 0); u16(cd, 0);          // mod time / date
+    u32(cd, crc);
+    u32(cd, data.length);
+    u32(cd, data.length);
+    u16(cd, nameBytes.length);
+    u16(cd, 0);                      // extra length
+    u16(cd, 0);                      // comment length
+    u16(cd, 0);                      // disk number start
+    u16(cd, 0);                      // internal attrs
+    u32(cd, 0);                      // external attrs
+    u32(cd, offset);                 // local header offset
+    nameBytes.forEach(b => cd.push(b));
+    central.push(new Uint8Array(cd));
+
+    offset += localHeader.length + data.length;
+  });
+
+  const centralStart = offset;
+  let centralSize = 0;
+  central.forEach(c => { chunks.push(c); centralSize += c.length; offset += c.length; });
+
+  const end = [];
+  u32(end, 0x06054b50);              // end of central directory signature
+  u16(end, 0); u16(end, 0);          // disk numbers
+  u16(end, files.length);            // entries on this disk
+  u16(end, files.length);            // total entries
+  u32(end, centralSize);
+  u32(end, centralStart);
+  u16(end, 0);                       // comment length
+  chunks.push(new Uint8Array(end));
+
+  let total = 0;
+  chunks.forEach(c => total += c.length);
+  const out = new Uint8Array(total);
+  let p = 0;
+  chunks.forEach(c => { out.set(c, p); p += c.length; });
+  return out;
+}
+
 function downloadFullList() {
-  const rows = engines
+  const data = engines
     .filter(engine => !isEngineLocked(engine.id))
     .map(engine => {
       const el = document.getElementById(`result-${engine.id}`);
       const text = el && !el.classList.contains("loading") ? el.textContent : "";
-      return `<tr><td>${escapeXml(engine.name)}</td><td>${escapeXml(text)}</td></tr>`;
-    })
-    .join("");
+      return { name: engine.name, text };
+    });
 
-  const html =
-    `<html xmlns:o="urn:schemas-microsoft-com:office:office" ` +
-    `xmlns:x="urn:schemas-microsoft-com:office:excel" ` +
-    `xmlns="http://www.w3.org/TR/REC-html40">` +
-    `<head><meta charset="UTF-8"></head><body>` +
-    `<table><thead><tr><th>Engine</th><th>Translation</th></tr></thead>` +
-    `<tbody>${rows}</tbody></table></body></html>`;
+  const cell = (ref, value) =>
+    `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
 
-  const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+  let rowsXml = `<row r="1">${cell("A1", "Engine")}${cell("B1", "Translation")}</row>`;
+  data.forEach((d, i) => {
+    const r = i + 2;
+    rowsXml += `<row r="${r}">${cell("A" + r, d.name)}${cell("B" + r, d.text)}</row>`;
+  });
+
+  const sheetXml =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<cols><col min="1" max="1" width="22" customWidth="1"/>` +
+    `<col min="2" max="2" width="60" customWidth="1"/></cols>` +
+    `<sheetData>${rowsXml}</sheetData></worksheet>`;
+
+  const contentTypes =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+    `<Default Extension="xml" ContentType="application/xml"/>` +
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+    `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+    `</Types>`;
+
+  const rootRels =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+    `</Relationships>`;
+
+  const workbook =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ` +
+    `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `<sheets><sheet name="Translations" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+
+  const workbookRels =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
+    `</Relationships>`;
+
+  const zip = buildZip([
+    { name: "[Content_Types].xml", data: contentTypes },
+    { name: "_rels/.rels", data: rootRels },
+    { name: "xl/workbook.xml", data: workbook },
+    { name: "xl/_rels/workbook.xml.rels", data: workbookRels },
+    { name: "xl/worksheets/sheet1.xml", data: sheetXml }
+  ]);
+
+  const blob = new Blob([zip], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "lingonect-translations.xls";
+  a.download = "lingonect-translations.xlsx";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
