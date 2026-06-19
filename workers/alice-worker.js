@@ -16,7 +16,7 @@
  *   https://alice.hanyuriyu.workers.dev
  */
 
-const ALICE_API_URL = "https://llm.api.cloud.yandex.net/v1/chat/completions";
+const ALICE_API_URL = "https://ai.api.cloud.yandex.net/v1/chat/completions";
 const ALICE_MODEL = "aliceai-llm/latest"; // model name within the folder
 
 export default {
