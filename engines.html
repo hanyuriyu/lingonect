@@ -1411,7 +1411,11 @@ async function translateWithTencent(text) {
   if (!res.ok) throw new Error(`Tencent Translate ${res.status}`);
   const data = await res.json();
   if (data.Response && data.Response.Error) {
-    throw new Error(`Tencent: ${data.Response.Error.Message}`);
+    const err = data.Response.Error;
+    if (err.Code === "UnsupportedLanguage" || /不支持的语种/.test(err.Message || "")) {
+      throw new Error("Language not supported");
+    }
+    throw new Error(`Tencent: ${err.Message}`);
   }
   return data.Response.TargetText.trim();
 }
@@ -1667,7 +1671,12 @@ async function translateWithBaidu(text) {
   });
   if (!res.ok) throw new Error(`Baidu Translate ${res.status}`);
   const data = await res.json();
-  if (data.error_code) throw new Error(`Baidu: ${data.error_msg}`);
+  if (data.error_code) {
+    if (String(data.error_code) === "58001" || /INVALID_TO_PARAM|INVALID_FROM_PARAM|unsupported/i.test(data.error_msg || "")) {
+      throw new Error("Language not supported");
+    }
+    throw new Error(`Baidu: ${data.error_msg}`);
+  }
   return data.trans_result.map(r => r.dst).join("\n").trim();
 }
 
@@ -1898,6 +1907,22 @@ const engines = [
     translate:  translateWithDoubao
   },
   {
+    id:         "yandex",
+    name:       "Yandex Translate",
+    logoUrl:    "yandex_logo.png",
+    badgeClass: "yandex",
+    badgeText:  "Y",
+    translate:  translateWithYandex
+  },
+  {
+    id:         "alice",
+    name:       "Alice",
+    logoUrl:    "AliceAI_logo.png",
+    badgeClass: "alice",
+    badgeText:  "AL",
+    translate:  translateWithAlice
+  },
+  {
     id:         "hyperclovex",
     name:       "HyperCLOVA X",
     logoUrl:    "hyperclovex_logo.webp",
@@ -1914,28 +1939,12 @@ const engines = [
     translate:  translateWithPapago
   },
   {
-    id:         "yandex",
-    name:       "Yandex Translate",
-    logoUrl:    "yandex_logo.png",
-    badgeClass: "yandex",
-    badgeText:  "Y",
-    translate:  translateWithYandex
-  },
-  {
     id:         "jais",
     name:       "Jais",
     logoUrl:    "jais_logo.png",
     badgeClass: "jais",
     badgeText:  "J",
     translate:  translateWithJais
-  },
-  {
-    id:         "alice",
-    name:       "Alice",
-    logoUrl:    "AliceAI_logo.png",
-    badgeClass: "alice",
-    badgeText:  "AL",
-    translate:  translateWithAlice
   }
 ];
 
