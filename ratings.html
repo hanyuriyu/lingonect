@@ -177,6 +177,16 @@ body{
   align-items:center;
   gap:10px;
 }
+/* Subtle LLM / NMT type label to the left of each logo */
+.engine-cell .engine-type{
+  width:24px;
+  flex-shrink:0;
+  text-align:center;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.5px;
+  color:#999;
+}
 .engine-cell img{
   width:24px;
   height:24px;
@@ -370,6 +380,15 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 
 const db = firebase.firestore();
 
+// Engines that are neural machine translation systems (everything else is an LLM)
+const NMT_ENGINES = new Set([
+  "google", "deepl", "baidu", "tencent", "alibaba",
+  "microsoft", "amazon", "meta", "yandex"
+]);
+function engineType(id) {
+  return NMT_ENGINES.has(id) ? "NMT" : "LLM";
+}
+
 // ── Engine definitions ──
 const engines = [
   { id: "claude",    name: "Claude",              logoUrl: "https://www.anthropic.com/favicon.ico" },
@@ -512,7 +531,7 @@ function renderTable() {
     const tr = document.createElement("tr");
 
     // Engine cell
-    let html = `<td><div class="engine-cell"><img src="${engine.logoUrl}" alt="${engine.name}"><span>${engine.name}</span></div></td>`;
+    let html = `<td><div class="engine-cell"><span class="engine-type">${engineType(engine.id)}</span><img src="${engine.logoUrl}" alt="${engine.name}"><span>${engine.name}</span></div></td>`;
 
     // Overall rating
     const overall = getOverallAverage(engine.id);
