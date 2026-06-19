@@ -1,25 +1,23 @@
 /**
- * Cloudflare Worker: Alice (AliceAI) Translation Proxy
+ * Cloudflare Worker: Alice AI LLM (Yandex) Translation Proxy
  *
- * Alice is proxied as an OpenAI-compatible chat-completions service — the same
- * request/response shape used by the DeepSeek, Alibaba and Grok workers
- * ({ model, messages } in, { choices: [{ message: { content } }] } out).
+ * Alice AI LLM is Yandex's text-generation foundation model, served through
+ * Yandex AI Studio's OpenAI-compatible Completions API. This worker proxies
+ * the same request/response shape used by the DeepSeek / Doubao workers
+ * ({ messages } in, { choices: [{ message: { content } }] } out).
  *
  * Environment secrets required:
- *   Settings > Variables and Secrets > Add:
- *     ALICE_API_KEY (encrypt)   — your AliceAI API key
- *
- * IMPORTANT — set the upstream endpoint:
- *   Replace ALICE_API_URL below with AliceAI's real OpenAI-compatible
- *   /chat/completions endpoint. (Left as a placeholder because the provider's
- *   base URL wasn't specified.) If Alice's API differs from the OpenAI shape,
- *   adjust the request body / response parsing to match.
+ *   Settings > Variables and Secrets > Add (encrypt):
+ *     ALICE_API_KEY    — Yandex Cloud API key (service account needs the
+ *                        ai.languageModels.user role)
+ *     ALICE_FOLDER_ID  — Yandex Cloud folder ID (used to build the model URI)
  *
  * The worker will be available at:
  *   https://alice.hanyuriyu.workers.dev
  */
 
-const ALICE_API_URL = "https://api.aliceai.example/v1/chat/completions"; // TODO: set real endpoint
+const ALICE_API_URL = "https://llm.api.cloud.yandex.net/v1/chat/completions";
+const ALICE_MODEL = "aliceai-llm/latest"; // model name within the folder
 
 export default {
   async fetch(request, env) {
@@ -38,14 +36,18 @@ export default {
     }
     try {
       const body = await request.json();
+      // Yandex's OpenAI-compatible endpoint expects the model URI
+      // gpt://<folder-id>/<model> — built here so the folder ID never
+      // leaves the worker.
+      const modelUri = `gpt://${(env.ALICE_FOLDER_ID || "").trim()}/${ALICE_MODEL}`;
       const res = await fetch(ALICE_API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.ALICE_API_KEY}`,
+          "Authorization": `Api-Key ${(env.ALICE_API_KEY || "").trim()}`,
         },
         body: JSON.stringify({
-          model: body.model || "alice",
+          model: modelUri,
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
