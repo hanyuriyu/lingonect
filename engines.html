@@ -402,7 +402,60 @@ body{
 .result-content{
   flex:1;
   min-width:0;
+  position:relative;
 }
+
+/* Copy button (top-right of each engine result) */
+.copy-btn{
+  position:absolute;
+  top:-4px;
+  right:0;
+  width:26px;
+  height:26px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:#c2c2c2;
+  border-radius:6px;
+  transition:color .15s, background .15s;
+}
+.copy-btn:hover{
+  color:#666;
+  background:#f2f2f2;
+}
+.copy-btn svg{
+  width:15px;
+  height:15px;
+}
+.copy-btn .check-icon{ display:none; }
+.copy-btn.copied{ color:#2e9e5b; }
+.copy-btn.copied:hover{ background:none; }
+.copy-btn.copied .copy-icon{ display:none; }
+.copy-btn.copied .check-icon{ display:block; }
+
+/* Download full list button (above the first result) */
+.download-bar{
+  margin-bottom:2px;
+}
+.download-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.2px;
+  color:var(--cobalt);
+}
+.download-btn:hover{ text-decoration:underline; }
+.download-btn svg{ width:14px; height:14px; }
 
 .engine-name{
   font-size:11px;
@@ -780,6 +833,16 @@ body{
 
     <!-- RESULTS -->
     <div id="ratingsHeader" class="ratings-header" style="display:none;">Please always rate<br>each engine output</div>
+    <div id="downloadBar" class="download-bar" style="display:none;">
+      <button class="download-btn" id="downloadBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Download full list
+      </button>
+    </div>
     <div class="results-area" id="resultsArea"></div>
     <div id="ratingsFooter" class="rating-submit-wrap" style="display:none;">
       <button class="rating-submit-btn" id="ratingSubmitBtn" type="button">Submit Ratings</button>
@@ -2013,6 +2076,15 @@ function buildCard(engine) {
       <div class="result-content">
         <p class="engine-name">${engine.name}</p>
         <p class="translation-text loading" id="result-${engine.id}">Translating…</p>
+        <button class="copy-btn" type="button" title="Copy translation" aria-label="Copy translation" data-engine="${engine.id}">
+          <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </button>
       </div>`;
     card.appendChild(buildStarRow(engine.id));
   }
@@ -2032,8 +2104,9 @@ submitEl.addEventListener("click", async () => {
   // Render all engine cards immediately (shows "Translating…")
   engines.forEach(engine => resultsArea.appendChild(buildCard(engine)));
 
-  // Show ratings header and submit footer
+  // Show ratings header, download bar and submit footer
   document.getElementById("ratingsHeader").style.display = "";
+  document.getElementById("downloadBar").style.display = "";
   document.getElementById("ratingsFooter").style.display = "";
 
   // Fire all translations in parallel, each capped by a timeout so a
@@ -2065,6 +2138,79 @@ submitEl.addEventListener("click", async () => {
 
   submitEl.disabled = false;
 });
+
+// ── Copy a single engine result to the clipboard ──
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+document.getElementById("resultsArea").addEventListener("click", e => {
+  const btn = e.target.closest(".copy-btn");
+  if (!btn) return;
+  const el = document.getElementById(`result-${btn.dataset.engine}`);
+  if (!el || el.classList.contains("loading")) return;
+  copyText(el.textContent).then(() => {
+    btn.classList.add("copied");
+    setTimeout(() => btn.classList.remove("copied"), 1400);
+  }).catch(err => console.error("Copy failed", err));
+});
+
+// ── Download all results as an Excel spreadsheet ──
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function downloadFullList() {
+  const rows = engines
+    .filter(engine => !isEngineLocked(engine.id))
+    .map(engine => {
+      const el = document.getElementById(`result-${engine.id}`);
+      const text = el && !el.classList.contains("loading") ? el.textContent : "";
+      return `<tr><td>${escapeXml(engine.name)}</td><td>${escapeXml(text)}</td></tr>`;
+    })
+    .join("");
+
+  const html =
+    `<html xmlns:o="urn:schemas-microsoft-com:office:office" ` +
+    `xmlns:x="urn:schemas-microsoft-com:office:excel" ` +
+    `xmlns="http://www.w3.org/TR/REC-html40">` +
+    `<head><meta charset="UTF-8"></head><body>` +
+    `<table><thead><tr><th>Engine</th><th>Translation</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table></body></html>`;
+
+  const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lingonect-translations.xls";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById("downloadBtn").addEventListener("click", downloadFullList);
 </script>
 <footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
 </body>
