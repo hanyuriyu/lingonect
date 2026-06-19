@@ -177,15 +177,22 @@ body{
   align-items:center;
   gap:10px;
 }
-/* Subtle LLM / NMT type label to the left of each logo */
+/* Logo + type label stacked vertically */
+.engine-cell .engine-logo-col{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  flex-shrink:0;
+}
+/* Subtle LLM / NMT type label below each logo */
 .engine-cell .engine-type{
-  width:24px;
   flex-shrink:0;
   text-align:center;
-  font-size:9px;
+  font-size:8px;
   font-weight:800;
   letter-spacing:.5px;
-  color:#999;
+  color:#bbb;
 }
 .engine-cell img{
   width:24px;
@@ -383,7 +390,7 @@ const db = firebase.firestore();
 // Engines that are neural machine translation systems (everything else is an LLM)
 const NMT_ENGINES = new Set([
   "google", "deepl", "baidu", "tencent", "alibaba",
-  "microsoft", "amazon", "meta", "yandex"
+  "microsoft", "amazon", "meta", "yandex", "papago"
 ]);
 function engineType(id) {
   return NMT_ENGINES.has(id) ? "NMT" : "LLM";
@@ -531,7 +538,7 @@ function renderTable() {
     const tr = document.createElement("tr");
 
     // Engine cell
-    let html = `<td><div class="engine-cell"><span class="engine-type">${engineType(engine.id)}</span><img src="${engine.logoUrl}" alt="${engine.name}"><span>${engine.name}</span></div></td>`;
+    let html = `<td><div class="engine-cell"><div class="engine-logo-col"><img src="${engine.logoUrl}" alt="${engine.name}"><span class="engine-type">${engineType(engine.id)}</span></div><span>${engine.name}</span></div></td>`;
 
     // Overall rating
     const overall = getOverallAverage(engine.id);

@@ -324,20 +324,20 @@ body{
 /* Logo container */
 .engine-logo-col{
   display:flex;
+  flex-direction:column;
   align-items:center;
-  gap:7px;
+  gap:3px;
   flex-shrink:0;
 }
 
-/* Subtle LLM / NMT type label to the left of each logo */
+/* Subtle LLM / NMT type label below each logo */
 .engine-type{
-  width:24px;
   flex-shrink:0;
   text-align:center;
-  font-size:9px;
+  font-size:8px;
   font-weight:800;
   letter-spacing:.5px;
-  color:#999;
+  color:#bbb;
 }
 
 .engine-logo-wrap{
@@ -1969,7 +1969,7 @@ const engines = [
 // Engines that are neural machine translation systems (everything else is an LLM)
 const NMT_ENGINES = new Set([
   "google", "deepl", "baidu", "tencent", "alibaba",
-  "microsoft", "amazon", "meta", "yandex"
+  "microsoft", "amazon", "meta", "yandex", "papago"
 ]);
 function engineType(id) {
   return NMT_ENGINES.has(id) ? "NMT" : "LLM";
@@ -1983,7 +1983,6 @@ function buildCard(engine) {
 
   const logoHtml = `
     <div class="engine-logo-col">
-      <span class="engine-type">${engineType(engine.id)}</span>
       <div class="engine-logo-wrap">
         <img
           class="engine-logo-img engine-logo-img--${engine.id}"
@@ -1993,6 +1992,7 @@ function buildCard(engine) {
         >
         <div class="engine-logo-badge ${engine.badgeClass}" style="display:none">${engine.badgeText}</div>
       </div>
+      <span class="engine-type">${engineType(engine.id)}</span>
     </div>`;
 
   const reqLevel = engineRequiresLevel(engine.id);
