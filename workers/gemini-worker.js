@@ -33,8 +33,13 @@ export default {
 
     try {
       const body = await request.json();
-      const { targetLang, text, model } = body;
+      const { targetLang, text, model, instruction } = body;
       const modelId = model || "gemini-2.5-flash";
+      // The client sends a methodology-aware system prompt as `instruction`
+      // (translate / transcreate / culturalize, plus any localization length
+      // constraint). Fall back to a plain translation instruction.
+      const promptInstruction = instruction
+        || `Translate into ${targetLang}. Output ONLY translated text.`;
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${env.GEMINI_API_KEY}`,
         {
@@ -43,7 +48,7 @@ export default {
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate into ${targetLang}. Output ONLY translated text.\n\n<text>${text}</text>`
+                text: `${promptInstruction}\n\n<text>${text}</text>`
               }]
             }]
           })
