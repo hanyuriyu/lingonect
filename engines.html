@@ -1436,6 +1436,18 @@ function llmSystemPrompt(extra) {
   return prompt;
 }
 
+// Absolute last-resort guard for localization: shorten a string to at most
+// `max` characters without cutting in the middle of a word, and trim any
+// dangling whitespace/punctuation so it ends cleanly. Only used when an engine
+// has ignored the budget across every retry.
+function trimToBudget(s, max) {
+  if (s.length <= max) return s;
+  let cut = s.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace >= Math.floor(max * 0.5)) cut = cut.slice(0, lastSpace);
+  return cut.replace(/[\s.,;:!?–—-]+$/, "").trim();
+}
+
 // ── API keys ──
 // Google Translate now runs through its Cloudflare Worker (GOOGLE_PROXY); the
 // key lives server-side as the worker secret GOOGLE_TRANSLATE_KEY.
@@ -2330,43 +2342,54 @@ submitEl.addEventListener("click", async () => {
       return;
     }
 
-    let timer;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`${engine.name} timed out after ${TRANSLATION_TIMEOUT_MS / 1000}s.`)),
-        TRANSLATION_TIMEOUT_MS
-      );
-    });
+    // Run a single engine call capped by the timeout, optionally with an extra
+    // corrective instruction appended to its system prompt.
+    const callWithTimeout = (extra) => {
+      let t;
+      const to = new Promise((_, reject) => {
+        t = setTimeout(
+          () => reject(new Error(`${engine.name} timed out after ${TRANSLATION_TIMEOUT_MS / 1000}s.`)),
+          TRANSLATION_TIMEOUT_MS
+        );
+      });
+      return Promise.race([engine.translate(text, extra), to]).finally(() => clearTimeout(t));
+    };
+
     try {
-      let translation = await Promise.race([engine.translate(text), timeout]);
-      // Localization: if the result overshoots the character budget, don't chop
-      // it mid-word — ask the same engine to rewrite it as a complete, natural,
-      // grammatically correct rendering that fits. Keep the first (complete)
-      // attempt if the retry fails or doesn't improve things.
-      if (maxChars > 0 && typeof translation === "string" && translation.trim().length > maxChars) {
-        const over = translation.trim();
-        const feedback = `\n\nYOUR PREVIOUS ATTEMPT WAS TOO LONG. It was ${over.length} characters: "${over}". That exceeds the ${maxChars}-character limit. Produce a NEW version that is a complete, natural, grammatically correct ${targetLang} rendering of AT MOST ${maxChars} characters. Do not truncate or leave it unfinished — rephrase, simplify, or shorten the message itself so the whole thought fits. Output only the final text.`;
-        let rt;
-        const retryTimeout = new Promise((_, reject) => {
-          rt = setTimeout(() => reject(new Error("retry timed out")), TRANSLATION_TIMEOUT_MS);
-        });
-        try {
-          const retried = await Promise.race([engine.translate(text, feedback), retryTimeout]);
-          if (typeof retried === "string" && retried.trim()) translation = retried;
-        } catch (e) {
-          // keep the complete first attempt rather than a truncated fragment
-        } finally {
-          clearTimeout(rt);
+      let translation = await callWithTimeout();
+
+      // Localization: enforce the character budget. Instead of chopping the
+      // output mid-word, re-ask the engine (a few times, with firmer feedback)
+      // to rewrite it as a complete, grammatical rendering that fits. Keep the
+      // shortest candidate seen, and only as an absolute last resort trim at a
+      // word boundary so the hard limit is never exceeded.
+      if (maxChars > 0 && typeof translation === "string") {
+        let best = translation.trim();
+        const MAX_FIT_RETRIES = 3;
+        for (let attempt = 1; attempt <= MAX_FIT_RETRIES && best.length > maxChars; attempt++) {
+          const feedback = `\n\nYOUR PREVIOUS ATTEMPT WAS ${best.length} CHARACTERS — TOO LONG: "${best}". The hard limit is ${maxChars} characters, counting every space and punctuation mark. Write a COMPLETE, natural, grammatically correct ${targetLang} version of AT MOST ${maxChars} characters. Count as you go. Do NOT truncate or trail off — if necessary convey only the essential gist in very few words. Output only the final text.`;
+          let retried;
+          try {
+            retried = await callWithTimeout(feedback);
+          } catch (e) {
+            break; // keep the best complete attempt so far rather than erroring out
+          }
+          if (typeof retried === "string" && retried.trim()) {
+            const cand = retried.trim();
+            if (cand.length <= maxChars) { best = cand; break; }   // fits — done
+            if (cand.length < best.length) best = cand;            // shorter — keep trying
+          }
         }
+        if (best.length > maxChars) best = trimToBudget(best, maxChars);
+        translation = best;
       }
+
       el.textContent = typeof translation === "string" ? translation.trim() : translation;
       el.classList.remove("loading");
     } catch (err) {
       el.textContent = err.message || "Translation failed.";
       el.classList.remove("loading");
       console.error(engine.name, err);
-    } finally {
-      clearTimeout(timer);
     }
   });
 
