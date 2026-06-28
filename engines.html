@@ -1479,7 +1479,7 @@ async function translateWithMistral(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "mistral-small-latest",
+      model: "mistral-large-latest",
       messages: [
         {
           role: "system",
@@ -1502,7 +1502,7 @@ async function translateWithClaude(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       system: llmSystemPrompt(extra),
       messages: [{ role: "user", content: `<text>${text}</text>` }]
@@ -1521,7 +1521,7 @@ async function translateWithOpenAI(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -1544,7 +1544,7 @@ async function translateWithPerplexity(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "sonar",
+      model: "sonar-pro",
       return_images: false,
       return_citations: false,
       return_related_questions: false,
@@ -1632,7 +1632,7 @@ async function translateWithGemini(text, extra) {
   const res = await fetch(GEMINI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, targetLang, model: "gemini-2.5-flash", instruction: llmSystemPrompt(extra) })
+    body: JSON.stringify({ text, targetLang, model: "gemini-2.5-pro", instruction: llmSystemPrompt(extra) })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -1731,7 +1731,7 @@ async function translateWithAlibaba(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "qwen-plus",
+      model: "qwen-max",
       messages: [
         {
           role: "system",
