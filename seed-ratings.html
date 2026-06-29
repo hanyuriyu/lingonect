@@ -360,7 +360,7 @@ let selectedRater = "claude";   // default
 const CLAUDE_PROXY     = "https://claudetranslate.hanyuriyu.workers.dev";
 const OPENAI_PROXY     = "https://openai.hanyuriyu.workers.dev";
 const DEEPL_PROXY      = "https://deepl.hanyuriyu.workers.dev";
-const GOOGLE_KEY       = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
+const GOOGLE_PROXY     = "https://googletranslate.hanyuriyu.workers.dev";
 const PERPLEXITY_PROXY = "https://lingonectperplexity.hanyuriyu.workers.dev";
 const MISTRAL_PROXY    = "https://mistral.hanyuriyu.workers.dev";
 const GEMINI_PROXY     = "https://geminitranslate.hanyuriyu.workers.dev";
@@ -515,14 +515,11 @@ async function translateWithDeepL(text, targetLang) {
 async function translateWithGoogle(text, targetLang) {
   const langCode = GOOGLE_LANG_MAP[targetLang];
   if (!langCode) throw new Error(`Google does not support ${targetLang}.`);
-  const res = await fetch(
-    `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q: text, target: langCode, format: "text" })
-    }
-  );
+  const res = await fetch(GOOGLE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ q: text, target: langCode, format: "text" })
+  });
   if (!res.ok) throw new Error(`Google ${res.status}`);
   const data = await res.json();
   return data.data.translations[0].translatedText;
