@@ -172,26 +172,28 @@ body{
 
 /* ── FORMALITY SELECTOR ── */
 /* Compact, right-aligned strip sitting just above the engine outputs. Mirrors
-   the methodology words: click to pick one level, click again to clear (which
-   means "keep the source text's own formality"). Only affects LLM engines. */
+   the methodology words: click to pick one level. "Original" keeps the source
+   text's own formality (the default). Only affects LLM engines. The strip is
+   centred under the headline and aims to stay on a single line, wrapping only
+   when the viewport is too narrow (e.g. phones). */
 .formality-bar{
   display:flex;
   flex-wrap:wrap;
-  justify-content:flex-end;
+  justify-content:center;
   align-items:center;
-  gap:4px 10px;
+  gap:3px 6px;
   margin:14px 0 2px;
 }
 .formality-bar .formality-label{
-  font-size:11px;
+  font-size:10px;
   font-weight:400;
   color:#bbb;
-  margin-right:2px;
-  letter-spacing:.3px;
+  margin-right:1px;
+  letter-spacing:.2px;
 }
 .formality-word{
   cursor:pointer;
-  font-size:12px;
+  font-size:10px;
   font-weight:700;
   color:#0a0a0a;
   text-shadow:0 0 1px rgba(0,0,0,.5);
@@ -203,8 +205,9 @@ body{
   color:#16c60c;
   text-shadow:0 0 9px rgba(22,198,12,.7);
 }
-.formality-word.disabled{          /* not available for the current target language */
-  color:#d2d2d2;
+.formality-word.disabled{          /* not available for the current target language —
+                                      a darker grey than the light "Select formality" label */
+  color:#8a8a8a;
   text-shadow:none;
   cursor:default;
   pointer-events:none;
@@ -956,6 +959,7 @@ body{
     <!-- FORMALITY — right-aligned, sits just above the engine outputs -->
     <div class="formality-bar" id="formalityBar" aria-label="Select formality">
       <span class="formality-label">Select formality</span>
+      <span class="formality-word" data-formality="original">Original</span>
       <span class="formality-word" data-formality="ceremonial">Ceremonial</span>
       <span class="formality-word" data-formality="honorific">Honorific</span>
       <span class="formality-word" data-formality="humble">Humble</span>
@@ -1445,18 +1449,19 @@ localizeMaxInput.addEventListener("input", () => {
 });
 
 // ── Formality selector ──
-// formality is one of the keys below, or null. null means "no formality chosen"
-// — in that case the target simply mirrors the source text's own formality.
-// Formality is an LLM-only feature (NMTs have no register control).
+// formality is always one of the keys below; "original" is the default resting
+// state, meaning the target simply mirrors the source text's own formality (so
+// there is always exactly one bright-green word). Formality is an LLM-only
+// feature (NMTs have no register control), though "original" needs no LLM.
 // Honorific and humble are grammatical register systems that only exist in
 // certain languages; for any other target language those two are disabled.
-let formality = null;
+let formality = "original";
 
 const HONORIFIC_LANGS = ["Japanese", "Korean", "Thai", "Vietnamese"];
 const formalityWords  = document.querySelectorAll(".formality-word");
 
 function formalityNeedsLLM() {
-  return formality !== null;
+  return formality !== "original";
 }
 function formalityAvailable(f) {
   // honorific/humble only make sense where the language grammaticalises them
@@ -1477,16 +1482,17 @@ formalityWords.forEach(w => {
   w.addEventListener("click", () => {
     const f = w.dataset.formality;
     if (!formalityAvailable(f)) return;
-    // Only one formality at a time; clicking the active one clears it.
-    formality = (formality === f) ? null : f;
+    // Only one formality at a time; clicking the active level falls back to
+    // "original" so a selection is always shown.
+    formality = (formality === f) ? "original" : f;
     renderFormality();
   });
 });
 
-// Honorific/humble can turn unavailable when the target language changes; keep
-// the current selection valid and the bright-green state in sync.
+// Honorific/humble can turn unavailable when the target language changes; fall
+// back to "original" and keep the bright-green state in sync.
 function syncFormalityToLanguage() {
-  if (formality && !formalityAvailable(formality)) formality = null;
+  if (!formalityAvailable(formality)) formality = "original";
   renderFormality();
 }
 
