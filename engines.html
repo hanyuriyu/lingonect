@@ -953,6 +953,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
+// Attach the signed-in user's Firebase ID token to every Cloudflare Worker
+// request. The workers verify this token server-side and reject calls that
+// lack one, so API credits can't be spent by anonymous direct (curl) requests.
+async function workerFetch(url, options = {}) {
+  const headers = Object.assign({}, options.headers || {});
+  const user = auth.currentUser;
+  if (user) {
+    headers["Authorization"] = "Bearer " + (await user.getIdToken());
+  }
+  return fetch(url, Object.assign({}, options, { headers }));
+}
+
 let userSubscriptionLevel = 3; // default for grandfathered users
 
 const ENGINE_TIERS = {
@@ -1475,7 +1487,7 @@ function assertLangSupported(map) {
 // ── Mistral AI ──
 const MISTRAL_PROXY = "https://mistral.hanyuriyu.workers.dev";
 async function translateWithMistral(text, extra) {
-  const res = await fetch(MISTRAL_PROXY, {
+  const res = await workerFetch(MISTRAL_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1498,7 +1510,7 @@ async function translateWithMistral(text, extra) {
 const CLAUDE_PROXY = "https://claudetranslate.hanyuriyu.workers.dev";
 
 async function translateWithClaude(text, extra) {
-  const res = await fetch(CLAUDE_PROXY, {
+  const res = await workerFetch(CLAUDE_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1517,7 +1529,7 @@ async function translateWithClaude(text, extra) {
 const OPENAI_PROXY = "https://openai.hanyuriyu.workers.dev";
 
 async function translateWithOpenAI(text, extra) {
-  const res = await fetch(OPENAI_PROXY, {
+  const res = await workerFetch(OPENAI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1540,7 +1552,7 @@ async function translateWithOpenAI(text, extra) {
 const PERPLEXITY_PROXY = "https://lingonectperplexity.hanyuriyu.workers.dev";
 
 async function translateWithPerplexity(text, extra) {
-  const res = await fetch(PERPLEXITY_PROXY, {
+  const res = await workerFetch(PERPLEXITY_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1584,7 +1596,7 @@ const GOOGLE_PROXY = "https://googletranslate.hanyuriyu.workers.dev";
 async function translateWithGoogle(text) {
   assertLangSupported(GOOGLE_LANG_MAP);
   const langCode = GOOGLE_LANG_MAP[targetLang];
-  const res = await fetch(GOOGLE_PROXY, {
+  const res = await workerFetch(GOOGLE_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ q: text, target: langCode, format: "text" })
@@ -1615,7 +1627,7 @@ const DEEPL_PROXY = "https://deepl.hanyuriyu.workers.dev";
 async function translateWithDeepL(text) {
   assertLangSupported(DEEPL_LANG_MAP);
   const langCode = DEEPL_LANG_MAP[targetLang];
-  const res = await fetch(DEEPL_PROXY, {
+  const res = await workerFetch(DEEPL_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text: [text], target_lang: langCode })
@@ -1629,7 +1641,7 @@ async function translateWithDeepL(text) {
 const GEMINI_PROXY = "https://geminitranslate.hanyuriyu.workers.dev";
 
 async function translateWithGemini(text, extra) {
-  const res = await fetch(GEMINI_PROXY, {
+  const res = await workerFetch(GEMINI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, targetLang, model: "gemini-2.5-pro", instruction: llmSystemPrompt(extra) })
@@ -1646,7 +1658,7 @@ async function translateWithGemini(text, extra) {
 const DEEPSEEK_PROXY = "https://deepseek.hanyuriyu.workers.dev";
 
 async function translateWithDeepSeek(text, extra) {
-  const res = await fetch(DEEPSEEK_PROXY, {
+  const res = await workerFetch(DEEPSEEK_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1669,7 +1681,7 @@ async function translateWithDeepSeek(text, extra) {
 const GROK_PROXY = "https://grok.hanyuriyu.workers.dev";
 
 async function translateWithGrok(text, extra) {
-  const res = await fetch(GROK_PROXY, {
+  const res = await workerFetch(GROK_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1706,7 +1718,7 @@ const TENCENT_LANG_MAP = {
 async function translateWithTencent(text) {
   assertLangSupported(TENCENT_LANG_MAP);
   const langCode = TENCENT_LANG_MAP[targetLang];
-  const res = await fetch(TENCENT_PROXY, {
+  const res = await workerFetch(TENCENT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, source: "auto", target: langCode })
@@ -1727,7 +1739,7 @@ async function translateWithTencent(text) {
 const ALIBABA_PROXY = "https://alibaba.hanyuriyu.workers.dev";
 
 async function translateWithAlibaba(text, extra) {
-  const res = await fetch(ALIBABA_PROXY, {
+  const res = await workerFetch(ALIBABA_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1764,7 +1776,7 @@ const MICROSOFT_LANG_MAP = {
 async function translateWithMicrosoft(text) {
   assertLangSupported(MICROSOFT_LANG_MAP);
   const langCode = MICROSOFT_LANG_MAP[targetLang];
-  const res = await fetch(MICROSOFT_PROXY, {
+  const res = await workerFetch(MICROSOFT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, to: langCode })
@@ -1805,7 +1817,7 @@ async function translateWithAmazon(text) {
   assertLangSupported(AMAZON_LANG_MAP);
   const langCode = AMAZON_LANG_MAP[targetLang];
   const srcCode = AMAZON_LANG_MAP[sourceLang];
-  const res = await fetch(AMAZON_PROXY, {
+  const res = await workerFetch(AMAZON_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, from: srcCode, to: langCode })
@@ -1822,7 +1834,7 @@ async function translateWithAmazon(text) {
 const NOVA_PROXY = "https://nova.hanyuriyu.workers.dev";
 
 async function translateWithNova(text, extra) {
-  const res = await fetch(NOVA_PROXY, {
+  const res = await workerFetch(NOVA_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1901,7 +1913,7 @@ async function loadMetaModel() {
 const META_PROXY = "https://meta.hanyuriyu.workers.dev";
 
 async function translateWithMetaViaProxy(text, srcCode, tgtCode) {
-  const res = await fetch(META_PROXY, {
+  const res = await workerFetch(META_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, source: srcCode || "eng_Latn", target: tgtCode })
@@ -1967,7 +1979,7 @@ const BAIDU_LANG_MAP = {
 async function translateWithBaidu(text) {
   assertLangSupported(BAIDU_LANG_MAP);
   const langCode = BAIDU_LANG_MAP[targetLang];
-  const res = await fetch(BAIDU_PROXY, {
+  const res = await workerFetch(BAIDU_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, from: "auto", to: langCode })
@@ -2000,7 +2012,7 @@ const YANDEX_LANG_MAP = {
 
 async function translateWithYandex(text) {
   assertLangSupported(YANDEX_LANG_MAP);
-  const res = await fetch(YANDEX_PROXY, {
+  const res = await workerFetch(YANDEX_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -2023,7 +2035,7 @@ async function translateWithYandex(text) {
 const ALICE_PROXY = "https://alice.hanyuriyu.workers.dev";
 
 async function translateWithAlice(text, extra) {
-  const res = await fetch(ALICE_PROXY, {
+  const res = await workerFetch(ALICE_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -2050,7 +2062,7 @@ async function translateWithAlice(text, extra) {
 const DOUBAO_PROXY = "https://doubao.hanyuriyu.workers.dev";
 
 async function translateWithDoubao(text, extra) {
-  const res = await fetch(DOUBAO_PROXY, {
+  const res = await workerFetch(DOUBAO_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

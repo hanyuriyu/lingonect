@@ -945,6 +945,18 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+
+// Attach the signed-in user's Firebase ID token to every Cloudflare Worker
+// request. The workers verify this token server-side and reject calls that
+// lack one, so API credits can't be spent by anonymous direct (curl) requests.
+async function workerFetch(url, options = {}) {
+  const headers = Object.assign({}, options.headers || {});
+  const user = auth.currentUser;
+  if (user) {
+    headers["Authorization"] = "Bearer " + (await user.getIdToken());
+  }
+  return fetch(url, Object.assign({}, options, { headers }));
+}
 const db   = firebase.firestore();
 
 const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
@@ -1079,7 +1091,7 @@ async function speakWithOpenAI(text, locale, btn){
   try {
     let objectUrl = ttsBlobCache.get(cacheKey);
     if (!objectUrl) {
-      const res = await fetch(OPENAI_WORKER + "/tts", {
+      const res = await workerFetch(OPENAI_WORKER + "/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1447,7 +1459,7 @@ ${ukrainianStressBlock}
 Input items:
 ${numbered}`;
 
-    const res = await fetch(CLAUDE_WORKER, {
+    const res = await workerFetch(CLAUDE_WORKER, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1605,7 +1617,7 @@ Return ONLY a valid JSON array of strings in the same order as the input. No com
 Words:
 ${numbered}`;
 
-  const res = await fetch(CLAUDE_WORKER, {
+  const res = await workerFetch(CLAUDE_WORKER, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
