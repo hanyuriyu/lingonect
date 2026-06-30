@@ -374,6 +374,10 @@ const NOVA_PROXY       = "https://nova.hanyuriyu.workers.dev";
 const HYPERCLOVAX_PROXY = "https://hyperclovax.hanyuriyu.workers.dev";
 const PAPAGO_PROXY     = "https://papago.hanyuriyu.workers.dev";
 const BAIDU_PROXY      = "https://baidu.hanyuriyu.workers.dev";
+const YANDEX_PROXY     = "https://yandex.hanyuriyu.workers.dev";
+const ALICE_PROXY      = "https://alice.hanyuriyu.workers.dev";
+const DOUBAO_PROXY     = "https://doubao.hanyuriyu.workers.dev";
+const ZAI_PROXY        = "https://zai.hanyuriyu.workers.dev";
 
 // ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
@@ -460,6 +464,17 @@ const PAPAGO_LANG_MAP = {
   "Hindi":"hi",
   "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id"
+};
+const YANDEX_LANG_MAP = {
+  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
+  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
+  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
+  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
+  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
+  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh","Korean":"ko",
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 
 // ── Translation functions ──
@@ -754,6 +769,81 @@ async function translateWithBaidu(text, targetLang) {
   return data.trans_result.map(r => r.dst).join("\n").trim();
 }
 
+async function translateWithYandex(text, targetLang, sourceLang) {
+  const tgtCode = YANDEX_LANG_MAP[targetLang];
+  if (!tgtCode) throw new Error(`Yandex Translate does not support ${targetLang}.`);
+  const srcCode = YANDEX_LANG_MAP[sourceLang] || "en";
+  const res = await workerFetch(YANDEX_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source: srcCode, target: tgtCode })
+  });
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { data = null; }
+  if (!res.ok || data?.message || !data?.translations) {
+    const msg = data?.message || raw.slice(0, 200) || `HTTP ${res.status}`;
+    throw new Error(`Yandex Translate ${res.status}: ${msg}`);
+  }
+  return data.translations[0].text.trim();
+}
+
+async function translateWithAlice(text, targetLang) {
+  const res = await workerFetch(ALICE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error || !data.choices) {
+    throw new Error(`Alice ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
+  }
+  return data.choices[0].message.content.trim();
+}
+
+async function translateWithDoubao(text, targetLang) {
+  const res = await workerFetch(DOUBAO_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "ep-20260617224552-qpsmq",
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(`Doubao ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
+  }
+  return data.choices[0].message.content.trim();
+}
+
+async function translateWithZai(text, targetLang) {
+  const res = await fetch(ZAI_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "glm-4.6",
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(`Z.ai ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
+  }
+  return data.choices[0].message.content.trim();
+}
+
 // ── Engine registry ──
 const ENGINE_LIST = [
   { id: "claude",     name: "Claude",              translate: translateWithClaude },
@@ -773,7 +863,11 @@ const ENGINE_LIST = [
   { id: "meta",       name: "Meta (NLLB-200)",      translate: translateWithMeta },
   { id: "hyperclovex",name: "HyperCLOVA X",         translate: translateWithHyperCloveX },
   { id: "papago",     name: "Naver Papago",         translate: translateWithPapago },
-  { id: "baidu",      name: "Baidu Translate",      translate: translateWithBaidu }
+  { id: "baidu",      name: "Baidu Translate",      translate: translateWithBaidu },
+  { id: "yandex",     name: "Yandex Translate",     translate: translateWithYandex },
+  { id: "alice",      name: "Alice",                translate: translateWithAlice },
+  { id: "doubao",     name: "Doubao",               translate: translateWithDoubao },
+  { id: "zai",        name: "Z.ai",                 translate: translateWithZai }
 ];
 
 // ── Rating function: ask the selected rater engine to score a translation ──
@@ -789,7 +883,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
 
   // For API-based engines (not DeepL/Google/Tencent/Microsoft which are non-LLM),
   // we send a rating prompt. For non-LLM engines, fall back to Claude.
-  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "papago", "baidu"];
+  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "papago", "baidu", "yandex"];
   const actualRater = NON_LLM.includes(raterEngine) ? "claude" : raterEngine;
 
   let rawScore;
@@ -833,18 +927,25 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
     const data = await res.json();
     rawScore = data.translated.trim();
   } else {
-    // Generic OpenAI-compatible proxy (Mistral, DeepSeek, Grok, Perplexity, Alibaba)
+    // Generic OpenAI-compatible proxy (Mistral, DeepSeek, Grok, Perplexity,
+    // Alibaba, Alice, Doubao, Z.ai). Most proxies require the Firebase ID
+    // token; Z.ai's worker takes none and rejects the Authorization header in
+    // CORS, so it is called with a plain (unauthenticated) fetch.
     const proxyMap = {
       mistral:    { proxy: MISTRAL_PROXY,    model: "mistral-small-latest" },
       deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
       grok:       { proxy: GROK_PROXY,       model: "grok-3" },
       perplexity: { proxy: PERPLEXITY_PROXY, model: "sonar" },
-      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-plus" }
+      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-plus" },
+      alice:      { proxy: ALICE_PROXY,      model: "aliceai-llm/latest" },
+      doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
+      zai:        { proxy: ZAI_PROXY,        model: "glm-4.6", noAuth: true }
     };
     const cfg = proxyMap[actualRater];
     if (!cfg) throw new Error(`No proxy config for rater "${actualRater}"`);
 
-    const res = await fetch(cfg.proxy, {
+    const fetchFn = cfg.noAuth ? fetch : workerFetch;
+    const res = await fetchFn(cfg.proxy, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -923,7 +1024,7 @@ function populateDropdowns() {
 // ── UI: Build rater radio buttons ──
 // NMT engines can't follow rating prompts, so they're excluded from the rater list.
 const NMT_ENGINE_IDS = new Set([
-  "deepl", "google", "tencent", "alibaba", "microsoft", "amazon", "meta", "baidu"
+  "deepl", "google", "tencent", "alibaba", "microsoft", "amazon", "meta", "baidu", "yandex"
 ]);
 
 function buildRaterOptions() {
