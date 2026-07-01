@@ -1,0 +1,5 @@
+# Deploys to https://deepseek.hanyuriyu.workers.dev
+name = "deepseek"
+main = "../deepseek-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true

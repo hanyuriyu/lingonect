@@ -1,0 +1,5 @@
+# Deploys to https://claudetranslate.hanyuriyu.workers.dev
+name = "claudetranslate"
+main = "../claude-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true

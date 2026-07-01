@@ -1,0 +1,5 @@
+# Deploys to https://amazon.hanyuriyu.workers.dev
+name = "amazon"
+main = "../amazon-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true

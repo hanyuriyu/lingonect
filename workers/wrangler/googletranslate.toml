@@ -1,0 +1,5 @@
+# Deploys to https://googletranslate.hanyuriyu.workers.dev
+name = "googletranslate"
+main = "../google-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true

@@ -1,0 +1,5 @@
+# Deploys to https://grok.hanyuriyu.workers.dev
+name = "grok"
+main = "../grok-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true

@@ -1,0 +1,5 @@
+# Deploys to https://nova.hanyuriyu.workers.dev
+name = "nova"
+main = "../nova-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
