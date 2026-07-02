@@ -1,0 +1,5 @@
+# Deploys to https://hyperclovax.hanyuriyu.workers.dev
+name = "hyperclovax"
+main = "../hyperclovax-worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
