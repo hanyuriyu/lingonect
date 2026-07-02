@@ -293,13 +293,20 @@ const auth = firebase.auth();
 // Attach the signed-in user's Firebase ID token to every Cloudflare Worker
 // request. The workers verify this token server-side and reject calls that
 // lack one, so API credits can't be spent by anonymous direct (curl) requests.
+let __quotaAlerted = false;
 async function workerFetch(url, options = {}) {
   const headers = Object.assign({}, options.headers || {});
   const user = auth.currentUser;
   if (user) {
     headers["Authorization"] = "Bearer " + (await user.getIdToken());
   }
-  return fetch(url, Object.assign({}, options, { headers }));
+  const res = await fetch(url, Object.assign({}, options, { headers }));
+  // 429 = daily request limit reached. Tell the user once (not once per call).
+  if (res.status === 429 && !__quotaAlerted) {
+    __quotaAlerted = true;
+    alert("You've reached your daily request limit. Please try again tomorrow.");
+  }
+  return res;
 }
 const db   = firebase.firestore();
 

@@ -146,6 +146,33 @@ export default {
       );
     }
 
+    // Per-user daily quota: 1000 requests per UTC calendar day. The admin
+    // account is exempt. Fails open (allows the request) if the KV store is
+    // missing or unavailable, so a storage hiccup never blocks translation.
+    if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
+      try {
+        const __day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+        const __qKey = "q:" + __authPayload.sub + ":" + __day;
+        const __used = parseInt((await env.QUOTA_KV.get(__qKey)) || "0", 10) || 0;
+        if (__used >= 1000) {
+          return new Response(
+            JSON.stringify({ error: "Daily request limit reached. Please try again tomorrow." }),
+            {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "https://www.lingonect.com",
+              },
+            }
+          );
+        }
+        // Counter auto-expires after 2 days so old day-keys clean themselves up.
+        await env.QUOTA_KV.put(__qKey, String(__used + 1), { expirationTtl: 172800 });
+      } catch (_) {
+        // KV unavailable — allow the request rather than blocking the user.
+      }
+    }
+
 
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: { message: "Method not allowed" } }), { status: 405, headers: cors });
