@@ -1,10 +1,13 @@
 # Deploys to https://alibaba.hanyuriyu.workers.dev
 name = "alibaba"
 main = "../alibaba-worker.js"
-compatibility_date = "2025-06-01"
+compatibility_date = "2026-03-24"
 workers_dev = true
 preview_urls = false
 
 [[kv_namespaces]]
 binding = "QUOTA_KV"
 id = "f9f80346649545989106f2b6459bbb28"
+
+[observability]
+enabled = true
