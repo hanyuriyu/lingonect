@@ -1601,6 +1601,38 @@ function localizeClause(max) {
   return `\n\nLOCALIZATION — STRICT LENGTH BUDGET (${max} characters): the final output must be a COMPLETE, natural, grammatically correct rendering of at most ${max} characters, counting every character including spaces and punctuation. This is a rewrite-to-fit task, NOT a trim: do not translate normally and chop the end off. Instead rethink how to express the core message within ${max} characters — choose tighter words, simplify the structure, or drop non-essential detail — but the result must read as finished and correct on its own. It must NEVER end mid-word or mid-thought, and must never be a truncated fragment. Preserve the key meaning and intent. Do not exceed ${max} characters.`;
 }
 
+// Target languages written in a non-Latin script. When translating into one of
+// these, LLM engines are asked to attach an inline reading aid to the output so
+// learners can pronounce it: furigana for Japanese kanji, pinyin for Chinese,
+// and the standard romanization for everything else.
+const NON_LATIN_LANGS = new Set([
+  "Russian", "Ukrainian", "Bulgarian", "Serbian", "Greek", "Georgian",
+  "Arabic", "Hebrew", "Persian (Farsi)", "Hindi", "Urdu", "Bengali",
+  "Japanese", "Chinese (Simplified)", "Chinese (Traditional)", "Korean", "Thai"
+]);
+
+function isNonLatinLang(lang){
+  return NON_LATIN_LANGS.has(lang);
+}
+function isChineseLang(lang){
+  return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
+}
+
+// Prompt clause telling an LLM how to attach an inline transliteration to
+// ${tgt} output. Returns "" for Latin-script languages (which need none).
+function transliterationClause(tgt){
+  if (!isNonLatinLang(tgt)) return "";
+  let how;
+  if (tgt === "Japanese") {
+    how = `Immediately after every word that contains kanji, add its furigana (the hiragana reading) in brackets, e.g. "私(わたし)は本(ほん)を読(よ)みます". Do not add furigana to words already written entirely in kana.`;
+  } else if (isChineseLang(tgt)) {
+    how = `Immediately after each Chinese word, add its Hanyu Pinyin with tone marks in brackets, e.g. "我(wǒ)喜欢(xǐhuan)咖啡(kāfēi)".`;
+  } else {
+    how = `Immediately after each ${tgt} word, add its Latin-alphabet transliteration (using the standard, best-known romanization method for ${tgt}) in brackets, e.g. word(translit) word(translit).`;
+  }
+  return `\n\nTRANSLITERATION — ${tgt} uses a non-Latin script, so the output MUST be made readable. ${how} The bracketed transliteration is a REQUIRED part of your output; add it to every ${tgt} word even though the base instructions say to output only the translated text.`;
+}
+
 // Builds the system prompt every client-side LLM engine sends, based on the
 // currently selected methodology and source/target languages. `extra` is an
 // optional addendum (used to give an engine corrective feedback, e.g. asking
@@ -1617,6 +1649,9 @@ function llmSystemPrompt(extra) {
   // the localization length budget and formality register do not apply to it.
   if (m !== "analyze" && localizeOn && localizeMax > 0) prompt += localizeClause(localizeMax);
   if (m !== "analyze" && formality && formalityAvailable(formality)) prompt += formalityClause(tgt);
+  // Attach an inline transliteration when the target uses a non-Latin script.
+  // Skipped for analyze, whose explanation is prose, not a translation.
+  if (m !== "analyze") prompt += transliterationClause(tgt);
   if (extra) prompt += extra;
   return prompt;
 }
