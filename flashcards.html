@@ -978,6 +978,34 @@ function isChineseLang(lang){
   return lang === "Chinese (Simplified)" || lang === "Chinese (Traditional)";
 }
 
+// Target languages written in a non-Latin script. For these, example
+// sentences (and the Claude definition) must carry an inline transliteration
+// so learners can read them: furigana for Japanese kanji, pinyin for Chinese,
+// and the standard romanization for everything else.
+const NON_LATIN_LANGS = new Set([
+  "Russian", "Ukrainian", "Bulgarian", "Serbian", "Greek", "Georgian",
+  "Arabic", "Hebrew", "Persian (Farsi)", "Hindi", "Urdu", "Bengali",
+  "Japanese", "Chinese (Simplified)", "Chinese (Traditional)", "Korean", "Thai"
+]);
+
+function isNonLatinLang(lang){
+  return NON_LATIN_LANGS.has(lang);
+}
+
+// Build the prompt snippet that tells a model how to attach an inline
+// transliteration to ${targetLang} text. Returns "" for Latin-script
+// languages (which need no transliteration).
+function transliterationInstruction(targetLang){
+  if (!isNonLatinLang(targetLang)) return "";
+  if (targetLang === "Japanese") {
+    return `${targetLang} uses a non-Latin script, so it MUST be made readable. Immediately after every word that contains kanji, add its furigana (the hiragana reading) in brackets, e.g. "私(わたし)は本(ほん)を読(よ)みます". Do not add furigana to words already written entirely in kana.`;
+  }
+  if (isChineseLang(targetLang)) {
+    return `${targetLang} uses a non-Latin script, so it MUST be made readable. Immediately after each Chinese word, add its Hanyu Pinyin with tone marks in brackets, e.g. "我(wǒ)喜欢(xǐhuan)咖啡(kāfēi)".`;
+  }
+  return `${targetLang} uses a non-Latin script, so it MUST be made readable. Immediately after each ${targetLang} word, add its Latin-alphabet transliteration (using the standard, best-known romanization method for ${targetLang}) in brackets, e.g. word(translit) word(translit).`;
+}
+
 // BCP-47 locales for the SpeechSynthesis API
 const LANG_LOCALE = {
   "English": "en-US",
@@ -1451,18 +1479,29 @@ If you genuinely do not know the stress placement for a word, consult your knowl
 ============================================================
 ` : "";
 
+    const translitInstr = transliterationInstruction(targetLang);
+    const translitBlock = translitInstr ? `
+
+============================================================
+INLINE TRANSLITERATION FOR ${targetLang.toUpperCase()}
+============================================================
+This applies to the "definition" and "example" fields (the ${targetLang} text only — never the ${sourceLang} translation in parentheses).
+${translitInstr}
+============================================================
+` : "";
+
     const prompt = `You are a language learning assistant. The user's source language is ${sourceLang} and they are learning ${targetLang}. The list below may contain items written in either ${sourceLang} or ${targetLang}, possibly mixed. Decide for each item which language it is in.
 
 For each item, provide:
 1. "word": The word/phrase in ${targetLang}. If the input item is already in ${targetLang}, use it as-is (correcting only obvious typos or normalising script). If the input item is in ${sourceLang}, translate it into ${targetLang}.
 2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word.
 3. "translation": The ${sourceLang} translation of the ${targetLang} word.
-4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).
-5. "example": One useful example sentence in ${targetLang} that uses the word/phrase, with its ${sourceLang} translation in parentheses.
+4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).${translitInstr ? " Add the inline transliteration described below to the target-language portion." : ""}
+5. "example": One useful example sentence in ${targetLang} that uses the word/phrase, with its ${sourceLang} translation in parentheses.${translitInstr ? " Add the inline transliteration described below to the target-language portion." : ""}
 6. "emoji": A simple, clear visualization of the word or phrase using 1-3 emojis. Pick the most concrete, recognisable emoji(s) that will help the learner visually remember the meaning. For abstract concepts, pick the most evocative symbol available (e.g. "freedom" -> "🕊️", "idea" -> "💡", "love" -> "❤️"). Always return at least one emoji.
 
 Return ONLY a valid JSON array, one element per input item, in the same order. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example", "emoji"
-${ukrainianStressBlock}
+${translitBlock}${ukrainianStressBlock}
 Input items:
 ${numbered}`;
 
@@ -1552,10 +1591,16 @@ ${numbered}`;
 // Returns an array of strings in the same order as `words`.
 async function generateExampleBatch(words, sourceLang, targetLang, workerUrl, model) {
   const numbered = words.map((w, i) => (i + 1) + ". " + w).join("\n");
+  const translitInstr = transliterationInstruction(targetLang);
+  const translitBlock = translitInstr ? `
+
+TRANSLITERATION (applies to the ${targetLang} sentence only, not the ${sourceLang} translation in parentheses):
+${translitInstr}
+` : "";
   const prompt = `For each of the following ${targetLang} words or phrases, write ONE natural, useful example sentence in ${targetLang}, followed by its ${sourceLang} translation in parentheses on the same line.
 
 IMPORTANT: Every example sentence MUST use the given word or phrase. The word/phrase must appear in the sentence itself.
-
+${translitBlock}
 Return ONLY a valid JSON array of strings, in the same order as the input. The array must have exactly ${words.length} elements — one per word. Each element must be the full example sentence string (including the ${sourceLang} translation in parentheses). Do not add any commentary, numbering, or keys.
 
 Words/phrases:
