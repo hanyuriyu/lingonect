@@ -1624,11 +1624,14 @@ function isChineseLang(lang){
 // Returns "" for Latin-script languages (which need none).
 function transliterationClause(tgt){
   if (!isNonLatinLang(tgt)) return "";
+  // Japanese is special: furigana goes in brackets right after each kanji
+  // word, AND the full romaji reading is appended once after the whole text.
+  if (tgt === "Japanese") {
+    return `\n\nTRANSLITERATION — Japanese uses a non-Latin script, so the output MUST be made readable. Do TWO things: (1) immediately after every word that contains kanji, add its furigana (the hiragana reading) in brackets, e.g. "本(ほん)を読(よ)む"; do not add furigana to words already written entirely in kana. (2) After the complete translated text, append the full Hepburn romaji reading of the whole text once, enclosed in square brackets, e.g. "私(わたし)は本(ほん)を読(よ)みます。 [Watashi wa hon o yomimasu.]". Both the furigana and the bracketed romaji are a REQUIRED part of your output even though the base instructions say to output only the translated text.`;
+  }
   let method;
   if (isChineseLang(tgt)) {
     method = "the full Hanyu Pinyin (with a tone mark on every syllable)";
-  } else if (tgt === "Japanese") {
-    method = "the full Hepburn romaji reading";
   } else {
     method = `the full Latin-alphabet transliteration (using the standard, best-known romanization method for ${tgt})`;
   }
