@@ -992,18 +992,21 @@ function isNonLatinLang(lang){
   return NON_LATIN_LANGS.has(lang);
 }
 
-// Build the prompt snippet that tells a model how to attach an inline
-// transliteration to ${targetLang} text. Returns "" for Latin-script
-// languages (which need no transliteration).
+// Build the prompt snippet that tells a model how to attach a transliteration
+// to ${targetLang} text. The transliteration is given ONCE for the whole piece
+// of text (not per word), in square brackets, and always carries stress/accent
+// marks. Returns "" for Latin-script languages (which need none).
 function transliterationInstruction(targetLang){
   if (!isNonLatinLang(targetLang)) return "";
-  if (targetLang === "Japanese") {
-    return `${targetLang} uses a non-Latin script, so it MUST be made readable. Immediately after every word that contains kanji, add its furigana (the hiragana reading) in brackets, e.g. "私(わたし)は本(ほん)を読(よ)みます". Do not add furigana to words already written entirely in kana.`;
-  }
+  let method;
   if (isChineseLang(targetLang)) {
-    return `${targetLang} uses a non-Latin script, so it MUST be made readable. Immediately after each Chinese word, add its Hanyu Pinyin with tone marks in brackets, e.g. "我(wǒ)喜欢(xǐhuan)咖啡(kāfēi)".`;
+    method = "the full Hanyu Pinyin (with a tone mark on every syllable)";
+  } else if (targetLang === "Japanese") {
+    method = "the full Hepburn romaji reading";
+  } else {
+    method = `the full Latin-alphabet transliteration (using the standard, best-known romanization method for ${targetLang})`;
   }
-  return `${targetLang} uses a non-Latin script, so it MUST be made readable. Immediately after each ${targetLang} word, add its Latin-alphabet transliteration (using the standard, best-known romanization method for ${targetLang}) in brackets, e.g. word(translit) word(translit).`;
+  return `${targetLang} uses a non-Latin script, so it MUST be made readable. Do NOT transliterate word by word. After the whole ${targetLang} text and BEFORE the translation in parentheses, add ${method} of the entire text once, enclosed in square brackets. ALWAYS mark stress/accent: put an acute accent on the stressed vowel of every word (á é í ó ú ý — or the language's own tone/accent marks), e.g. "Будь ласка, зробіть це якомога швидше! [Bud' láska, zrobít' tse yakomóha shvýdshe!] (Please do it as fast as possible!)".`;
 }
 
 // BCP-47 locales for the SpeechSynthesis API
@@ -1483,9 +1486,9 @@ If you genuinely do not know the stress placement for a word, consult your knowl
     const translitBlock = translitInstr ? `
 
 ============================================================
-INLINE TRANSLITERATION FOR ${targetLang.toUpperCase()}
+TRANSLITERATION FOR ${targetLang.toUpperCase()}
 ============================================================
-This applies to the "definition" and "example" fields (the ${targetLang} text only — never the ${sourceLang} translation in parentheses).
+This applies to the "definition" and "example" fields (transliterate the ${targetLang} text only — never the ${sourceLang} translation in parentheses).
 ${translitInstr}
 ============================================================
 ` : "";
@@ -1496,8 +1499,8 @@ For each item, provide:
 1. "word": The word/phrase in ${targetLang}. If the input item is already in ${targetLang}, use it as-is (correcting only obvious typos or normalising script). If the input item is in ${sourceLang}, translate it into ${targetLang}.
 2. "transliteration": A transliteration (romanization) of the ${targetLang} word if ${targetLang} uses a non-Latin script. If it uses Latin script, just repeat the word.
 3. "translation": The ${sourceLang} translation of the ${targetLang} word.
-4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).${translitInstr ? " Add the inline transliteration described below to the target-language portion." : ""}
-5. "example": One useful example sentence in ${targetLang} that uses the word/phrase, with its ${sourceLang} translation in parentheses.${translitInstr ? " Add the inline transliteration described below to the target-language portion." : ""}
+4. "definition": A short dictionary-style definition of the word written in ${targetLang}, followed by a ${sourceLang} back-translation of that definition in parentheses on the same line. Keep it concise (one sentence).${translitInstr ? " Add the transliteration described below for the target-language portion." : ""}
+5. "example": One useful example sentence in ${targetLang} that uses the word/phrase, with its ${sourceLang} translation in parentheses.${translitInstr ? " Add the transliteration described below for the target-language portion." : ""}
 6. "emoji": A simple, clear visualization of the word or phrase using 1-3 emojis. Pick the most concrete, recognisable emoji(s) that will help the learner visually remember the meaning. For abstract concepts, pick the most evocative symbol available (e.g. "freedom" -> "🕊️", "idea" -> "💡", "love" -> "❤️"). Always return at least one emoji.
 
 Return ONLY a valid JSON array, one element per input item, in the same order. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example", "emoji"
