@@ -998,10 +998,11 @@ function isNonLatinLang(lang){
 // marks. Returns "" for Latin-script languages (which need none).
 function transliterationInstruction(targetLang){
   if (!isNonLatinLang(targetLang)) return "";
-  // Japanese is special: furigana goes in brackets right after each kanji
-  // word, AND the full romaji reading is given once after the whole text.
+  // Japanese: keep the sentence itself clean (no inline furigana). After the
+  // sentence and its parenthesised translation, give a comma-separated list of
+  // the kanji words with their furigana, then the full romaji.
   if (targetLang === "Japanese") {
-    return `Japanese uses a non-Latin script, so it MUST be made readable. Do TWO things: (1) immediately after every word that contains kanji, add its furigana (the hiragana reading) in brackets, e.g. "本(ほん)を読(よ)む"; do not add furigana to words already written entirely in kana. (2) After the whole Japanese text and BEFORE the translation in parentheses, add the full Hepburn romaji reading of the entire text once, enclosed in square brackets, e.g. "私(わたし)は本(ほん)を読(よ)みます。 [Watashi wa hon o yomimasu.] (I read a book.)".`;
+    return `Japanese uses a non-Latin script, so it MUST be made readable, but keep the Japanese sentence itself CLEAN — no furigana, no romaji, no brackets inside it. After the sentence and its translation in parentheses, append the reading aid in this order: first "Kanji:" followed by a comma-separated list of every word in the sentence that contains kanji, each with its furigana (hiragana reading) in brackets; then "Romaji:" followed by the full Hepburn romaji reading of the whole sentence. Example: "私は本を読みます。 (I read a book.) Kanji: 私(わたし), 本(ほん), 読(よ)む Romaji: Watashi wa hon o yomimasu." Omit the Kanji list if the sentence has no kanji.`;
   }
   let method;
   if (isChineseLang(targetLang)) {

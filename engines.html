@@ -597,6 +597,19 @@ body{
   font-style:italic;
 }
 
+/* Reading aid (kanji list + transliteration) shown under the translation.
+   Deliberately separate from .translation-text so the copy button, ratings,
+   and download only ever capture the clean translation. */
+.reading-aid{
+  font-size:13px;
+  line-height:1.6;
+  margin:8px 0 0;
+  padding-top:8px;
+  border-top:1px dashed #e0e0e0;
+  color:#777;
+  white-space:pre-line;
+}
+
 /* ── STAR RATINGS ── */
 .ratings-header{
   font-size:12px;
@@ -1624,10 +1637,14 @@ function isChineseLang(lang){
 // Returns "" for Latin-script languages (which need none).
 function transliterationClause(tgt){
   if (!isNonLatinLang(tgt)) return "";
-  // Japanese is special: furigana goes in brackets right after each kanji
-  // word, AND the full romaji reading is appended once after the whole text.
+  // The clean translation comes first and must stay free of any reading marks.
+  // The reading aid goes AFTER a literal [[READING]] marker so the client can
+  // split it off — the translation the user copies never includes it.
   if (tgt === "Japanese") {
-    return `\n\nTRANSLITERATION — Japanese uses a non-Latin script, so the output MUST be made readable. Do TWO things: (1) immediately after every word that contains kanji, add its furigana (the hiragana reading) in brackets, e.g. "本(ほん)を読(よ)む"; do not add furigana to words already written entirely in kana. (2) After the complete translated text, append the full Hepburn romaji reading of the whole text once, enclosed in square brackets, e.g. "私(わたし)は本(ほん)を読(よ)みます。 [Watashi wa hon o yomimasu.]". Both the furigana and the bracketed romaji are a REQUIRED part of your output even though the base instructions say to output only the translated text.`;
+    return `\n\nREADING AID — Japanese uses a non-Latin script, so add reading help, but keep the translation itself CLEAN: the translated text must contain NO furigana, NO romaji, and NO brackets. After the clean translation, output a line containing exactly [[READING]] and nothing else, then provide, each on its own line:
+Kanji: a comma-separated list of every word in the translation that contains kanji, each followed by its furigana (hiragana reading) in brackets — e.g. Kanji: 私(わたし), 本(ほん), 読(よ)む
+Romaji: the full Hepburn romaji reading of the whole translation — e.g. Romaji: Watashi wa hon o yomimasu.
+Omit the Kanji line if the translation contains no kanji. Output the [[READING]] marker and these lines ONLY after the clean translation.`;
   }
   let method;
   if (isChineseLang(tgt)) {
@@ -1635,7 +1652,23 @@ function transliterationClause(tgt){
   } else {
     method = `the full Latin-alphabet transliteration (using the standard, best-known romanization method for ${tgt})`;
   }
-  return `\n\nTRANSLITERATION — ${tgt} uses a non-Latin script, so the output MUST be made readable. Do NOT transliterate word by word. After the complete translated text, append ${method} of the whole text once, enclosed in square brackets on the same output. ALWAYS mark stress/accent: put an acute accent on the stressed vowel of every word (á é í ó ú ý — or the language's own tone/accent marks), e.g. "Будь ласка, зробіть це якомога швидше! [Bud' láska, zrobít' tse yakomóha shvýdshe!]". The bracketed transliteration is a REQUIRED part of your output even though the base instructions say to output only the translated text.`;
+  return `\n\nREADING AID — ${tgt} uses a non-Latin script, so add a reading aid, but keep the translation itself CLEAN: it must contain NO transliteration and NO brackets. After the clean translation, output a line containing exactly [[READING]] and nothing else, then a single line:
+Transliteration: ${method} of the whole translation, ALWAYS marking stress/accent — an acute accent on the stressed vowel of every word (á é í ó ú ý, or the language's own tone/accent marks) — e.g. Transliteration: Bud' láska, zrobít' tse yakomóha shvýdshe!
+Output the [[READING]] marker and the transliteration line ONLY after the clean translation.`;
+}
+
+// Split an engine reply into the clean translation and an optional reading aid
+// (kanji list / transliteration). Engines are asked to separate the two with a
+// [[READING]] marker; if it's absent the whole reply is treated as translation.
+function splitReading(s){
+  if (typeof s !== "string") return { translation: s, reading: "" };
+  const marker = "[[READING]]";
+  const i = s.indexOf(marker);
+  if (i === -1) return { translation: s.trim(), reading: "" };
+  return {
+    translation: s.slice(0, i).trim(),
+    reading: s.slice(i + marker.length).trim()
+  };
 }
 
 // Builds the system prompt every client-side LLM engine sends, based on the
@@ -2565,6 +2598,7 @@ function buildCard(engine) {
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </button>
+        <div class="reading-aid" id="reading-${engine.id}" style="display:none"></div>
       </div>`;
     card.appendChild(buildStarRow(engine.id));
   }
@@ -2626,14 +2660,28 @@ submitEl.addEventListener("click", async () => {
         .finally(() => clearTimeout(t));
     };
 
-    try {
-      let translation = await callWithTimeout();
+    const readingEl = document.getElementById(`reading-${engine.id}`);
+    const showReading = (reading) => {
+      if (!readingEl) return;
+      if (reading) { readingEl.textContent = reading; readingEl.style.display = ""; }
+      else { readingEl.textContent = ""; readingEl.style.display = "none"; }
+    };
 
-      // Localization: enforce the character budget. Instead of chopping the
-      // output mid-word, re-ask the engine (a few times, with firmer feedback)
-      // to rewrite it as a complete, grammatical rendering that fits. Keep the
-      // shortest candidate seen, and only as an absolute last resort trim at a
-      // word boundary so the hard limit is never exceeded.
+    try {
+      // The reply carries the clean translation and an optional reading aid
+      // (kanji list / transliteration) after a [[READING]] marker. Split them
+      // so only the clean translation lands in the copyable/rated/downloaded
+      // result; the reading aid is shown separately below it.
+      const first = splitReading(await callWithTimeout());
+      let translation = first.translation;
+      let reading = first.reading;
+
+      // Localization: enforce the character budget on the CLEAN translation
+      // only. Instead of chopping the output mid-word, re-ask the engine (a few
+      // times, with firmer feedback) to rewrite it as a complete, grammatical
+      // rendering that fits. Keep the shortest candidate seen, and only as an
+      // absolute last resort trim at a word boundary so the limit is never
+      // exceeded.
       if (maxChars > 0 && typeof translation === "string") {
         let best = translation.trim();
         const MAX_FIT_RETRIES = 3;
@@ -2646,9 +2694,10 @@ submitEl.addEventListener("click", async () => {
             break; // keep the best complete attempt so far rather than erroring out
           }
           if (typeof retried === "string" && retried.trim()) {
-            const cand = retried.trim();
-            if (cand.length <= maxChars) { best = cand; break; }   // fits — done
-            if (cand.length < best.length) best = cand;            // shorter — keep trying
+            const rp = splitReading(retried);
+            const cand = rp.translation.trim();
+            if (cand.length <= maxChars) { best = cand; reading = rp.reading; break; }   // fits — done
+            if (cand.length < best.length) { best = cand; reading = rp.reading; }        // shorter — keep trying
           }
         }
         if (best.length > maxChars) best = trimToBudget(best, maxChars);
@@ -2657,9 +2706,11 @@ submitEl.addEventListener("click", async () => {
 
       el.textContent = typeof translation === "string" ? translation.trim() : translation;
       el.classList.remove("loading");
+      showReading(reading);
     } catch (err) {
       el.textContent = err.message || "Translation failed.";
       el.classList.remove("loading");
+      showReading("");
       console.error(engine.name, err);
     }
   });
