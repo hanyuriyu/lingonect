@@ -555,6 +555,39 @@ body{
 .copy-btn.copied .copy-icon{ display:none; }
 .copy-btn.copied .check-icon{ display:block; }
 
+/* Speak button (loudspeaker, sits just left of the copy button) */
+.speak-btn{
+  position:absolute;
+  top:-4px;
+  right:30px;
+  width:26px;
+  height:26px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:#c2c2c2;
+  border-radius:6px;
+  transition:color .15s, background .15s;
+}
+.speak-btn:hover{
+  color:#666;
+  background:#f2f2f2;
+}
+.speak-btn svg{
+  width:16px;
+  height:16px;
+}
+.speak-btn .stop-icon{ display:none; }
+.speak-btn.speaking{ color:var(--cobalt); }
+.speak-btn.speaking .speak-icon{ display:none; }
+.speak-btn.speaking .stop-icon{ display:block; }
+.speak-btn[disabled]{ opacity:.4; cursor:default; }
+.speak-btn[disabled]:hover{ background:none; color:#c2c2c2; }
+
 /* Download full list button (just above the first result's divider line) */
 .download-bar{
   margin-top:24px;
@@ -2589,6 +2622,16 @@ function buildCard(engine) {
       <div class="result-content">
         <p class="engine-name">${engine.name}</p>
         <p class="translation-text loading" id="result-${engine.id}">Translating…</p>
+        <button class="speak-btn" type="button" title="Listen to translation" aria-label="Listen to translation" data-engine="${engine.id}" ${ttsSupported ? "" : "disabled"}>
+          <svg class="speak-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+          <svg class="stop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
+          </svg>
+        </button>
         <button class="copy-btn" type="button" title="Copy translation" aria-label="Copy translation" data-engine="${engine.id}">
           <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -2750,6 +2793,95 @@ document.getElementById("resultsArea").addEventListener("click", e => {
     setTimeout(() => btn.classList.remove("copied"), 1400);
   }).catch(err => console.error("Copy failed", err));
 });
+
+// ── Speak (text-to-speech) a single engine result in the target language ──
+// Uses the browser's built-in Web Speech API (speechSynthesis) so it works
+// for every engine — LLMs and NMTs (Google, DeepL, …) alike — with no extra
+// worker or API key. The DeepL and Google Translate v2 APIs do not expose a
+// TTS endpoint, so the client-side speaker both covers those NMTs and is the
+// simplest option for this static site.
+
+// BCP-47 voice tags for each supported target language. Regionalised so the
+// browser can pick the closest matching installed voice.
+const SPEECH_LANG_MAP = {
+  "English":"en-US","Spanish":"es-ES","French":"fr-FR","German":"de-DE","Italian":"it-IT",
+  "Portuguese (Brazil)":"pt-BR","Portuguese (Portugal)":"pt-PT",
+  "Swedish":"sv-SE","Norwegian":"nb-NO","Danish":"da-DK","Finnish":"fi-FI",
+  "Dutch":"nl-NL","Polish":"pl-PL","Russian":"ru-RU","Ukrainian":"uk-UA","Turkish":"tr-TR",
+  "Greek":"el-GR","Romanian":"ro-RO","Hungarian":"hu-HU","Czech":"cs-CZ","Slovak":"sk-SK",
+  "Bulgarian":"bg-BG","Croatian":"hr-HR","Serbian":"sr-RS","Lithuanian":"lt-LT",
+  "Latvian":"lv-LV","Estonian":"et-EE","Slovenian":"sl-SI","Catalan":"ca-ES","Icelandic":"is-IS","Georgian":"ka-GE",
+  "Arabic":"ar-SA","Hebrew":"he-IL","Persian (Farsi)":"fa-IR","Hindi":"hi-IN","Urdu":"ur-PK","Bengali":"bn-BD",
+  "Japanese":"ja-JP","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko-KR",
+  "Thai":"th-TH","Vietnamese":"vi-VN","Indonesian":"id-ID","Malay":"ms-MY","Tagalog (Filipino)":"fil-PH"
+};
+
+const ttsSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+
+// getVoices() is populated asynchronously; keep a cache refreshed on change.
+let ttsVoices = ttsSupported ? window.speechSynthesis.getVoices() : [];
+if (ttsSupported) {
+  window.speechSynthesis.addEventListener("voiceschanged", () => {
+    ttsVoices = window.speechSynthesis.getVoices();
+  });
+}
+
+// Pick the best installed voice for a BCP-47 tag: exact match first, then any
+// voice sharing the base language (e.g. "pt" for "pt-BR").
+function pickVoice(langCode) {
+  if (!ttsVoices.length) ttsVoices = window.speechSynthesis.getVoices();
+  const lower = langCode.toLowerCase();
+  const base = lower.split("-")[0];
+  return ttsVoices.find(v => v.lang && v.lang.toLowerCase() === lower)
+      || ttsVoices.find(v => v.lang && v.lang.toLowerCase().replace("_", "-").startsWith(base + "-"))
+      || ttsVoices.find(v => v.lang && v.lang.toLowerCase().split(/[-_]/)[0] === base)
+      || null;
+}
+
+// The button currently mid-utterance, so a second click (or clicking another
+// speaker) can stop it cleanly.
+let speakingBtn = null;
+
+function stopSpeaking() {
+  if (speakingBtn) { speakingBtn.classList.remove("speaking"); speakingBtn = null; }
+  if (ttsSupported) window.speechSynthesis.cancel();
+}
+
+function speakResult(btn) {
+  const el = document.getElementById(`result-${btn.dataset.engine}`);
+  if (!el || el.classList.contains("loading")) return;
+  const text = el.textContent.trim();
+  if (!text) return;
+
+  // Clicking the active speaker (or any speaker while one is playing) stops it.
+  const wasThisSpeaking = btn === speakingBtn;
+  stopSpeaking();
+  if (wasThisSpeaking) return;
+
+  const utter = new SpeechSynthesisUtterance(text);
+  const langCode = SPEECH_LANG_MAP[targetLang] || "en-US";
+  utter.lang = langCode;
+  const voice = pickVoice(langCode);
+  if (voice) utter.voice = voice;
+  utter.rate = 0.85;   // clear and unhurried, per the design intent
+  utter.pitch = 1;
+  utter.onend = () => { if (btn === speakingBtn) { btn.classList.remove("speaking"); speakingBtn = null; } };
+  utter.onerror = () => { if (btn === speakingBtn) { btn.classList.remove("speaking"); speakingBtn = null; } };
+
+  speakingBtn = btn;
+  btn.classList.add("speaking");
+  window.speechSynthesis.speak(utter);
+}
+
+document.getElementById("resultsArea").addEventListener("click", e => {
+  const btn = e.target.closest(".speak-btn");
+  if (!btn) return;
+  if (!ttsSupported) return;
+  speakResult(btn);
+});
+
+// A fresh translation run wipes the cards; make sure any in-flight speech stops.
+submitEl.addEventListener("click", () => stopSpeaking());
 
 // ── Download all results as a real .xlsx spreadsheet ──
 // Builds an Office Open XML workbook (a ZIP of XML parts) with no external
