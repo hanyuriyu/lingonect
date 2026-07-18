@@ -319,6 +319,21 @@ const db   = firebase.firestore();
 
 const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
 
+// Profiles created on/after this instant are new free users; earlier ones are
+// grandfathered ("full" access). Keep in sync with the Cloudflare workers.
+const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
+
+// "pro" subscribers get 200 requests/day; "free" users get 500 requests total;
+// "legacy" (grandfathered) members keep unlimited full access.
+function classifyPlanData(d) {
+  if (!d) return "legacy";
+  if (d.plan === "pro" || d.subscribed === true) return "pro";
+  if (d.plan === "free") return "free";
+  const created = d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0;
+  if (created && created >= NEW_LIMITS_CUTOFF_MS) return "free";
+  return "legacy";
+}
+
 let allUsers = [];
 let activeTab = "all";
 
@@ -364,7 +379,7 @@ async function loadUsers() {
       email: d.emailConsent ? (d.email || "") : "",
       emailConsent: !!d.emailConsent,
       certification: d.certification || "Uncertified",
-      subscriptionLevel: d.subscriptionLevel !== undefined ? d.subscriptionLevel : 3,
+      plan: classifyPlanData(d),
       createdAt: d.createdAt || d.updatedAt || null
     });
   });
@@ -407,9 +422,9 @@ function renderList() {
     const isCert = u.certification === "Lingonect Certified";
     const badgeClass = isCert ? "certified" : "uncertified";
     const badgeText = isCert ? "Certified" : "Uncertified";
-    const subLevel = u.subscriptionLevel;
-    const subBadgeClass = subLevel > 0 ? "sub-level" : "sub-free";
-    const subBadgeText = subLevel > 0 ? "L" + subLevel : "Free";
+    const planLabels = { pro: "Pro", free: "Free", legacy: "Full" };
+    const subBadgeClass = u.plan === "free" ? "sub-free" : "sub-level";
+    const subBadgeText = planLabels[u.plan] || "Full";
     const dateStr = u.createdAt ? formatDate(u.createdAt) : "—";
 
     return `

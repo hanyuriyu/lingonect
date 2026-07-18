@@ -323,67 +323,43 @@ body{
 <div class="page-wrap">
   <main class="stage">
     <p class="page-title">Subscription</p>
-    <p class="page-sub">Unlock more engines</p>
+    <p class="page-sub">Simple pricing. Every engine.</p>
 
     <div class="current-level" id="currentLevel">Loading your subscription...</div>
 
-    <!-- Free tier info -->
-    <div class="free-section">
-      <p style="font-weight:800;font-size:15px;color:#111;">Free Tier</p>
-      <p>All users get access to these engines at no cost:</p>
-      <p class="free-engines">Claude &middot; OpenAI &middot; Google Translate &middot; Gemini</p>
-    </div>
-
-    <!-- Paid tiers -->
-    <div class="tier-grid">
-      <!-- Level 1 -->
-      <div class="tier-card" id="tierCard1">
-        <p class="tier-header">Level 1</p>
-        <p class="tier-price" id="tierPrice1">$1.50<span style="font-size:14px;color:#888;">/mo</span></p>
-        <p class="tier-price-note" id="tierNote1">Billed $9 every 6 months</p>
+    <!-- Plans -->
+    <div class="tier-grid" style="grid-template-columns:repeat(2,1fr);max-width:640px;margin-left:auto;margin-right:auto;">
+      <!-- Free -->
+      <div class="tier-card" id="freeCard">
+        <p class="tier-header">Free</p>
+        <p class="tier-price">$0</p>
+        <p class="tier-price-note">No card required</p>
         <ul class="tier-engines">
-          <li><span class="engine-dot" style="background:#0047FF;"></span> DeepL</li>
-          <li><span class="engine-dot" style="background:#20B2AA;"></span> Perplexity</li>
-          <li><span class="engine-dot" style="background:#FF6B35;"></span> Mistral AI</li>
-          <li><span class="engine-dot" style="background:#4C6EF5;"></span> DeepSeek</li>
+          <li><span class="engine-dot" style="background:#16c60c;"></span> Up to 500 requests total</li>
+          <li><span class="engine-dot" style="background:#16c60c;"></span> Claude &middot; OpenAI &middot; Google &middot; Gemini</li>
+          <li><span class="engine-dot" style="background:#16c60c;"></span> Spaced-repetition flashcards</li>
         </ul>
-        <a class="tier-btn" id="tierBtn1" href="#" target="_blank">Subscribe</a>
+        <a class="tier-btn owned-btn" id="freeBtn" style="cursor:default;">Included</a>
       </div>
 
-      <!-- Level 2 -->
-      <div class="tier-card" id="tierCard2">
-        <p class="tier-header">Level 2</p>
-        <p class="tier-price" id="tierPrice2">$1.50<span style="font-size:14px;color:#888;">/mo</span></p>
-        <p class="tier-price-note" id="tierNote2">Billed $9 every 6 months</p>
+      <!-- Pro -->
+      <div class="tier-card" id="proCard">
+        <p class="tier-header">Pro</p>
+        <p class="tier-price">$2.80<span style="font-size:14px;color:#888;">/mo</span></p>
+        <p class="tier-price-note">Billed $8.40 every 3 months</p>
         <ul class="tier-engines">
-          <li><span class="engine-dot" style="background:#111;"></span> Grok</li>
-          <li><span class="engine-dot" style="background:#0052D9;"></span> Tencent Translate</li>
-          <li><span class="engine-dot" style="background:#FF6A00;"></span> Alibaba Translate</li>
-          <li><span class="engine-dot" style="background:#00A4EF;"></span> Microsoft Translate</li>
+          <li><span class="engine-dot" style="background:#0047FF;"></span> 200 requests per day</li>
+          <li><span class="engine-dot" style="background:#0047FF;"></span> Every engine unlocked</li>
+          <li><span class="engine-dot" style="background:#0047FF;"></span> Cancel anytime</li>
         </ul>
-        <a class="tier-btn" id="tierBtn2" href="#" target="_blank">Subscribe</a>
-      </div>
-
-      <!-- Level 3 -->
-      <div class="tier-card" id="tierCard3">
-        <p class="tier-header">Level 3</p>
-        <p class="tier-price" id="tierPrice3">$1.50<span style="font-size:14px;color:#888;">/mo</span></p>
-        <p class="tier-price-note" id="tierNote3">Billed $9 every 6 months</p>
-        <ul class="tier-engines">
-          <li><span class="engine-dot" style="background:#FF9900;"></span> Amazon Translate</li>
-          <li><span class="engine-dot" style="background:#FF9900;"></span> Amazon Nova</li>
-          <li><span class="engine-dot" style="background:#0668E1;"></span> Meta (NLLB-200)</li>
-          <li><span class="engine-dot" style="background:#2932E1;"></span> Baidu Translate</li>
-        </ul>
-        <a class="tier-btn" id="tierBtn3" href="#" target="_blank">Subscribe</a>
+        <a class="tier-btn" id="proBtn" href="#" target="_blank">Subscribe</a>
       </div>
     </div>
 
     <div class="payment-info">
-      <strong>Billing terms</strong><br>
-      Each level is charged in 6-month intervals at $9 per level ($1.50/month equivalent).<br>
-      Your access activates automatically after payment.<br>
-      You can cancel anytime, but the current 6-month period will continue until it ends — no refunds for unused time.
+      <strong>How it works</strong><br>
+      Your first 500 requests are free. After that, Pro gives you 200 requests per day across every engine for $2.80/month, billed quarterly at $8.40.<br>
+      You can cancel anytime — your access continues until the end of the current quarter, then stops. No refunds for the remainder of a paid quarter.
     </div>
   </main>
 </div>
@@ -411,12 +387,13 @@ const db   = firebase.firestore();
 
 const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
 
-// Stripe Payment Links — replace these with your actual Stripe Payment Link URLs
-const STRIPE_LINKS = {
-  1: "#stripe-level-1-link",
-  2: "#stripe-level-2-link",
-  3: "#stripe-level-3-link"
-};
+// Profiles created on/after this instant are new free users; earlier ones are
+// grandfathered. Keep in sync with the Cloudflare workers.
+const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
+
+// Stripe Payment Link for the Pro plan — replace with your real link once
+// Stripe is set up ($2.80/mo, billed $8.40 quarterly).
+const STRIPE_PRO_LINK = "#stripe-pro-link";
 
 auth.onAuthStateChanged(async user => {
   if (!user || !user.emailVerified) {
@@ -428,7 +405,7 @@ auth.onAuthStateChanged(async user => {
     document.getElementById("adminNavLink").style.display = "";
   }
 
-  await loadSubscription(user.uid);
+  await loadSubscription(user);
   document.body.style.visibility = "visible";
 });
 
@@ -436,45 +413,55 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
 });
 
-async function loadSubscription(uid) {
-  const doc = await db.collection("profiles").doc(uid).get();
-  // Existing users without the field are grandfathered at Level 3
-  const level = doc.exists && doc.data().subscriptionLevel !== undefined
-    ? doc.data().subscriptionLevel
-    : 3;
-
-  renderCurrentLevel(level);
-  renderTierCards(level);
+async function loadSubscription(user) {
+  const doc = await db.collection("profiles").doc(user.uid).get();
+  const status = classifyPlan(doc.exists ? doc.data() : null, user.email);
+  renderStatus(status);
 }
 
-function renderCurrentLevel(level) {
-  const el = document.getElementById("currentLevel");
-  if (level >= 3) {
-    el.innerHTML = "Your plan: <strong>Level 3 (Full Access)</strong> — All engines unlocked";
-  } else if (level === 2) {
-    el.innerHTML = "Your plan: <strong>Level 2</strong> — Add Level 3 for $9 every 6 months";
-  } else if (level === 1) {
-    el.innerHTML = "Your plan: <strong>Level 1</strong> — Add Level 2 or Level 3 for $9 every 6 months each";
-  } else {
-    el.innerHTML = "Your plan: <strong>Free</strong> — Subscribe to unlock more engines";
+// "admin" and "legacy" (grandfathered) members have unlimited full access;
+// "pro" subscribers get 200 requests/day; "free" users get 500 requests total.
+function classifyPlan(data, email) {
+  if (email === ADMIN_EMAIL) return "admin";
+  if (!data) return "legacy";
+  if (data.plan === "pro" || data.subscribed === true) return "pro";
+  if (data.plan === "free") return "free";
+  const created = data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0;
+  if (created && created >= NEW_LIMITS_CUTOFF_MS) return "free";
+  return "legacy";
+}
+
+function renderStatus(status) {
+  const banner = document.getElementById("currentLevel");
+  const proBtn = document.getElementById("proBtn");
+  const proCard = document.getElementById("proCard");
+
+  if (status === "pro") {
+    banner.innerHTML = "Your plan: <strong>Pro</strong> — 200 requests/day across every engine";
+    proCard.classList.add("owned");
+    proBtn.textContent = "Active";
+    proBtn.classList.add("owned-btn");
+    proBtn.removeAttribute("href");
+    proBtn.style.cursor = "default";
+    return;
   }
-}
 
-function renderTierCards(level) {
-  const tiers = [1, 2, 3];
-  tiers.forEach(n => {
-    const btn = document.getElementById("tierBtn" + n);
-    const card = document.getElementById("tierCard" + n);
-    if (level >= n) {
-      card.classList.add("owned");
-      btn.textContent = "Owned";
-      btn.classList.add("owned-btn");
-      btn.removeAttribute("href");
-    } else {
-      btn.href = STRIPE_LINKS[n];
-      btn.textContent = "Subscribe — $9 / 6 months";
-    }
-  });
+  if (status === "admin" || status === "legacy") {
+    banner.innerHTML = status === "admin"
+      ? "Your plan: <strong>Admin</strong> — unlimited access to every engine"
+      : "Your plan: <strong>Full access</strong> — as an early member every engine is unlocked with no request cap";
+    // These users already have full access; don't nudge them to subscribe.
+    proCard.classList.add("owned");
+    proBtn.textContent = "Included";
+    proBtn.classList.add("owned-btn");
+    proBtn.removeAttribute("href");
+    proBtn.style.cursor = "default";
+    return;
+  }
+
+  // Free user
+  banner.innerHTML = "Your plan: <strong>Free</strong> — up to 500 requests, then subscribe to keep going";
+  proBtn.href = STRIPE_PRO_LINK;
 }
 </script>
 </body>

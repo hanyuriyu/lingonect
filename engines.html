@@ -1068,15 +1068,29 @@ async function workerFetch(url, options = {}) {
     headers["Authorization"] = "Bearer " + (await user.getIdToken());
   }
   const res = await fetch(url, Object.assign({}, options, { headers }));
-  // 429 = daily request limit reached. Tell the user once (not once per call).
+  // 429 = request limit reached (either the daily quota or the 500-request
+  // free cap). Tell the user once, not once per fanned-out engine call.
   if (res.status === 429 && !__quotaAlerted) {
     __quotaAlerted = true;
-    alert("You've reached your daily request limit. Please try again tomorrow.");
+    let msg = "You've reached your request limit. Please try again later.";
+    let freeCap = false;
+    try {
+      const info = await res.clone().json();
+      if (info && info.error) msg = info.error;
+      if (info && info.code === "free_limit_reached") freeCap = true;
+    } catch (_) {}
+    alert(msg);
+    if (freeCap) window.location.href = "subscription.html";
   }
   return res;
 }
 
-let userSubscriptionLevel = 3; // default for grandfathered users
+// True for admin, Pro subscribers and grandfathered/legacy members; false for
+// new free users, who are limited to the free-tier engines (tier 0) below.
+let userHasFullAccess = true;
+// Profiles created on/after this instant are new free users; earlier ones are
+// grandfathered. Keep in sync with the Cloudflare workers.
+const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
 
 const ENGINE_TIERS = {
   claude: 0, openai: 0, google: 0, gemini: 0,
@@ -1091,8 +1105,20 @@ function engineRequiresLevel(engineId) {
   return ENGINE_TIERS[engineId] || 0;
 }
 
+// Free users can only use the free-tier engines (tier 0). Everyone with full
+// access (admin, Pro subscribers, grandfathered members) gets every engine.
 function isEngineLocked(engineId) {
-  return engineRequiresLevel(engineId) > userSubscriptionLevel;
+  return engineRequiresLevel(engineId) > 0 && !userHasFullAccess;
+}
+
+// Mirror of the worker's classifier: who gets every engine (and no 500 cap)?
+function computeFullAccess(data) {
+  if (!data) return true;               // no profile yet → treat as grandfathered
+  if (data.plan === "pro" || data.subscribed === true) return true;
+  if (data.plan === "free") return false;
+  const created = data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0;
+  if (created && created >= NEW_LIMITS_CUTOFF_MS) return false;  // new free user
+  return true;                          // grandfathered member
 }
 
 const db = firebase.firestore();
@@ -1107,9 +1133,11 @@ auth.onAuthStateChanged(async user => {
     document.getElementById("adminNavLink").style.display = "";
   }
 
-  const profileDoc = await db.collection("profiles").doc(user.uid).get();
-  if (profileDoc.exists && profileDoc.data().subscriptionLevel !== undefined) {
-    userSubscriptionLevel = profileDoc.data().subscriptionLevel;
+  if (user.email === "linguisticsconsulting@gmail.com") {
+    userHasFullAccess = true;
+  } else {
+    const profileDoc = await db.collection("profiles").doc(user.uid).get();
+    userHasFullAccess = computeFullAccess(profileDoc.exists ? profileDoc.data() : null);
   }
 
   document.body.style.visibility = "visible";
@@ -2604,16 +2632,14 @@ function buildCard(engine) {
       <span class="engine-type">${engineType(engine.id)}</span>
     </div>`;
 
-  const reqLevel = engineRequiresLevel(engine.id);
-
   if (locked) {
     card.innerHTML = `
       ${logoHtml}
       <div class="result-content">
         <p class="engine-name">${engine.name}</p>
         <div class="lock-overlay">
-          Available with Level ${reqLevel} subscription.
-          <a href="subscription.html">Upgrade</a>
+          Included with Pro.
+          <a href="subscription.html">Subscribe</a>
         </div>
       </div>`;
   } else {

@@ -113,6 +113,40 @@ async function verifyFirebaseToken(authHeader) {
   return valid ? payload : null;
 }
 
+// ── New-user request-limit policy ──────────────────────────────
+// Profiles created on or after this instant are subject to the 500-request
+// free cap; anyone created earlier is grandfathered. Stripe (added later) can
+// override per-user by writing plan "pro" (subscriber) or "free" to the profile.
+const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
+const FIRESTORE_PROFILE_BASE =
+  "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID +
+  "/databases/(default)/documents/profiles/";
+
+// Classify a user as "pro" (subscriber, 200/day), "free" (new user, 500
+// lifetime), or "legacy" (grandfathered, 1000/day). Reads the user's own
+// profile from Firestore with their forwarded ID token. Fails safe to "legacy"
+// so a hiccup never blocks a grandfathered or paying user.
+async function __resolveUserStatus(uid, authHeader) {
+  try {
+    const res = await fetch(FIRESTORE_PROFILE_BASE + uid, {
+      headers: { Authorization: authHeader },
+    });
+    if (!res.ok) return "legacy";
+    const doc = await res.json();
+    const f = (doc && doc.fields) || {};
+    const plan = f.plan && f.plan.stringValue;
+    const subscribed = f.subscribed && f.subscribed.booleanValue === true;
+    if (plan === "pro" || subscribed) return "pro";
+    if (plan === "free") return "free";
+    const created = f.createdAt && f.createdAt.timestampValue;
+    const createdMs = created ? Date.parse(created) : 0;
+    if (createdMs && createdMs >= NEW_LIMITS_CUTOFF_MS) return "free";
+    return "legacy";
+  } catch (_) {
+    return "legacy";
+  }
+}
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -141,30 +175,66 @@ export default {
       );
     }
 
-    // Per-user daily quota: 1000 requests per UTC calendar day. The admin
-    // account is exempt. Fails open (allows the request) if the KV store is
-    // missing or unavailable, so a storage hiccup never blocks translation.
+    // ── Per-user request limits ─────────────────────────────
+    // Admin is always exempt. Everything below fails open: any KV/Firestore
+    // hiccup lets the request through rather than blocking a paying or
+    // grandfathered user.
+    //   • Grandfathered users (profile created before the cutoff, or with no
+    //     explicit plan) keep the legacy allowance of 1000 requests/UTC-day.
+    //   • Subscribers (plan "pro") get 200 requests/UTC-day.
+    //   • New free users (plan "free", or a profile created on/after the
+    //     cutoff) get 500 requests total, ever. After that they must subscribe.
     if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
       try {
-        const __day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-        const __qKey = "q:" + __authPayload.sub + ":" + __day;
-        const __used = parseInt((await env.QUOTA_KV.get(__qKey)) || "0", 10) || 0;
-        if (__used >= 1000) {
-          return new Response(
-            JSON.stringify({ error: "Daily request limit reached. Please try again tomorrow." }),
-            {
-              status: 429,
-              headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "https://www.lingonect.com",
-              },
-            }
-          );
+        const __uid = __authPayload.sub;
+        // Resolve the user's status, cached in KV so Firestore is hit at most
+        // once every 10 minutes per user.
+        let __status = await env.QUOTA_KV.get("st:" + __uid);
+        if (!__status) {
+          __status = await __resolveUserStatus(__uid, request.headers.get("Authorization"));
+          await env.QUOTA_KV.put("st:" + __uid, __status, { expirationTtl: 600 });
         }
-        // Counter auto-expires after 2 days so old day-keys clean themselves up.
-        await env.QUOTA_KV.put(__qKey, String(__used + 1), { expirationTtl: 172800 });
+
+        if (__status === "free") {
+          // Lifetime cap: 500 requests, ever.
+          const __tKey = "t:" + __uid;
+          const __total = parseInt((await env.QUOTA_KV.get(__tKey)) || "0", 10) || 0;
+          if (__total >= 500) {
+            return new Response(
+              JSON.stringify({ error: "You've used all 500 free requests. Subscribe to keep translating.", code: "free_limit_reached" }),
+              {
+                status: 429,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "https://www.lingonect.com",
+                },
+              }
+            );
+          }
+          await env.QUOTA_KV.put(__tKey, String(__total + 1));
+        } else {
+          // Daily cap: 200/day for subscribers, 1000/day for grandfathered users.
+          const __dailyMax = __status === "pro" ? 200 : 1000;
+          const __day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+          const __qKey = "q:" + __uid + ":" + __day;
+          const __used = parseInt((await env.QUOTA_KV.get(__qKey)) || "0", 10) || 0;
+          if (__used >= __dailyMax) {
+            return new Response(
+              JSON.stringify({ error: "Daily request limit reached. Please try again tomorrow.", code: "daily_limit_reached" }),
+              {
+                status: 429,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "https://www.lingonect.com",
+                },
+              }
+            );
+          }
+          // Counter auto-expires after 2 days so old day-keys clean themselves up.
+          await env.QUOTA_KV.put(__qKey, String(__used + 1), { expirationTtl: 172800 });
+        }
       } catch (_) {
-        // KV unavailable — allow the request rather than blocking the user.
+        // KV/Firestore unavailable — allow the request rather than blocking the user.
       }
     }
 
