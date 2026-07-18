@@ -957,10 +957,19 @@ async function workerFetch(url, options = {}) {
     headers["Authorization"] = "Bearer " + (await user.getIdToken());
   }
   const res = await fetch(url, Object.assign({}, options, { headers }));
-  // 429 = daily request limit reached. Tell the user once (not once per call).
+  // 429 = request limit reached (either the daily quota or the 500-request
+  // free cap). Tell the user once, not once per call.
   if (res.status === 429 && !__quotaAlerted) {
     __quotaAlerted = true;
-    alert("You've reached your daily request limit. Please try again tomorrow.");
+    let msg = "You've reached your request limit. Please try again later.";
+    let freeCap = false;
+    try {
+      const info = await res.clone().json();
+      if (info && info.error) msg = info.error;
+      if (info && info.code === "free_limit_reached") freeCap = true;
+    } catch (_) {}
+    alert(msg);
+    if (freeCap) window.location.href = "subscription.html";
   }
   return res;
 }
