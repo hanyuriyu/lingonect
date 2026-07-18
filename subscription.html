@@ -348,7 +348,7 @@ body{
         <p class="tier-price">$2.80<span style="font-size:14px;color:#888;">/mo</span></p>
         <p class="tier-price-note">Billed $8.40 every 3 months</p>
         <ul class="tier-engines">
-          <li><span class="engine-dot" style="background:#0047FF;"></span> 200 requests per day</li>
+          <li><span class="engine-dot" style="background:#0047FF;"></span> 800 requests per day</li>
           <li><span class="engine-dot" style="background:#0047FF;"></span> Every engine unlocked</li>
           <li><span class="engine-dot" style="background:#0047FF;"></span> Cancel anytime</li>
         </ul>
@@ -358,7 +358,7 @@ body{
 
     <div class="payment-info">
       <strong>How it works</strong><br>
-      Your first 500 requests are free. After that, Pro gives you 200 requests per day across every engine for $2.80/month, billed quarterly at $8.40.<br>
+      Your first 500 requests are free. After that, Pro gives you 800 requests per day across every engine for $2.80/month, billed quarterly at $8.40.<br>
       You can cancel anytime — your access continues until the end of the current quarter, then stops. No refunds for the remainder of a paid quarter.
     </div>
   </main>
@@ -420,7 +420,7 @@ async function loadSubscription(user) {
 }
 
 // "admin" and "legacy" (grandfathered) members have unlimited full access;
-// "pro" subscribers get 200 requests/day; "free" users get 500 requests total.
+// "pro" subscribers get 800 requests/day; "free" users get 500 requests total.
 function classifyPlan(data, email) {
   if (email === ADMIN_EMAIL) return "admin";
   if (!data) return "legacy";
@@ -437,7 +437,7 @@ function renderStatus(status) {
   const proCard = document.getElementById("proCard");
 
   if (status === "pro") {
-    banner.innerHTML = "Your plan: <strong>Pro</strong> — 200 requests/day across every engine";
+    banner.innerHTML = "Your plan: <strong>Pro</strong> — 800 requests/day across every engine";
     proCard.classList.add("owned");
     proBtn.textContent = "Active";
     proBtn.classList.add("owned-btn");
