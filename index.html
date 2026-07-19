@@ -26,6 +26,28 @@
 <meta name="twitter:description" content="Compare AI translation engines side by side, chat with linguists, and explore how language and culture shape the world.">
 <meta name="twitter:image" content="https://www.lingonect.com/logo.png">
 
+<!-- Structured data: establish the Lingonect entity so search engines and LLMs
+     do not confuse it with the unrelated "Lingonet" language company.
+     Add verified social profile URLs to "sameAs" once they exist. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Lingonect",
+  "url": "https://www.lingonect.com/",
+  "logo": "https://www.lingonect.com/logo.png",
+  "description": "Lingonect is a platform to compare AI translation engines side by side, create AI-powered flashcard stacks, and connect with multilingual humans about language and culture."
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Lingonect",
+  "url": "https://www.lingonect.com/"
+}
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
@@ -144,6 +166,27 @@ html,body{
 }
 .auth-link:hover{ color:var(--cobalt); }
 
+/* === BRAND HEADING + TAGLINE (crawlable, keyword-rich page content) === */
+.brand-heading{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:17px;
+  font-weight:800;
+  margin:12px 0 6px;
+  color:#000;
+  text-align:center;
+  letter-spacing:.3px;
+}
+.brand-tagline{
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:12.5px;
+  line-height:1.5;
+  margin:0 0 6px;
+  max-width:260px;
+  color:#555;
+  text-align:center;
+  pointer-events:auto;
+}
+
 /* === LANGUAGE SWITCHER === */
 .language-switcher{
   position:fixed;
@@ -224,17 +267,19 @@ html,body{
 
   .stage{
     left:50%;
-    top:260px;
+    top:330px;
     transform:translateX(-50%);
     width:min(92vw, 560px);
-    height:calc(100dvh - 340px);
-    height:calc(100vh - 340px);
+    height:calc(100dvh - 410px);
+    height:calc(100vh - 410px);
   }
 
   #typed{
     font-size:18px;
     line-height:1.7;
   }
+
+  .brand-tagline{ max-width:280px; }
 
   .auth-nav{ margin-top:10px; }
   .auth-link{ font-size:14px; line-height:2; }
@@ -249,9 +294,9 @@ html,body{
 @media (max-width: 420px){
   .stage{
     width:92vw;
-    top:240px;
-    height:calc(100dvh - 320px);
-    height:calc(100vh - 320px);
+    top:310px;
+    height:calc(100dvh - 390px);
+    height:calc(100vh - 390px);
   }
   #typed{ font-size:17px; }
   .logo{ width:140px; height:140px; }
@@ -266,12 +311,38 @@ html,body{
 <div class="logo-rail">
   <div class="logo-group">
     <a href="index.html"><img class="logo" src="logo.png" alt="Lingonect"></a>
+    <h1 class="brand-heading">Lingonect</h1>
+    <p class="brand-tagline">Compare AI translation engines side by side, build AI-powered language flashcards, and connect with truly multilingual humans.</p>
     <nav class="auth-nav" aria-label="Account">
       <a href="login.html" class="auth-link">Login</a>
       <a href="register.html" class="auth-link">Register</a>
     </nav>
   </div>
 </div>
+
+<!-- STATIC, CRAWLABLE FALLBACK: shown when JavaScript is disabled, and
+     guarantees real page content exists in the initial HTML (the animated
+     statement above is injected by JS, so crawlers that don't render JS
+     would otherwise see an empty page). -->
+<noscript>
+  <div style="max-width:640px;margin:120px auto 40px;padding:0 20px;font-family:'Special Elite','Courier New',monospace;line-height:1.7;color:#111;">
+    <h2>Lingonect — where language, culture &amp; AI translation meet</h2>
+    <p>Lingonect is a platform for people who love language. Compare AI translation
+       engines side by side, create AI-powered flashcard stacks to study vocabulary,
+       chat with truly multilingual humans, and explore how language and culture shape
+       the world.</p>
+    <p>Language and culture are uniquely human. Unlike artificial intelligence, humans
+       generate language from within — through emotion, experience, joy, trauma, pain
+       and memory. AI does not experience language; it reproduces it from the outside.
+       Lingonect brings together truly multilingual humans and uses AI to practise,
+       refine, and responsibly share linguistic and cultural knowledge.</p>
+    <p><a href="engines.html">Translation engines</a> &middot;
+       <a href="chat.html">Chat</a> &middot;
+       <a href="ratings.html">Ratings</a> &middot;
+       <a href="register.html">Register</a> &middot;
+       <a href="login.html">Login</a></p>
+  </div>
+</noscript>
 
 <!-- CENTERED TYPING STAGE -->
 <section class="stage" aria-label="Lingonect statement">
