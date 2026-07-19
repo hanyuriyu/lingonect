@@ -46,11 +46,30 @@ body{
   height:44px;
   display:flex;
   align-items:center;
-  justify-content:center;
+  justify-content:safe center;
   gap:32px;
   background:var(--bg);
   z-index:100;
   font-family:"Special Elite","Courier New",monospace;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  padding:0 16px;
+  box-sizing:border-box;
+}
+.top-nav::-webkit-scrollbar{ display:none; }
+/* Right-edge fade hints that the nav scrolls horizontally when items overflow */
+.top-nav::after{
+  content:"";
+  position:fixed;
+  top:0;
+  right:0;
+  width:28px;
+  height:44px;
+  pointer-events:none;
+  z-index:101;
+  background:linear-gradient(to right, rgba(255,255,255,0), var(--bg));
 }
 .top-nav a{
   font-size:14px;
@@ -59,6 +78,8 @@ body{
   text-decoration:none;
   letter-spacing:.5px;
   transition:color .2s;
+  white-space:nowrap;
+  flex:0 0 auto;
 }
 .top-nav a:hover{ color:var(--text); }
 .top-nav a.active{ color:var(--text); }
