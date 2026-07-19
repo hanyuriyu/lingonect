@@ -317,13 +317,11 @@ mark{
 
   <h2>Correct</h2>
 
-  <p>Correction does <strong>not translate</strong> either. It proofreads your <strong>source-language</strong> input and fixes any <strong>objective grammar, syntax, spelling, punctuation, or style mistakes</strong>, returning the corrected text in the <strong>same language you wrote it in</strong>. Below a <strong>grey dotted line</strong>, it then gives a short, succinct explanation of <strong>what was corrected and why</strong>, written in the <strong>target language</strong> you have selected &mdash; just like the transliteration reading aid.</p>
+  <p>Correction does <strong>not translate</strong> either. It proofreads your <strong>source-language</strong> input and fixes any <strong>objective grammar, syntax, spelling, punctuation, or style mistakes</strong>, returning the corrected text in the <strong>same language you wrote it in</strong>. Below a <strong>grey dotted line</strong>, it then gives a short, succinct explanation of <strong>what was corrected and why</strong>, written in the <strong>target language</strong> you have selected &mdash; just like the transliteration reading aid. Correction is an <strong>LLM-only</strong> methodology, so NMT engines will not return a result.</p>
 
-  <p>Because it fixes rather than translates, the <strong>formality level has no effect</strong> on correction. Correction is an <strong>LLM-only</strong> methodology, so NMT engines will not return a result.</p>
+  <p>Unlike analysis, the <strong>formality level does apply</strong> to correction. If you leave it on <strong>Original</strong>, the corrected text keeps the formality of your input. If you pick a specific level, correction will <strong>not only fix the objective mistakes but also adjust the text to that register</strong> &mdash; for example correcting a casual note into polite, formal phrasing. Because the corrected text stays in your source language, honorific and humble become available based on your <strong>source</strong> language rather than the target.</p>
 
-  <div class="note">
-    Unlike analysis, correction <strong>can</strong> be combined with localization. Select localization with a character max limit and then add correction: your input is corrected <em>and</em> shortened to fit the character limit you specified, giving you a clean, correct sentence within your desired length.
-  </div>
+  <p>Correction also has its <strong>own optional maximum character limit</strong>, just like localization. When you select correction, a <mark>Max characters</mark> box appears &mdash; enter a number and the corrected text will be rewritten to fit that limit; leave it blank for no limit. You can alternatively combine correction with <strong>localization</strong>, in which case the localization limit is used. Either way, your input comes back corrected <em>and</em> within your desired length.</p>
 
   <h2>Selecting a methodology</h2>
 
