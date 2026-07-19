@@ -8,14 +8,14 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<meta name="description" content="How to use Lingonect: understand NMT vs LLM engines, localization, transcreation, culturalization, analysis, and formality levels.">
+<meta name="description" content="How to use Lingonect: understand NMT vs LLM engines, localization, transcreation, culturalization, analysis, correction, and formality levels.">
 <link rel="canonical" href="https://www.lingonect.com/how-to-use.html">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.lingonect.com/how-to-use.html">
 <meta property="og:title" content="How to use Lingonect">
-<meta property="og:description" content="How to use Lingonect: understand NMT vs LLM engines, localization, transcreation, culturalization, analysis, and formality levels.">
+<meta property="og:description" content="How to use Lingonect: understand NMT vs LLM engines, localization, transcreation, culturalization, analysis, correction, and formality levels.">
 <meta property="og:image" content="https://www.lingonect.com/logo.png">
 <meta property="og:site_name" content="Lingonect">
 
@@ -281,7 +281,7 @@ mark{
 
   <h2>NMTs vs. LLMs</h2>
 
-  <p>When using Lingonect, it is important to understand the difference between <span class="term">NMTs</span> (Neural Machine Translation) and <span class="term">LLMs</span> (Large Language Models). While all engines support <strong>translation</strong>, more complex methodologies, such as <strong>localization</strong>, <strong>transcreation</strong>, <strong>culturalization</strong>, and <strong>analysis</strong>, are supported <mark>only by LLMs</mark>. Please note that if you select these methodologies for an NMT engine, <strong>you will not receive a response</strong>.</p>
+  <p>When using Lingonect, it is important to understand the difference between <span class="term">NMTs</span> (Neural Machine Translation) and <span class="term">LLMs</span> (Large Language Models). While all engines support <strong>translation</strong>, more complex methodologies, such as <strong>localization</strong>, <strong>transcreation</strong>, <strong>culturalization</strong>, <strong>analysis</strong>, and <strong>correction</strong>, are supported <mark>only by LLMs</mark>. Please note that if you select these methodologies for an NMT engine, <strong>you will not receive a response</strong>.</p>
 
   <div class="note">
     Consider each LLM as <strong>one single opinion</strong>. Every LLM has its own datasets and its own learning algorithm, so there isn't necessarily a single best one; it often depends on what you like most or understand best. <strong>Never trust only one LLM!</strong> For Western languages and cultures, models like <strong>ChatGPT, Claude, Gemini, or Mistral</strong> tend to shine; for Eastern European, something like <strong>Yandex or Alice</strong> may serve you better; and for Asian, Chinese in particular, <strong>Baidu, Alibaba, or Tencent</strong>. You are the human who decides what you need, what you like most, and what fits your purpose best. <mark>Lingonect recommends to always compare at least 3-4 different outputs.</mark>
@@ -300,7 +300,7 @@ mark{
   <p>On Lingonect, the localization methodology provides a translation that is automatically adjusted to your desired length. Simply enter the <mark>maximum character count</mark> for your translation, and the tool will localize the text to fit those constraints.</p>
 
   <div class="note">
-    After selecting localization with a character max limit, you can select translation, transcreation, or culturalization. Localization <strong>cannot</strong> be combined with analysis. If you select <strong>only</strong> localization, the system will automatically use <strong>translation</strong> as the primary methodology.
+    After selecting localization with a character max limit, you can select translation, transcreation, culturalization, or correction. Localization <strong>cannot</strong> be combined with analysis. If you select <strong>only</strong> localization, the system will automatically use <strong>translation</strong> as the primary methodology.
   </div>
 
   <h2>Transcreation</h2>
@@ -314,6 +314,14 @@ mark{
   <h2>Analysis</h2>
 
   <p>Analysis does <strong>not translate</strong>. Instead it takes your source word, phrase, or sentence and explains its <strong>syntax, grammar, style, and meaning</strong>, written in the <strong>target language</strong> you have selected, so a learner can understand the source text. Because it produces an explanation rather than a translation, <strong>localization cannot be combined with analysis</strong> and the <strong>formality level has no effect</strong>.</p>
+
+  <h2>Correct</h2>
+
+  <p>Correction does <strong>not translate</strong> either. It proofreads your <strong>source-language</strong> input and fixes any <strong>objective grammar, syntax, spelling, punctuation, or style mistakes</strong>, returning the corrected text in the <strong>same language you wrote it in</strong>. Below a <strong>grey dotted line</strong>, it then gives a short, succinct explanation of <strong>what was corrected and why</strong>, written in the <strong>target language</strong> you have selected &mdash; just like the transliteration reading aid. Correction is an <strong>LLM-only</strong> methodology, so NMT engines will not return a result.</p>
+
+  <p>Unlike analysis, the <strong>formality level does apply</strong> to correction. If you leave it on <strong>Original</strong>, the corrected text keeps the formality of your input. If you pick a specific level, correction will <strong>not only fix the objective mistakes but also adjust the text to that register</strong> &mdash; for example correcting a casual note into polite, formal phrasing. Because the corrected text stays in your source language, honorific and humble become available based on your <strong>source</strong> language rather than the target.</p>
+
+  <p>Correction also has its <strong>own optional maximum character limit</strong>, just like localization. When you select correction, a <mark>Max characters</mark> box appears &mdash; enter a number and the corrected text will be rewritten to fit that limit; leave it blank for no limit. You can alternatively combine correction with <strong>localization</strong>, in which case the localization limit is used. Either way, your input comes back corrected <em>and</em> within your desired length.</p>
 
   <h2>Selecting a methodology</h2>
 
