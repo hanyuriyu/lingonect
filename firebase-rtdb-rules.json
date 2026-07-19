@@ -1,21 +1,35 @@
 {
   "rules": {
     "presence": {
+      ".read": "auth !== null",
       "$uid": {
-        ".read": true,
-        ".write": "$uid === auth.uid"
+        ".write": "$uid === auth.uid",
+        ".validate": "newData.hasChildren(['online', 'username', 'firstLang', 'lastSeen'])",
+        "online": { ".validate": "newData.isBoolean()" },
+        "username": { ".validate": "newData.isString() && newData.val().length <= 100" },
+        "firstLang": { ".validate": "newData.isString() && newData.val().length <= 100" },
+        "lastSeen": { ".validate": "newData.val() === now" },
+        "$other": { ".validate": false }
       }
     },
     "invites": {
       "$uid": {
         ".read": "$uid === auth.uid",
-        ".write": "auth !== null"
+        ".write": "auth !== null && ((!newData.exists() && $uid === auth.uid) || newData.child('from').val() === auth.uid)",
+        ".validate": "newData.hasChildren(['from', 'fromName', 'ts'])",
+        "from": { ".validate": "newData.isString() && newData.val() === auth.uid" },
+        "fromName": { ".validate": "newData.isString() && newData.val().length <= 100" },
+        "ts": { ".validate": "newData.val() === now" },
+        "$other": { ".validate": false }
       }
     },
     "activeChats": {
-      ".read": true,
+      ".read": "auth !== null",
       "$uid": {
-        ".write": "$uid === auth.uid"
+        ".write": "$uid === auth.uid",
+        "$otherUid": {
+          ".validate": "newData.isBoolean()"
+        }
       }
     },
     "$other": {
