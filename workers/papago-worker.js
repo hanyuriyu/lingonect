@@ -256,6 +256,22 @@ export default {
     };
 
     try {
+      // ── Request body size guard ─────────────────────────────
+      // Reject oversized payloads before parsing, so an authenticated client
+      // can't push a huge body through to the paid upstream provider.
+      const __clen = parseInt(request.headers.get("Content-Length") || "0", 10) || 0;
+      if (__clen > 100000) {
+        return new Response(
+          JSON.stringify({ error: "Request body too large", code: "body_too_large" }),
+          {
+            status: 413,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "https://www.lingonect.com",
+            },
+          }
+        );
+      }
       const { text, source, target } = await request.json();
 
       const clientId     = (env.PAPAGO_CLIENT_ID     || "").trim();
