@@ -1471,11 +1471,12 @@ inputEl.addEventListener("input", () => {
 // culturalize | analyze | correct (mutually exclusive). null means none
 // explicitly selected, in which case translation is assumed. Localize is an
 // independent modifier with a max-character limit; it can be combined with any
-// base methodology EXCEPT analyze and correct, and is only ever produced by an
-// LLM (NMTs cannot localize/transcreate/culturalize/analyze/correct). Analyze
-// does not translate at all — it explains the source text — and correct only
-// fixes the source text rather than translating it, so localization, formality
-// and transliteration do not apply to either.
+// base methodology EXCEPT analyze, and is only ever produced by an LLM (NMTs
+// cannot localize/transcreate/culturalize/analyze/correct). Analyze does not
+// translate at all — it explains the source text — so localization, formality
+// and transliteration do not apply to it. Correct fixes the source text rather
+// than translating it, so formality and transliteration do not apply; but
+// localization CAN combine with it, capping the corrected text to the limit.
 let baseMethod = null;
 let localizeOn = false;
 let localizeMax = 0;
@@ -1495,8 +1496,9 @@ function methodologyNeedsLLM() {
 
 // Methods that do not produce an ordinary translation of the source into the
 // target language: analyze explains the source, correct fixes the source. For
-// both, the localization budget, formality register, and transliteration reading
-// aid do not apply.
+// both, the formality register and the transliteration reading aid do not apply.
+// (The localization length budget DOES apply to correct — it caps the corrected
+// text — but not to analyze; that distinction is handled separately below.)
 function isSourceOrientedMethod(m) {
   return m === "analyze" || m === "correct";
 }
@@ -1526,19 +1528,20 @@ methodWords.forEach(w => {
   w.addEventListener("click", () => {
     const m = w.dataset.method;
     if (m === "localize") {
-      // Localize cannot be combined with Analyze or Correct — turning it on
-      // clears whichever of those is active.
-      if (isSourceOrientedMethod(baseMethod)) baseMethod = null;
+      // Localize cannot be combined with Analyze (a prose explanation has no
+      // length budget), so turning it on clears Analyze. It CAN combine with
+      // Correct — the corrected text is then also cut to the character limit.
+      if (baseMethod === "analyze") baseMethod = null;
       localizeOn = !localizeOn;
       if (localizeOn) setTimeout(() => localizeMaxInput.focus(), 0);
     } else {
       // The base methodologies are mutually exclusive; clicking the active one
       // again clears it (translation is then assumed).
       baseMethod = (baseMethod === m) ? null : m;
-      // Analyze explains and Correct fixes the source rather than translating,
-      // so neither can be combined with localization; selecting one clears any
-      // active localization.
-      if (isSourceOrientedMethod(baseMethod)) localizeOn = false;
+      // Analyze explains rather than translates, so it cannot be combined with
+      // localization; selecting it clears any active localization. Correct can
+      // combine with localization (correct-and-fit), so it does not.
+      if (baseMethod === "analyze") localizeOn = false;
     }
     renderMethodology();
   });
@@ -1776,10 +1779,13 @@ function llmSystemPrompt(extra) {
   else if (m === "analyze")     prompt = analyzePrompt(src, tgt);
   else if (m === "correct")     prompt = correctPrompt(src, tgt);
   else                          prompt = baseTranslatePrompt(tgt);
-  // Analyze explains the source and Correct fixes the source rather than
-  // producing an ordinary target-language translation, so the localization
-  // length budget and formality register do not apply to either.
-  if (!isSourceOrientedMethod(m) && localizeOn && localizeMax > 0) prompt += localizeClause(localizeMax);
+  // Localization applies to any method that emits editable text EXCEPT analyze
+  // (a prose explanation has no length budget). For correct it caps the
+  // corrected source text; the budget clause is language-neutral so it works
+  // whether the output is in the source or the target language.
+  if (m !== "analyze" && localizeOn && localizeMax > 0) prompt += localizeClause(localizeMax);
+  // Formality is a target-language register control, so it does not apply to the
+  // source-oriented methods (analyze explains, correct only fixes errors).
   if (!isSourceOrientedMethod(m) && formality && formalityAvailable(formality)) prompt += formalityClause(tgt);
   // Attach an inline transliteration when the target uses a non-Latin script.
   // Skipped for analyze (prose explanation) and correct (the output is the
@@ -2732,6 +2738,9 @@ submitEl.addEventListener("click", async () => {
   const formalityOn = formalityNeedsLLM();
   const needsLLM = methodologyNeedsLLM() || formalityOn;
   const maxChars = (localizeOn && localizeMax > 0) ? localizeMax : 0;
+  // Correct returns the corrected SOURCE text, so any over-budget retry must ask
+  // for a shorter SOURCE-language version; every other method outputs the target.
+  const budgetLang = effectiveMethod() === "correct" ? sourceLang : targetLang;
 
   engines.forEach(async engine => {
     if (isEngineLocked(engine.id)) return;
@@ -2789,7 +2798,7 @@ submitEl.addEventListener("click", async () => {
         let best = translation.trim();
         const MAX_FIT_RETRIES = 3;
         for (let attempt = 1; attempt <= MAX_FIT_RETRIES && best.length > maxChars; attempt++) {
-          const feedback = `\n\nYOUR PREVIOUS ATTEMPT WAS ${best.length} CHARACTERS — TOO LONG: "${best}". The hard limit is ${maxChars} characters, counting every space and punctuation mark. Write a COMPLETE, natural, grammatically correct ${targetLang} version of AT MOST ${maxChars} characters. Count as you go. Do NOT truncate or trail off — if necessary convey only the essential gist in very few words. Output only the final text.`;
+          const feedback = `\n\nYOUR PREVIOUS ATTEMPT WAS ${best.length} CHARACTERS — TOO LONG: "${best}". The hard limit is ${maxChars} characters, counting every space and punctuation mark. Write a COMPLETE, natural, grammatically correct ${budgetLang} version of AT MOST ${maxChars} characters. Count as you go. Do NOT truncate or trail off — if necessary convey only the essential gist in very few words. Output only the final text.`;
           let retried;
           try {
             retried = await callWithTimeout(feedback);
