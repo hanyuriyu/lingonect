@@ -127,7 +127,7 @@ const FIRESTORE_PROFILE_BASE =
   "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID +
   "/databases/(default)/documents/profiles/";
 
-// Classify a user as "pro" (subscriber, 200/day), "free" (new user, 500
+// Classify a user as "pro" (subscriber, 800/day), "free" (new user, 500
 // lifetime), or "legacy" (grandfathered, 1000/day). Reads the user's own
 // profile from Firestore with their forwarded ID token. Fails safe to "legacy"
 // so a hiccup never blocks a grandfathered or paying user.
@@ -190,7 +190,7 @@ export default {
     // grandfathered user.
     //   • Grandfathered users (profile created before the cutoff, or with no
     //     explicit plan) keep the legacy allowance of 1000 requests/UTC-day.
-    //   • Subscribers (plan "pro") get 200 requests/UTC-day.
+    //   • Subscribers (plan "pro") get 800 requests/UTC-day.
     //   • New free users (plan "free", or a profile created on/after the
     //     cutoff) get 500 requests total, ever. After that they must subscribe.
     if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
@@ -222,8 +222,8 @@ export default {
           }
           await env.QUOTA_KV.put(__tKey, String(__total + 1));
         } else {
-          // Daily cap: 200/day for subscribers, 1000/day for grandfathered users.
-          const __dailyMax = __status === "pro" ? 200 : 1000;
+          // Daily cap: 800/day for subscribers, 1000/day for grandfathered users.
+          const __dailyMax = __status === "pro" ? 800 : 1000;
           const __day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
           const __qKey = "q:" + __uid + ":" + __day;
           const __used = parseInt((await env.QUOTA_KV.get(__qKey)) || "0", 10) || 0;

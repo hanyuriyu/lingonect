@@ -323,7 +323,7 @@ const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
 // grandfathered ("full" access). Keep in sync with the Cloudflare workers.
 const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
 
-// "pro" subscribers get 200 requests/day; "free" users get 500 requests total;
+// "pro" subscribers get 800 requests/day; "free" users get 500 requests total;
 // "legacy" (grandfathered) members keep unlimited full access.
 function classifyPlanData(d) {
   if (!d) return "legacy";
