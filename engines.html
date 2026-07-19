@@ -125,6 +125,17 @@ body{
   letter-spacing:.2px;
   white-space:nowrap;
   text-align:center;
+  /* The one-line headline is wider than the 620px .stage box. Centre it on the
+     viewport (a full-bleed break-out) instead of on the narrow stage, so it
+     shares the same centre as the eyebrow / sub / how-to lines. Without this,
+     macOS Safari lets the overflowing nowrap line drift to the right rather
+     than centring it symmetrically. Reset to normal flow on mobile (below),
+     where the headline wraps inside the stage. */
+  position:relative;
+  width:100vw;
+  max-width:100vw;
+  left:50%;
+  transform:translateX(-50%);
 }
 
 /* Clickable methodology words in the headline */
@@ -812,6 +823,12 @@ body{
   .hero-headline{
     font-size:16px;
     white-space:normal;
+    /* headline wraps inside the stage on mobile — undo the desktop break-out */
+    position:static;
+    width:auto;
+    max-width:none;
+    left:auto;
+    transform:none;
   }
   .hero-sub{ font-size:15px; }
 
