@@ -260,7 +260,15 @@ export default {
           model: body.model || "glm-4.6",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
-          max_tokens: body.max_tokens ?? 1024,
+          // GLM-4.6 is a hybrid reasoning model with "thinking" ON by default.
+          // For a short translation the chain-of-thought is pure overhead: it
+          // lands in `reasoning_content` and, worse, eats the `max_tokens`
+          // budget so the actual answer in `message.content` comes back empty —
+          // which the app rendered as a blank Z.ai result. Turn thinking off
+          // (unless the client explicitly asks for it) and keep a generous
+          // token ceiling as a safety net in case the flag isn't honoured.
+          thinking: body.thinking ?? { type: "disabled" },
+          max_tokens: body.max_tokens ?? 2048,
         }),
       });
       const data = await res.json();
