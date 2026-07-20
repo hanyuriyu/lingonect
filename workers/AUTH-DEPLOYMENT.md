@@ -30,7 +30,7 @@ Content-Type, Authorization`. A browser will **block** a request that sends the
 
 Therefore deploy in this order:
 
-1. **Redeploy all 22 workers to Cloudflare first** (or at the same time as the
+1. **Redeploy all 23 workers to Cloudflare first** (or at the same time as the
    site). Each worker is still a single self-contained file — paste/deploy as
    before; no new secrets or env vars are needed.
 2. **Then** publish the frontend (merge this branch). Pushing the frontend
