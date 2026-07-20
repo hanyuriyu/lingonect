@@ -2546,7 +2546,7 @@ async function translateWithDoubao(text, extra) {
 const ZAI_PROXY = "https://zai.hanyuriyu.workers.dev";
 
 async function translateWithZai(text, extra) {
-  const res = await fetch(ZAI_PROXY, {
+  const res = await workerFetch(ZAI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
