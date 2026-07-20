@@ -1857,11 +1857,23 @@ function splitReading(s){
   if (typeof s !== "string") return { translation: s, reading: "" };
   const marker = "[[READING]]";
   const i = s.indexOf(marker);
-  if (i === -1) return { translation: s.trim(), reading: "" };
-  return {
-    translation: s.slice(0, i).trim(),
-    reading: s.slice(i + marker.length).trim()
-  };
+  if (i !== -1) {
+    return {
+      translation: s.slice(0, i).trim(),
+      reading: s.slice(i + marker.length).trim()
+    };
+  }
+  // Fallback: some models (e.g. Sarvam) ignore the [[READING]] marker and
+  // append the reading aid inline. Split on the "Transliteration:" label so the
+  // reading aid still lands in its own section instead of the translation box.
+  const m = s.match(/Transliteration\s*:/i);
+  if (m && m.index > 0) {
+    return {
+      translation: s.slice(0, m.index).trim(),
+      reading: s.slice(m.index).trim()
+    };
+  }
+  return { translation: s.trim(), reading: "" };
 }
 
 // Builds the system prompt every client-side LLM engine sends, based on the
