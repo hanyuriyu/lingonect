@@ -265,6 +265,11 @@ export default {
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
+          // Sarvam models have "thinking mode" on by default, which burns the
+          // token budget on internal reasoning and returns content: null for a
+          // short task like translation. null disables it — we want the direct
+          // answer, not chain-of-thought. Frontend may override.
+          reasoning_effort: body.reasoning_effort ?? null,
         }),
       });
 
