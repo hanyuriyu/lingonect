@@ -724,32 +724,27 @@ async function translateWithNova(text, targetLang) {
   return data.output.message.content[0].text.trim();
 }
 
-// Meta NLLB-200 (in-browser via Transformers.js)
-let metaTranslator = null;
-let metaModelLoading = false;
-async function loadMetaModel() {
-  if (metaTranslator) return metaTranslator;
-  if (metaModelLoading) {
-    while (metaModelLoading) await new Promise(r => setTimeout(r, 200));
-    return metaTranslator;
-  }
-  metaModelLoading = true;
-  try {
-    const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3");
-    metaTranslator = await pipeline("translation", "Xenova/nllb-200-distilled-600M");
-    return metaTranslator;
-  } finally {
-    metaModelLoading = false;
-  }
-}
+// Meta NLLB-200 — run server-side via the Cloudflare Worker rather than loading
+// the ~600M-parameter model in-browser. The in-browser model held several
+// hundred MB of WASM weights resident for the tab's lifetime, which pushed the
+// tab over the browser's per-tab memory ceiling ("reloaded because it was using
+// significant memory"). The proxy returns the same NLLB-200 output.
+const META_PROXY = "https://meta.hanyuriyu.workers.dev";
 
 async function translateWithMeta(text, targetLang, sourceLang) {
   const srcCode = NLLB_LANG_MAP[sourceLang] || "eng_Latn";
   const tgtCode = NLLB_LANG_MAP[targetLang];
   if (!tgtCode) throw new Error(`Meta NLLB-200 does not support ${targetLang}.`);
-  const translator = await loadMetaModel();
-  const result = await translator(text, { src_lang: srcCode, tgt_lang: tgtCode });
-  return result[0].translation_text;
+  const res = await workerFetch(META_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source: srcCode, target: tgtCode })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(`Meta NLLB-200: ${data.error || res.status}`);
+  }
+  return (data.result || "").trim();
 }
 
 async function translateWithHyperCloveX(text, targetLang) {
