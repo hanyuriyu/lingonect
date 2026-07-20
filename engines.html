@@ -2324,12 +2324,54 @@ const NLLB_LANG_MAP = {
 };
 
 // The NLLB-200 model is ~600M parameters and several hundred MB of WASM
-// weights. Loading it in-browser holds that memory resident for the whole tab
-// lifetime, which pushes the tab over the browser's per-tab memory ceiling —
-// on iOS Safari it kills the tab outright, and on desktop Safari it triggers a
-// "reloaded because it was using significant memory" reload after a session of
-// use. So every device runs NLLB-200 server-side via the Cloudflare Worker
-// below instead of loading the model locally.
+// weights. iOS Safari (iPhone/iPad) has a tight per-tab memory cap and will
+// kill the tab ("A problem repeatedly occurred") when the model loads, so we
+// skip the in-browser model on those devices and use the server-side proxy.
+function isMobileLowMemoryDevice() {
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
+  const lowMem = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
+  return isIOS || isAndroid || lowMem;
+}
+
+// On capable devices the model runs in-browser. Rather than keeping it resident
+// for the whole tab lifetime — which held several hundred MB and eventually
+// tripped desktop Safari's "reloaded because it was using significant memory"
+// reload — we load it on demand and dispose() it after each translation so it
+// never accumulates across a session. The weights stay in the browser's Cache
+// Storage, so re-loading on the next run reads from cache without re-downloading.
+let metaTranslator = null;
+
+async function loadMetaModel() {
+  // Never keep two copies alive: free any prior instance before loading again.
+  await disposeMetaModel();
+  const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3");
+  const el = document.getElementById("result-meta");
+  metaTranslator = await pipeline("translation", "Xenova/nllb-200-distilled-600M", {
+    progress_callback: (p) => {
+      if (el && p.status === "download" && p.total) {
+        const pct = Math.round((p.loaded / p.total) * 100);
+        el.textContent = `Loading model… ${pct}%`;
+      } else if (el && p.status === "ready") {
+        el.textContent = "Translating…";
+      }
+    }
+  });
+  return metaTranslator;
+}
+
+async function disposeMetaModel() {
+  if (!metaTranslator) return;
+  const t = metaTranslator;
+  metaTranslator = null;
+  try { await t.dispose(); } catch (e) { console.warn("Meta model dispose failed", e); }
+}
+
+// Mobile devices can't load the 600M model in-browser without crashing Safari,
+// so they call a Cloudflare Worker that proxies to a Hugging Face Space running
+// NLLB-200 server-side.
 const META_PROXY = "https://meta.hanyuriyu.workers.dev";
 
 async function translateWithMetaViaProxy(text, srcCode, tgtCode) {
@@ -2349,7 +2391,18 @@ async function translateWithMeta(text) {
   assertLangSupported(NLLB_LANG_MAP);
   const srcCode = NLLB_LANG_MAP[sourceLang];
   const tgtCode = NLLB_LANG_MAP[targetLang];
-  return translateWithMetaViaProxy(text, srcCode, tgtCode);
+  if (isMobileLowMemoryDevice()) {
+    return translateWithMetaViaProxy(text, srcCode, tgtCode);
+  }
+  // Load on demand, translate, then always free the model so it doesn't stay
+  // resident and accumulate memory across the session.
+  const translator = await loadMetaModel();
+  try {
+    const result = await translator(text, { src_lang: srcCode, tgt_lang: tgtCode });
+    return result[0].translation_text;
+  } finally {
+    disposeMetaModel();
+  }
 }
 
 // ── HyperCLOVA X (via Cloudflare Worker → Naver CLOVA Studio) ──
