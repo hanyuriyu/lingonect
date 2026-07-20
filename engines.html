@@ -2552,7 +2552,12 @@ async function translateWithZai(text, extra) {
   if (!res.ok || data.error) {
     throw new Error(`Z.ai ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
   }
-  return data.choices[0].message.content.trim();
+  // GLM's reasoning mode can return an empty `content` (the text ends up in
+  // `reasoning_content`, or the token budget was spent thinking). Surface that
+  // as a clear error rather than a silent blank result.
+  const out = (data.choices?.[0]?.message?.content || "").trim();
+  if (!out) throw new Error("Z.ai returned an empty response");
+  return out;
 }
 
 // ── Engine registry (add future engines here) ──
