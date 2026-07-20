@@ -661,11 +661,12 @@ async function translateWithTencent(text, targetLang) {
 }
 
 async function translateWithAlibaba(text, targetLang) {
+  // Fast NMT-style Alibaba engine: smallest/quickest Qwen model.
   const res = await workerFetch(ALIBABA_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "qwen-plus",
+      model: "qwen-turbo",
       messages: [
         { role: "system", content: sysPrompt(targetLang) },
         { role: "user", content: `<text>${text}</text>` }
@@ -673,6 +674,27 @@ async function translateWithAlibaba(text, targetLang) {
     })
   });
   if (!res.ok) throw new Error(`Alibaba ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+async function translateWithQwen(text, targetLang) {
+  // Qwen LLM: Alibaba's flagship reasoning model with thinking enabled,
+  // via the same DashScope proxy/key as the Alibaba engine.
+  const res = await workerFetch(ALIBABA_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "qwen-max",
+      enable_thinking: true,
+      max_tokens: 2048,
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Qwen ${res.status}`);
   const data = await res.json();
   return data.choices[0].message.content.trim();
 }
@@ -887,6 +909,7 @@ const ENGINE_LIST = [
   { id: "grok",       name: "Grok",                 translate: translateWithGrok },
   { id: "tencent",    name: "Tencent Translate",    translate: translateWithTencent },
   { id: "alibaba",    name: "Alibaba Translate",    translate: translateWithAlibaba },
+  { id: "qwen",       name: "Qwen",                 translate: translateWithQwen },
   { id: "microsoft",  name: "Microsoft Translate",  translate: translateWithMicrosoft },
   { id: "amazon",     name: "Amazon Translate",     translate: translateWithAmazon },
   { id: "nova",       name: "Amazon Nova",          translate: translateWithNova },
@@ -966,7 +989,8 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
       grok:       { proxy: GROK_PROXY,       model: "grok-3" },
       perplexity: { proxy: PERPLEXITY_PROXY, model: "sonar" },
-      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-plus" },
+      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-turbo" },
+      qwen:       { proxy: ALIBABA_PROXY,    model: "qwen-max" },
       alice:      { proxy: ALICE_PROXY,      model: "aliceai-llm/latest" },
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
       zai:        { proxy: ZAI_PROXY,        model: "glm-4.6", noAuth: true }

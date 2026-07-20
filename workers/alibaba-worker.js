@@ -243,19 +243,40 @@ export default {
     }
     try {
       const body = await request.json();
-      const res = await fetch("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.DASHSCOPE_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: body.model || "qwen-plus",
-          messages: body.messages,
-          temperature: body.temperature ?? 0.3,
-          max_tokens: body.max_tokens ?? 1024,
-        }),
-      });
+      // The same DashScope proxy serves two Lingonect engines:
+      //   • "Alibaba Translate" — a fast, plain NMT-style call (qwen-turbo).
+      //   • "Qwen" — the reasoning LLM (qwen-max with enable_thinking).
+      // So forward the caller's model and the optional thinking flag.
+      const payload = {
+        model: body.model || "qwen-plus",
+        messages: body.messages,
+        temperature: body.temperature ?? 0.3,
+        max_tokens: body.max_tokens ?? 1024,
+      };
+      if (typeof body.enable_thinking === "boolean") {
+        payload.enable_thinking = body.enable_thinking;
+      }
+
+      const callDashscope = (p) =>
+        fetch("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.DASHSCOPE_API_KEY}`,
+          },
+          body: JSON.stringify(p),
+        });
+
+      let res = await callDashscope(payload);
+      // Some Qwen reasoning models only return thinking output in streaming
+      // mode and reject a non-streaming request. This proxy is non-streaming,
+      // so if a thinking request is rejected, transparently retry once without
+      // thinking rather than failing the whole translation.
+      if (!res.ok && payload.enable_thinking) {
+        const fallback = { ...payload };
+        delete fallback.enable_thinking;
+        res = await callDashscope(fallback);
+      }
       const data = await res.json();
       return new Response(JSON.stringify(data), {
         status: res.status,
