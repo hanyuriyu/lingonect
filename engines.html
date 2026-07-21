@@ -529,6 +529,8 @@ body{
 .engine-logo-badge.alice      { background:#7C5CFC; }
 .engine-logo-badge.doubao     { background:#0A84FF; }
 .engine-logo-badge.zai        { background:#111827; }
+.engine-logo-badge.cotoha     { background:#00A0B0; }
+.engine-logo-badge.tsuzumi    { background:#E60027; }
 
 .result-content{
   flex:1;
@@ -2635,6 +2637,22 @@ async function translateWithZai(text, extra) {
   return out;
 }
 
+// ── Cotoha Translator (via Cloudflare Worker → NTT Communications COTOHA) ──
+// NMT engine. API key not yet provisioned.
+const COTOHA_PROXY = "https://cotoha.hanyuriyu.workers.dev";
+
+async function translateWithCotoha(text) {
+  return "API implementation in progress";
+}
+
+// ── NTT Tsuzumi (via Cloudflare Worker → NTT tsuzumi) ──
+// Japanese LLM. API key not yet provisioned.
+const TSUZUMI_PROXY = "https://tsuzumi.hanyuriyu.workers.dev";
+
+async function translateWithTsuzumi(text) {
+  return "API implementation in progress";
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -2836,13 +2854,29 @@ const engines = [
     badgeClass: "jais",
     badgeText:  "J",
     translate:  translateWithJais
+  },
+  {
+    id:         "cotoha",
+    name:       "Cotoha Translator",
+    logoUrl:    "cotoha_logo2.png",
+    badgeClass: "cotoha",
+    badgeText:  "CO",
+    translate:  translateWithCotoha
+  },
+  {
+    id:         "tsuzumi",
+    name:       "NTT Tsuzumi",
+    logoUrl:    "tsuzumi_logo2.png",
+    badgeClass: "tsuzumi",
+    badgeText:  "TZ",
+    translate:  translateWithTsuzumi
   }
 ];
 
 // Engines that are neural machine translation systems (everything else is an LLM)
 const NMT_ENGINES = new Set([
   "google", "deepl", "baidu", "tencent", "alibaba",
-  "microsoft", "amazon", "meta", "yandex", "papago"
+  "microsoft", "amazon", "meta", "yandex", "papago", "cotoha"
 ]);
 function engineType(id) {
   return NMT_ENGINES.has(id) ? "NMT" : "LLM";
