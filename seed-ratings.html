@@ -408,6 +408,8 @@ const YANDEX_PROXY     = "https://yandex.hanyuriyu.workers.dev";
 const ALICE_PROXY      = "https://alice.hanyuriyu.workers.dev";
 const DOUBAO_PROXY     = "https://doubao.hanyuriyu.workers.dev";
 const ZAI_PROXY        = "https://zai.hanyuriyu.workers.dev";
+const LLAMA_PROXY      = "https://together.hanyuriyu.workers.dev";
+const SARVAM_PROXY     = "https://sarvam.hanyuriyu.workers.dev";
 
 // ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
@@ -564,7 +566,7 @@ async function translateWithDeepL(text, targetLang) {
 async function translateWithGoogle(text, targetLang) {
   const langCode = GOOGLE_LANG_MAP[targetLang];
   if (!langCode) throw new Error(`Google does not support ${targetLang}.`);
-  const res = await fetch(GOOGLE_PROXY, {
+  const res = await workerFetch(GOOGLE_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ q: text, target: langCode, format: "text" })
@@ -884,7 +886,7 @@ async function translateWithDoubao(text, targetLang) {
 }
 
 async function translateWithZai(text, targetLang) {
-  const res = await fetch(ZAI_PROXY, {
+  const res = await workerFetch(ZAI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -899,6 +901,42 @@ async function translateWithZai(text, targetLang) {
   if (!res.ok || data.error) {
     throw new Error(`Z.ai ${res.status}: ${data.error?.message || data.error?.code || "request failed"}`);
   }
+  return data.choices[0].message.content.trim();
+}
+
+// ── Meta Llama 3.3 (via Cloudflare Worker → Together AI) ──
+async function translateWithLlama(text, targetLang) {
+  const res = await workerFetch(LLAMA_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Meta Llama ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+// ── Sarvam AI (via Cloudflare Worker) — Indian-languages specialist ──
+async function translateWithSarvam(text, targetLang) {
+  const res = await workerFetch(SARVAM_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "sarvam-30b",
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Sarvam ${res.status}`);
+  const data = await res.json();
   return data.choices[0].message.content.trim();
 }
 
@@ -920,6 +958,8 @@ const ENGINE_LIST = [
   { id: "amazon",     name: "Amazon Translate",     translate: translateWithAmazon },
   { id: "nova",       name: "Amazon Nova",          translate: translateWithNova },
   { id: "meta",       name: "Meta (NLLB-200)",      translate: translateWithMeta },
+  { id: "llama",      name: "Meta Llama 3.3",       translate: translateWithLlama },
+  { id: "sarvam",     name: "Sarvam",               translate: translateWithSarvam },
   { id: "hyperclovex",name: "HyperCLOVA X",         translate: translateWithHyperCloveX },
   { id: "papago",     name: "Naver Papago",         translate: translateWithPapago },
   { id: "baidu",      name: "Baidu Translate",      translate: translateWithBaidu },
@@ -987,9 +1027,9 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
     rawScore = data.translated.trim();
   } else {
     // Generic OpenAI-compatible proxy (Mistral, DeepSeek, Grok, Perplexity,
-    // Alibaba, Alice, Doubao, Z.ai). Most proxies require the Firebase ID
-    // token; Z.ai's worker takes none and rejects the Authorization header in
-    // CORS, so it is called with a plain (unauthenticated) fetch.
+    // Alibaba, Alice, Doubao, Z.ai, Llama, Sarvam). Every proxy requires a
+    // valid Firebase ID token (Authorization: Bearer <idToken>), so they are
+    // all called through workerFetch, which attaches the token.
     const proxyMap = {
       mistral:    { proxy: MISTRAL_PROXY,    model: "mistral-small-latest" },
       deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
@@ -999,13 +1039,14 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       qwen:       { proxy: ALIBABA_PROXY,    model: "qwen-max" },
       alice:      { proxy: ALICE_PROXY,      model: "aliceai-llm/latest" },
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
-      zai:        { proxy: ZAI_PROXY,        model: "glm-4.6", noAuth: true }
+      zai:        { proxy: ZAI_PROXY,        model: "glm-4.6" },
+      llama:      { proxy: LLAMA_PROXY,      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+      sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-30b" }
     };
     const cfg = proxyMap[actualRater];
     if (!cfg) throw new Error(`No proxy config for rater "${actualRater}"`);
 
-    const fetchFn = cfg.noAuth ? fetch : workerFetch;
-    const res = await fetchFn(cfg.proxy, {
+    const res = await workerFetch(cfg.proxy, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
