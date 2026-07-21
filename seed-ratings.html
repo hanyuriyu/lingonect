@@ -347,14 +347,16 @@ auth.onAuthStateChanged(user => {
 
 // ── All supported languages ──
 const ALL_LANGUAGES = [
-  "English","Spanish","French","German","Italian","Portuguese (Brazil)","Portuguese (Portugal)",
-  "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
-  "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
-  "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
-  "Latvian","Estonian","Slovenian","Catalan","Icelandic","Georgian",
-  "Arabic","Hebrew","Persian (Farsi)","Hindi","Urdu","Bengali",
-  "Japanese","Chinese (Simplified)","Chinese (Traditional)","Korean",
-  "Thai","Vietnamese","Indonesian","Malay","Tagalog (Filipino)"
+  "Arabic (Egypt)","Arabic (Gulf)","Arabic (Levant)","Arabic (MSA)",
+  "Bengali","Bulgarian","Catalan","Chinese (Simplified)","Chinese (Traditional)",
+  "Croatian","Czech","Danish","Dutch","English (UK)","English (US)","Estonian",
+  "Finnish","French (Canada)","French (EU)","Georgian","German","Greek","Gujarati",
+  "Hebrew","Hindi","Hungarian","Icelandic","Indonesian","Italian","Japanese",
+  "Kannada","Korean","Latvian","Lithuanian","Malay","Malayalam","Marathi",
+  "Norwegian","Odia","Persian (Farsi)","Polish","Portuguese (Brazil)","Portuguese (Portugal)",
+  "Punjabi","Romanian","Russian","Serbian","Slovak","Slovenian","Spanish (EU)",
+  "Spanish (LATAM)","Swedish","Tagalog (Filipino)","Tamil","Telugu","Thai",
+  "Turkish","Ukrainian","Urdu","Vietnamese"
 ];
 
 // ── State: sentences ──
@@ -366,19 +368,19 @@ const sentences = [
 
 // ── State: language pairs (preset 8 + user-added) ──
 const PRESET_PAIR_KEYS = new Set([
-  "English|Spanish","English|French","English|German","English|Italian",
-  "English|Japanese","English|Arabic","English|Korean","English|Chinese (Simplified)"
+  "English (US)|Spanish (EU)","English (US)|French (EU)","English (US)|German","English (US)|Italian",
+  "English (US)|Japanese","English (US)|Arabic (MSA)","English (US)|Korean","English (US)|Chinese (Simplified)"
 ]);
 
 const langPairs = [
-  { source: "English", target: "Spanish",               preset: true },
-  { source: "English", target: "French",                preset: true },
-  { source: "English", target: "German",                preset: true },
-  { source: "English", target: "Italian",               preset: true },
-  { source: "English", target: "Japanese",              preset: true },
-  { source: "English", target: "Arabic",                preset: true },
-  { source: "English", target: "Korean",                preset: true },
-  { source: "English", target: "Chinese (Simplified)",  preset: true }
+  { source: "English (US)", target: "Spanish (EU)",         preset: true },
+  { source: "English (US)", target: "French (EU)",          preset: true },
+  { source: "English (US)", target: "German",               preset: true },
+  { source: "English (US)", target: "Italian",              preset: true },
+  { source: "English (US)", target: "Japanese",             preset: true },
+  { source: "English (US)", target: "Arabic (MSA)",         preset: true },
+  { source: "English (US)", target: "Korean",               preset: true },
+  { source: "English (US)", target: "Chinese (Simplified)", preset: true }
 ];
 
 // ── State: selected rater ──
@@ -409,84 +411,88 @@ const ZAI_PROXY        = "https://zai.hanyuriyu.workers.dev";
 
 // ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
-  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es","French (EU)":"fr","French (Canada)":"fr","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-PT","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 const DEEPL_LANG_MAP = {
-  "English":"EN-US","Spanish":"ES","French":"FR","German":"DE","Italian":"IT",
+  "English (US)":"EN-US","English (UK)":"EN-GB","Spanish (EU)":"ES","Spanish (LATAM)":"ES-419","French (EU)":"FR","French (Canada)":"FR","German":"DE","Italian":"IT",
   "Portuguese (Brazil)":"PT-BR","Portuguese (Portugal)":"PT-PT","Swedish":"SV","Norwegian":"NB","Danish":"DA","Finnish":"FI",
   "Dutch":"NL","Polish":"PL","Russian":"RU","Ukrainian":"UK","Turkish":"TR",
   "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
   "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
   "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS",
-  "Arabic":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
+  "Arabic (MSA)":"AR","Arabic (Egypt)":"AR","Arabic (Levant)":"AR","Arabic (Gulf)":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
   "Japanese":"JA","Chinese (Simplified)":"ZH-HANS","Chinese (Traditional)":"ZH-HANT","Korean":"KO",
   "Thai":"TH","Vietnamese":"VI","Indonesian":"ID","Malay":"MS","Tagalog (Filipino)":"TL"
 };
 const TENCENT_LANG_MAP = {
-  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es","French (EU)":"fr","French (Canada)":"fr","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 const MICROSOFT_LANG_MAP = {
-  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es","French (EU)":"fr","French (Canada)":"fr-ca","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-pt","Swedish":"sv","Norwegian":"nb","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh-Hans","Chinese (Traditional)":"zh-Hant","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"fil"
 };
 const AMAZON_LANG_MAP = {
-  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es-MX","French (EU)":"fr","French (Canada)":"fr-CA","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt-PT","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
 const NLLB_LANG_MAP = {
-  "English":"eng_Latn","Spanish":"spa_Latn","French":"fra_Latn","German":"deu_Latn","Italian":"ita_Latn",
+  "English (US)":"eng_Latn","English (UK)":"eng_Latn","Spanish (EU)":"spa_Latn","Spanish (LATAM)":"spa_Latn","French (EU)":"fra_Latn","French (Canada)":"fra_Latn","German":"deu_Latn","Italian":"ita_Latn",
   "Portuguese (Brazil)":"por_Latn","Portuguese (Portugal)":"por_Latn","Swedish":"swe_Latn","Norwegian":"nob_Latn","Danish":"dan_Latn","Finnish":"fin_Latn",
   "Dutch":"nld_Latn","Polish":"pol_Latn","Russian":"rus_Cyrl","Ukrainian":"ukr_Cyrl","Turkish":"tur_Latn",
   "Greek":"ell_Grek","Romanian":"ron_Latn","Hungarian":"hun_Latn","Czech":"ces_Latn","Slovak":"slk_Latn",
   "Bulgarian":"bul_Cyrl","Croatian":"hrv_Latn","Serbian":"srp_Cyrl","Lithuanian":"lit_Latn",
   "Latvian":"lvs_Latn","Estonian":"est_Latn","Slovenian":"slv_Latn","Catalan":"cat_Latn","Icelandic":"isl_Latn","Georgian":"kat_Geor",
-  "Arabic":"arb_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
+  "Arabic (MSA)":"arb_Arab","Arabic (Egypt)":"arz_Arab","Arabic (Levant)":"apc_Arab","Arabic (Gulf)":"ars_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
+  "Tamil":"tam_Taml","Telugu":"tel_Telu","Marathi":"mar_Deva","Gujarati":"guj_Gujr","Kannada":"kan_Knda","Malayalam":"mal_Mlym","Punjabi":"pan_Guru","Odia":"ory_Orya",
   "Japanese":"jpn_Jpan","Chinese (Simplified)":"zho_Hans","Chinese (Traditional)":"zho_Hant","Korean":"kor_Hang",
   "Thai":"tha_Thai","Vietnamese":"vie_Latn","Indonesian":"ind_Latn","Malay":"zsm_Latn","Tagalog (Filipino)":"tgl_Latn"
 };
 const BAIDU_LANG_MAP = {
-  "English":"en","Spanish":"spa","French":"fra","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"spa","Spanish (LATAM)":"spa","French (EU)":"fra","French (Canada)":"fra","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"swe","Norwegian":"nor","Danish":"dan","Finnish":"fin",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"ukr","Turkish":"tr",
   "Greek":"el","Romanian":"rom","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bul","Croatian":"hrv","Serbian":"srp","Lithuanian":"lit",
   "Latvian":"lav","Estonian":"est","Slovenian":"slo","Catalan":"cat","Icelandic":"ice","Georgian":"kat",
-  "Arabic":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
+  "Arabic (MSA)":"ara","Arabic (Egypt)":"ara","Arabic (Levant)":"ara","Arabic (Gulf)":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
   "Japanese":"jp","Chinese (Simplified)":"zh","Chinese (Traditional)":"cht","Korean":"kor",
   "Thai":"th","Vietnamese":"vie","Indonesian":"id","Malay":"may","Tagalog (Filipino)":"tl"
 };
 const PAPAGO_LANG_MAP = {
-  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es","French (EU)":"fr","French (Canada)":"fr","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt",
   "Russian":"ru",
   "Hindi":"hi",
@@ -494,13 +500,13 @@ const PAPAGO_LANG_MAP = {
   "Thai":"th","Vietnamese":"vi","Indonesian":"id"
 };
 const YANDEX_LANG_MAP = {
-  "English":"en","Spanish":"es","French":"fr","German":"de","Italian":"it",
+  "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es","French (EU)":"fr","French (Canada)":"fr","German":"de","Italian":"it",
   "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
   "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
@@ -1071,7 +1077,7 @@ function populateDropdowns() {
     srcSel.add(new Option(lang, lang));
     tgtSel.add(new Option(lang, lang));
   });
-  srcSel.value = "English";
+  srcSel.value = "English (US)";
   tgtSel.value = "Portuguese (Brazil)";
 }
 
