@@ -454,25 +454,28 @@ const engines = [
 
 // ── Language pairs ──
 const PRESET_PAIRS = [
-  { source: "English", target: "Spanish" },
-  { source: "English", target: "French" },
-  { source: "English", target: "German" },
-  { source: "English", target: "Italian" },
-  { source: "English", target: "Japanese" },
-  { source: "English", target: "Arabic" },
-  { source: "English", target: "Korean" },
-  { source: "English", target: "Chinese (Simplified)" }
+  { source: "English (US)", target: "Spanish (EU)" },
+  { source: "English (US)", target: "French (EU)" },
+  { source: "English (US)", target: "German" },
+  { source: "English (US)", target: "Italian" },
+  { source: "English (US)", target: "Japanese" },
+  { source: "English (US)", target: "Arabic (MSA)" },
+  { source: "English (US)", target: "Korean" },
+  { source: "English (US)", target: "Chinese (Simplified)" }
 ];
 
+// Alphabetically sorted so the custom source/target dropdowns read in order.
 const ALL_LANGUAGES = [
-  "English","Spanish","French","German","Italian","Portuguese (Brazil)","Portuguese (Portugal)",
-  "Swedish","Norwegian","Danish","Finnish","Dutch","Polish",
-  "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
-  "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
-  "Latvian","Estonian","Slovenian","Catalan","Icelandic","Georgian",
-  "Arabic","Hebrew","Persian (Farsi)","Hindi","Urdu","Bengali",
-  "Japanese","Chinese (Simplified)","Chinese (Traditional)","Korean",
-  "Thai","Vietnamese","Indonesian","Malay","Tagalog (Filipino)"
+  "Arabic (Egypt)","Arabic (Gulf)","Arabic (Levant)","Arabic (MSA)",
+  "Bengali","Bulgarian","Catalan","Chinese (Simplified)","Chinese (Traditional)",
+  "Croatian","Czech","Danish","Dutch","English (UK)","English (US)","Estonian",
+  "Finnish","French (Canada)","French (EU)","Georgian","German","Greek","Gujarati",
+  "Hebrew","Hindi","Hungarian","Icelandic","Indonesian","Italian","Japanese",
+  "Kannada","Korean","Latvian","Lithuanian","Malay","Malayalam","Marathi",
+  "Norwegian","Odia","Persian (Farsi)","Polish","Portuguese (Brazil)","Portuguese (Portugal)",
+  "Punjabi","Romanian","Russian","Serbian","Slovak","Slovenian","Spanish (EU)",
+  "Spanish (LATAM)","Swedish","Tagalog (Filipino)","Tamil","Telugu","Thai",
+  "Turkish","Ukrainian","Urdu","Vietnamese"
 ];
 
 // Populate custom dropdowns
@@ -496,16 +499,29 @@ let ratingsData = {};
 
 function pairKey(source, target) { return source + "|" + target; }
 
+// Existing ratings were recorded before languages were split into regional
+// variants. Map each legacy base name to the specific variant those ratings
+// were actually collected on so they line up with the new pair columns.
+const LEGACY_LANG_MIGRATION = {
+  "English": "English (US)",
+  "Spanish": "Spanish (EU)",
+  "French":  "French (EU)",
+  "Arabic":  "Arabic (MSA)"
+};
+function migrateLang(lang) {
+  return LEGACY_LANG_MIGRATION[lang] || lang;
+}
+
 async function loadRatings() {
   const snapshot = await db.collection("ratings").get();
 
   snapshot.forEach(doc => {
     const d = doc.data();
-    const target = d.targetLanguage;
+    const target = migrateLang(d.targetLanguage);
     if (!target) return;
 
-    // For older docs without sourceLanguage, fall back to "English"
-    const source = d.sourceLanguage || "English";
+    // For older docs without sourceLanguage, fall back to English (US).
+    const source = migrateLang(d.sourceLanguage || "English");
     const key = pairKey(source, target);
 
     if (!ratingsData[key]) ratingsData[key] = {};
