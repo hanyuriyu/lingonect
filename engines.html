@@ -2473,9 +2473,10 @@ async function translateWithMeta(text) {
   }
 }
 
-// ── Meta Llama 4 (via Cloudflare Worker → Together AI) ──
+// ── Meta Llama 3.3 (via Cloudflare Worker → Together AI) ──
 // A hosted, always-on LLM alternative to the NLLB-200 NMT above. Uses Together
-// AI's OpenAI-compatible endpoint with Llama 4 Maverick (efficient MoE model).
+// AI's OpenAI-compatible endpoint with Llama 3.3 70B Instruct Turbo — the
+// Llama model Together serves serverless (Llama 4 requires a dedicated endpoint).
 const LLAMA_PROXY = "https://together.hanyuriyu.workers.dev";
 
 async function translateWithLlama(text, extra) {
@@ -2483,7 +2484,7 @@ async function translateWithLlama(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
       messages: [
         {
           role: "system",
@@ -2845,7 +2846,7 @@ const engines = [
   },
   {
     id:         "llama",
-    name:       "Meta Llama 4",
+    name:       "Meta Llama 3.3",
     logoUrl:    "LLaMA-Meta-Logo-Vector.png",
     badgeClass: "llama",
     badgeText:  "LM",

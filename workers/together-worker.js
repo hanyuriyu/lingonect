@@ -3,7 +3,8 @@
  *
  * Proxies to Together AI's OpenAI-compatible Chat Completions endpoint so the
  * site can use Meta's Llama models as a hosted LLM engine. Defaults to
- * Llama 4 Maverick (an efficient MoE: ~17B active params, strong multilingual).
+ * Llama 3.3 70B Instruct Turbo — the Llama model Together serves serverless
+ * (Llama 4 variants require a paid dedicated endpoint).
  *
  * Deploy steps:
  *   1. npx wrangler init together
@@ -260,7 +261,7 @@ export default {
           "Authorization": `Bearer ${env.TOGETHER_API_KEY}`,
         },
         body: JSON.stringify({
-          model: body.model || "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+          model: body.model || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
