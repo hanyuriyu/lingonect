@@ -521,6 +521,7 @@ body{
 .engine-logo-badge.amazon     { background:#FF9900; }
 .engine-logo-badge.nova       { background:#232F3E; }
 .engine-logo-badge.meta       { background:#0668E1; }
+.engine-logo-badge.llama      { background:#0866FF; }
 .engine-logo-badge.sarvam     { background:#EA5B2A; }
 .engine-logo-badge.hyperclovex{ background:#03C75A; }
 .engine-logo-badge.papago     { background:#14B8A6; }
@@ -1170,7 +1171,7 @@ const ENGINE_TIERS = {
   claude: 0, openai: 0, google: 0, gemini: 0,
   deepl: 1, perplexity: 1, mistral: 1, deepseek: 1,
   grok: 2, tencent: 2, alibaba: 2, qwen: 2, microsoft: 2,
-  amazon: 3, nova: 3, meta: 3, baidu: 3,
+  amazon: 3, nova: 3, meta: 3, llama: 3, baidu: 3,
   hyperclovex: 0, papago: 0, yandex: 0, jais: 0, sarvam: 0,
   alice: 2, doubao: 2, zai: 2
 };
@@ -2472,6 +2473,31 @@ async function translateWithMeta(text) {
   }
 }
 
+// ── Meta Llama 4 (via Cloudflare Worker → Together AI) ──
+// A hosted, always-on LLM alternative to the NLLB-200 NMT above. Uses Together
+// AI's OpenAI-compatible endpoint with Llama 4 Maverick (efficient MoE model).
+const LLAMA_PROXY = "https://together.hanyuriyu.workers.dev";
+
+async function translateWithLlama(text, extra) {
+  const res = await workerFetch(LLAMA_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+      messages: [
+        {
+          role: "system",
+          content: llmSystemPrompt(extra)
+        },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Meta Llama ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
 // ── Sarvam AI (via Cloudflare Worker) — Indian-languages specialist ──
 const SARVAM_PROXY = "https://sarvam.hanyuriyu.workers.dev";
 
@@ -2816,6 +2842,14 @@ const engines = [
     badgeClass: "meta",
     badgeText:  "MT",
     translate:  translateWithMeta
+  },
+  {
+    id:         "llama",
+    name:       "Meta Llama 4",
+    logoUrl:    "LLaMA-Meta-Logo-Vector.png",
+    badgeClass: "llama",
+    badgeText:  "LM",
+    translate:  translateWithLlama
   },
   {
     id:         "sarvam",
