@@ -3196,16 +3196,67 @@ if (ttsSupported) {
   });
 }
 
-// Pick the best installed voice for a BCP-47 tag: exact match first, then any
-// voice sharing the base language (e.g. "pt" for "pt-BR").
-function pickVoice(langCode) {
+// Rough gender guess from a voice's name. The Web Speech API has no gender
+// field, but many platform voices spell it out ("Google UK English Female",
+// "Microsoft David") or use a well-known first name. Used only to *interleave*
+// male and female voices so learners hear a mix — an unknown result is fine.
+const FEMALE_NAME_HINTS = /\b(female|woman|girl|samantha|victoria|karen|moira|tessa|fiona|serena|kate|susan|zira|hazel|catherine|amelie|amélie|audrey|aurelie|marie|celine|léa|lea|anna|petra|katja|hedda|paulina|helena|laura|monica|mónica|paola|alice|elsa|federica|carla|ellen|lotte|zosia|ewa|milena|katarina|yuna|sora|nayeon|kyoko|o-ren|ting-ting|tingting|sinji|sin-ji|meijia|mei-jia|xiaoxiao|xiaoyi|lekha|swara|kalpana|zuzana|iveta|laila|hoda|zeina|maryam|nicky|joana|luciana|ines|inés)\b/i;
+const MALE_NAME_HINTS   = /\b(male|man|boy|daniel|alex|fred|thomas|oliver|arthur|gordon|david|mark|guy|george|james|ryan|jorge|diego|juan|carlos|pablo|yannick|nicolas|mathieu|hans|stefan|conrad|yuri|dmitri|maxim|pavel|luca|cosimo|kenji|otoya|ichiro|takeshi|minho|junho|liang|kangkang|yunyang|yunjian|wang|xiaoming|rishi|hemant|prabhat|ahmed|hamed|bashkar|felipe|ricardo|joaquim)\b/i;
+
+function guessGender(v) {
+  const n = (v && v.name || "").toLowerCase();
+  if (FEMALE_NAME_HINTS.test(n)) return "f";
+  if (MALE_NAME_HINTS.test(n)) return "m";
+  return "?";
+}
+
+// All installed voices that can speak a given BCP-47 tag, best matches first
+// (exact region, then a regional variant of the same language, then any voice
+// sharing the base language). This is the pool we spread engines across.
+function voicesForLang(langCode) {
   if (!ttsVoices.length) ttsVoices = window.speechSynthesis.getVoices();
   const lower = langCode.toLowerCase();
   const base = lower.split("-")[0];
-  return ttsVoices.find(v => v.lang && v.lang.toLowerCase() === lower)
-      || ttsVoices.find(v => v.lang && v.lang.toLowerCase().replace("_", "-").startsWith(base + "-"))
-      || ttsVoices.find(v => v.lang && v.lang.toLowerCase().split(/[-_]/)[0] === base)
-      || null;
+  const exact = [], region = [], sameBase = [];
+  for (const v of ttsVoices) {
+    if (!v.lang) continue;
+    const vl = v.lang.toLowerCase().replace("_", "-");
+    if (vl === lower) exact.push(v);
+    else if (vl.startsWith(base + "-")) region.push(v);
+    else if (vl.split("-")[0] === base) sameBase.push(v);
+  }
+  return [...exact, ...region, ...sameBase];
+}
+
+// Order a voice pool so consecutive picks alternate female / male / unknown.
+// This way, when engines are assigned voices by index, neighbouring cards land
+// on different genders as much as the installed voices allow.
+function interleaveByGender(voices) {
+  const f = voices.filter(v => guessGender(v) === "f");
+  const m = voices.filter(v => guessGender(v) === "m");
+  const u = voices.filter(v => guessGender(v) === "?");
+  const out = [];
+  let i = 0;
+  while (f[i] || m[i]) {
+    if (f[i]) out.push(f[i]);
+    if (m[i]) out.push(m[i]);
+    i++;
+  }
+  return out.concat(u);
+}
+
+// Give each engine its own voice from the pool for the current target
+// language, so no two adjacent cards sound identical and the set mixes men and
+// women. Assignment is by the engine's fixed position in `engines`, so a given
+// engine keeps a consistent voice across runs. Returns null when no voice for
+// the language is installed (caller falls back to the browser default).
+const ENGINE_INDEX = new Map(engines.map((e, i) => [e.id, i]));
+
+function pickVoiceForEngine(langCode, engineId) {
+  const pool = interleaveByGender(voicesForLang(langCode));
+  if (!pool.length) return null;
+  const idx = ENGINE_INDEX.has(engineId) ? ENGINE_INDEX.get(engineId) : 0;
+  return pool[idx % pool.length];
 }
 
 // The button currently mid-utterance, so a second click (or clicking another
@@ -3231,10 +3282,15 @@ function speakResult(btn) {
   const utter = new SpeechSynthesisUtterance(text);
   const langCode = SPEECH_LANG_MAP[targetLang] || "en-US";
   utter.lang = langCode;
-  const voice = pickVoice(langCode);
+  const engineId = btn.dataset.engine;
+  const voice = pickVoiceForEngine(langCode, engineId);
   if (voice) utter.voice = voice;
-  utter.rate = 0.85;   // clear and unhurried, per the design intent
-  utter.pitch = 1;
+  // Nudge pitch/rate per engine so cards still sound distinct even when the
+  // platform only ships a single voice for this language. Kept subtle and
+  // deterministic (keyed off the engine's fixed index) so it stays natural.
+  const idx = ENGINE_INDEX.has(engineId) ? ENGINE_INDEX.get(engineId) : 0;
+  utter.rate = 0.85 + ((idx % 3) - 1) * 0.05;   // 0.80 / 0.85 / 0.90 — clear and unhurried
+  utter.pitch = 1 + ((idx % 5) - 2) * 0.06;     // ~0.88–1.12 around neutral
   utter.onend = () => { if (btn === speakingBtn) { btn.classList.remove("speaking"); speakingBtn = null; } };
   utter.onerror = () => { if (btn === speakingBtn) { btn.classList.remove("speaking"); speakingBtn = null; } };
 
