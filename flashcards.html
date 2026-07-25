@@ -1611,7 +1611,7 @@ ${numbered}`;
     // Fetch a second example sentence per card from DeepSeek.
     try {
       const dsExamples = await generateExampleBatch(
-        targetWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+        targetWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-v4-pro"
       );
       cards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
     } catch (err) {
@@ -2181,7 +2181,7 @@ async function regenerateExamples(stack) {
       // Regenerate example2 from DeepSeek
       try {
         const dsExamples = await generateExampleBatch(
-          batchWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-chat"
+          batchWords, sourceLang, targetLang, DEEPSEEK_WORKER, "deepseek-v4-pro"
         );
         batchCards.forEach((c, idx) => { c.example2 = dsExamples[idx] || ""; });
       } catch (err) {

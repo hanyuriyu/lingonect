@@ -626,7 +626,7 @@ async function translateWithDeepSeek(text, targetLang) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: "deepseek-v4-pro",
       messages: [
         { role: "system", content: sysPrompt(targetLang) },
         { role: "user", content: `<text>${text}</text>` }
@@ -1032,7 +1032,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
     // all called through workerFetch, which attaches the token.
     const proxyMap = {
       mistral:    { proxy: MISTRAL_PROXY,    model: "mistral-small-latest" },
-      deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
+      deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-v4-pro" },
       grok:       { proxy: GROK_PROXY,       model: "grok-3" },
       perplexity: { proxy: PERPLEXITY_PROXY, model: "sonar" },
       alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-turbo" },
