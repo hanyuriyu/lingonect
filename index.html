@@ -176,15 +176,21 @@ html,body{
   text-align:center;
   letter-spacing:.3px;
 }
+/* Visually hidden, but still real text in the DOM: crawlers and screen
+   readers get the tagline, sighted users don't see it cluttering the logo
+   rail. Do NOT use display:none / visibility:hidden here — those remove it
+   from the accessibility tree and devalue it for search engines. */
 .brand-tagline{
-  font-family:"Special Elite","Courier New",monospace;
-  font-size:12.5px;
-  line-height:1.5;
-  margin:0 0 6px;
-  max-width:260px;
-  color:#555;
-  text-align:center;
-  pointer-events:auto;
+  position:absolute;
+  width:1px;
+  height:1px;
+  margin:-1px;
+  padding:0;
+  border:0;
+  overflow:hidden;
+  clip:rect(0 0 0 0);
+  clip-path:inset(50%);
+  white-space:nowrap;
 }
 
 /* === LANGUAGE SWITCHER === */
@@ -278,8 +284,6 @@ html,body{
     font-size:18px;
     line-height:1.7;
   }
-
-  .brand-tagline{ max-width:280px; }
 
   .auth-nav{ margin-top:10px; }
   .auth-link{ font-size:14px; line-height:2; }
