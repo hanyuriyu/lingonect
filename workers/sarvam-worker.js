@@ -261,7 +261,10 @@ export default {
           "api-subscription-key": env.SARVAM_API_KEY,
         },
         body: JSON.stringify({
-          model: body.model || "sarvam-30b",
+          // sarvam-30b was deprecated by Sarvam in favour of sarvam-105b; the
+          // old id now comes back as a retired model. Keep the default on the
+          // supported flagship so a request without an explicit model works.
+          model: body.model || "sarvam-105b",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
