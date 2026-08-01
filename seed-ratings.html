@@ -928,7 +928,7 @@ async function translateWithSarvam(text, targetLang) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "sarvam-30b",
+      model: "sarvam-105b",
       messages: [
         { role: "system", content: sysPrompt(targetLang) },
         { role: "user", content: `<text>${text}</text>` }
@@ -1041,7 +1041,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
       zai:        { proxy: ZAI_PROXY,        model: "glm-4.6" },
       llama:      { proxy: LLAMA_PROXY,      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-      sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-30b" }
+      sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-105b" }
     };
     const cfg = proxyMap[actualRater];
     if (!cfg) throw new Error(`No proxy config for rater "${actualRater}"`);
