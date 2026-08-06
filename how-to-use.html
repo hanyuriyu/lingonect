@@ -179,6 +179,9 @@ mark{
 }
 .swatch.bright{ background:#22c55e; }
 .swatch.dark{ background:#15803d; }
+.swatch.green{ background:#16c60c; }
+.swatch.blue{ background:#0047ff; }
+.swatch.red{ background:#e3120b; }
 
 /* ── SEPARATOR ── */
 .section-sep{
@@ -302,7 +305,7 @@ mark{
 
   <h2>NMTs vs. LLMs</h2>
 
-  <p>When using Lingonect, it is important to understand the difference between <span class="term">NMTs</span> (Neural Machine Translation) and <span class="term">LLMs</span> (Large Language Models). While all engines support <strong>translation</strong>, more complex methodologies, such as <strong>localization</strong>, <strong>transcreation</strong>, <strong>culturalization</strong>, <strong>analysis</strong>, and <strong>correction</strong>, are supported <mark>only by LLMs</mark>. Please note that if you select these methodologies for an NMT engine, <strong>you will not receive a response</strong>.</p>
+  <p>When using Lingonect, it is important to understand the difference between <span class="term">NMTs</span> (Neural Machine Translation) and <span class="term">LLMs</span> (Large Language Models). While all engines support <strong>translation</strong>, more complex methodologies, such as <strong>localization</strong>, <strong>transcreation</strong>, <strong>culturalization</strong>, <strong>analysis</strong>, <strong>correction</strong>, and <strong>contextualization</strong>, are supported <mark>only by LLMs</mark>. Please note that if you select these methodologies for an NMT engine, <strong>you will not receive a response</strong>.</p>
 
   <div class="note">
     Consider each LLM as <strong>one single opinion</strong>. Every LLM has its own datasets and its own learning algorithm, so there isn't necessarily a single best one; it often depends on what you like most or understand best. <strong>Never trust only one LLM!</strong> For Western languages and cultures, models like <strong>ChatGPT, Claude, Gemini, or Mistral</strong> tend to shine; for Eastern European, something like <strong>Yandex or Alice</strong> may serve you better; and for Asian, Chinese in particular, <strong>Baidu, Alibaba, or Tencent</strong>. You are the human who decides what you need, what you like most, and what fits your purpose best. <mark>Lingonect recommends to always compare at least 3-4 different outputs.</mark>
@@ -343,6 +346,20 @@ mark{
   <p>Unlike analysis, the <strong>formality level does apply</strong> to correction. If you leave it on <strong>Original</strong>, the corrected text keeps the formality of your input. If you pick a specific level, correction will <strong>not only fix the objective mistakes but also adjust the text to that register</strong>, for example correcting a casual note into polite, formal phrasing. Because the corrected text stays in your source language, honorific and humble become available based on your <strong>source</strong> language rather than the target.</p>
 
   <p>Correction also has its <strong>own optional maximum character limit</strong>, just like localization. When you select correction, a <mark>Max characters</mark> box appears: enter a number and the corrected text will be rewritten to fit that limit; leave it blank for no limit.</p>
+
+  <h2>Contextualization</h2>
+
+  <p>Contextualization is a <strong>deep dive on a single word</strong>. Unlike the other methodologies, it accepts <strong>only one word</strong> at a time, written in your <strong>source language</strong>. In return you get a compact learner's entry, with all explanations written in the <strong>target language</strong> you have selected:</p>
+
+  <ul>
+    <li>A <strong>concise definition</strong> and the nearest natural equivalent in the target language.</li>
+    <li>Important <strong>collocations and idioms</strong> that use the word.</li>
+    <li>Strong, relevant <strong>example sentences</strong> in the source language — each with an <strong>audio button</strong> to hear it spoken — alongside a <strong>backtranslation</strong> in the target language.</li>
+    <li>If the word is a <strong>verb</strong>, its full <strong>conjugations</strong>; if it is a <strong>noun</strong> (or adjective) and the language inflects it, its full <strong>declensions</strong>.</li>
+    <li>Any other <strong>grammar points</strong> worth knowing that are specific to that word in the source language.</li>
+  </ul>
+
+  <p>Key notes are colour-coded so the most important things stand out: <strong style="color:#0f9c08;">green<span class="swatch green"></span></strong> for <strong>must-know</strong> points, <strong style="color:#0047ff;">blue<span class="swatch blue"></span></strong> for <strong>key points</strong>, and <strong style="color:#e3120b;">red<span class="swatch red"></span></strong> for <strong>important things to watch out for</strong>. Contextualization is an <strong>LLM-only</strong> methodology, and because it explains rather than translates, localization and the formality level do not apply.</p>
 
   <h2>Selecting a methodology</h2>
 
