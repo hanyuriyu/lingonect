@@ -574,8 +574,31 @@ body{
 .ctx-ex .ctx-ex-body{ flex:1; min-width:0; }
 .ctx-ex-src{ color:#111; font-size:15px; line-height:1.5; }
 .ctx-ex-tgt{ color:#888; font-size:13px; line-height:1.5; margin-top:1px; }
-.ctx-audio-btn{ flex-shrink:0; margin-top:1px; }
-.ctx-audio-btn.loading{ color:var(--cobalt); opacity:.55; cursor:progress; }
+/* Inline audio button, styled on its own (NOT .speak-btn, which is absolutely
+   positioned for the engine cards and would otherwise fly to the page corner). */
+.ctx-audio-btn{
+  flex-shrink:0;
+  margin-top:1px;
+  width:26px;
+  height:26px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:#c2c2c2;
+  border-radius:6px;
+  transition:color .15s, background .15s;
+}
+.ctx-audio-btn:hover{ color:#666; background:#f2f2f2; }
+.ctx-audio-btn svg{ width:16px; height:16px; }
+.ctx-audio-btn .stop-icon{ display:none; }
+.ctx-audio-btn.speaking{ color:var(--cobalt); }
+.ctx-audio-btn.speaking .speak-icon{ display:none; }
+.ctx-audio-btn.speaking .stop-icon{ display:block; }
+.ctx-audio-btn.loading{ color:var(--cobalt); cursor:progress; }
 .ctx-audio-btn.loading .speak-icon{ animation:ctxPulse 1s ease-in-out infinite; }
 @keyframes ctxPulse{ 0%,100%{ opacity:.35; } 50%{ opacity:1; } }
 
@@ -3618,7 +3641,7 @@ function parseCtxJson(raw) {
 // from OpenAI's TTS (an <audio> element), so this needs no browser speech
 // support and is always enabled.
 function ctxAudioBtnHtml(refAttr) {
-  return `<button class="speak-btn ctx-audio-btn" type="button" ${refAttr} title="Listen" aria-label="Listen">
+  return `<button class="ctx-audio-btn" type="button" ${refAttr} title="Listen" aria-label="Listen">
       <svg class="speak-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
       <svg class="stop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>
     </button>`;
