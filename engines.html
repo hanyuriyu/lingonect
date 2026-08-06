@@ -440,6 +440,71 @@ body{
   clear:both;
 }
 
+/* ── Summarised result (Analyze / Correct) ──
+   For Analyze and Correct we don't show one card per engine; instead we gather
+   every LLM's result and present a single, well-structured summary that leans
+   on the points the models agree on most (highest agreement ≈ most reliable).
+   Key spans are highlighted in the site's three signal colours: bright green
+   (strong agreement), bright blue/cobalt (key point) and bright red (caution). */
+.summary-card{
+  padding:22px 0 4px;
+  border-top:1px solid #e8e8e8;
+}
+.summary-intro{
+  font-size:13px;
+  font-weight:700;
+  color:#555;
+  line-height:1.5;
+  margin:0 0 8px;
+}
+.summary-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px 16px;
+  font-size:11px;
+  color:#8a8a8a;
+  margin:0 0 16px;
+}
+.summary-legend span{ display:inline-flex; align-items:center; gap:5px; }
+.summary-legend i{
+  width:11px;
+  height:11px;
+  border-radius:3px;
+  display:inline-block;
+  flex-shrink:0;
+}
+.summary-status{
+  font-size:13px;
+  color:var(--cobalt);
+  margin:6px 0;
+}
+.summary-status.error{ color:#e3120b; }
+.summary-body{
+  font-size:15px;
+  line-height:1.65;
+  color:#111;
+}
+.summary-body .summary-h{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.6px;
+  text-transform:uppercase;
+  color:#8a8a8a;
+  margin:16px 0 4px;
+}
+.summary-body .summary-p{ margin:0 0 8px; }
+.summary-body .summary-list{ margin:0 0 8px; padding-left:20px; }
+.summary-body .summary-list li{ margin:3px 0; }
+.summary-body .hl{
+  font-weight:700;
+  border-radius:3px;
+  padding:0 2px;
+}
+.summary-body .hl-green{ color:#0f9c08; background:rgba(22,198,12,.13); }   /* strong agreement */
+.summary-body .hl-blue{  color:var(--cobalt); background:rgba(0,71,255,.10); } /* key point */
+.summary-body .hl-red{   color:#e3120b; background:rgba(227,18,11,.10); }    /* caution / debated */
+.summary-copy-btn{ margin-top:6px; }
+
 .result-card{
   display:flex;
   flex-direction:row;
@@ -3092,6 +3157,266 @@ function buildCard(engine) {
   return card;
 }
 
+// ── Summarised methodologies (Analyze / Correct) ──
+// For Analyze and Correct, showing one card per engine isn't useful — the value
+// is in the combined picture. Instead we run every available LLM, then feed all
+// their results to one summariser that writes a single, well-structured output.
+// The summariser is told to lean on CONSENSUS: the more models independently
+// agree on a point, the more reliable it is, so those points form the core of
+// the summary. Key spans come back wrapped in [[G]]/[[B]]/[[R]] markers, which
+// we render in the site's signal colours (bright green / blue / red).
+
+// Methods that get the single summarised view rather than per-engine cards.
+function isSummarizedMethod(m) {
+  return m === "analyze" || m === "correct";
+}
+
+const SUMMARY_MODEL = "claude-sonnet-4-6";
+
+// System prompt for the Analyze summary: synthesise several independent
+// analyses into one, in the target language, weighting agreed points highest.
+function analyzeSummaryPrompt(src, tgt) {
+  return `You are an expert linguist and language teacher, fully fluent in both ${src} and ${tgt}.
+
+You will receive the original ${src} text followed by several INDEPENDENT expert analyses of it (each produced by a different AI system), explaining its meaning, syntax, grammar and style, written in ${tgt}.
+
+Combine them into ONE clear, well-structured summary, written ENTIRELY in ${tgt}, that a ${tgt}-speaking learner can read easily.
+
+Deciding what to include:
+- The more analyses independently AGREE on a point, the more likely it is correct. Build the summary around those agreed points and present them as the reliable core.
+- Where analyses conflict, follow the majority; mention a notable disagreement briefly as a caution rather than listing every variant.
+- Discard anything only one source claims that looks doubtful or off-topic.
+
+Structure the summary under short, clear headings for the aspects that actually apply — Meaning, Syntax, Grammar, Style — using a "### Heading" line for each and concise "- " bullet points beneath. Keep it succinct; short notes, not an essay.
+
+Highlight the most important spans using ONLY these three inline markers (never HTML, and never markdown for colour). Each marker pair must open and close on the SAME line:
+- [[G]]…[[/G]] around HIGH-AGREEMENT points shared by most analyses — the most reliable takeaways.
+- [[B]]…[[/B]] around the KEY facts or terms the learner most needs (e.g. the core meaning, the closest ${tgt} equivalent).
+- [[R]]…[[/R]] around CAUTIONS — points the sources disagree on, common mistakes, or nuances to watch out for.
+Highlight only genuinely key spans — a few words each, not whole sentences. Do not nest markers.
+
+Do NOT mention that you are combining sources, do NOT name or count the AI systems, and do NOT add any preamble or sign-off. Output only the summary, in ${tgt}.`;
+}
+
+// System prompt for the Correct summary: pick the single best corrected source
+// text (by agreement) and synthesise a short explanation in the target language.
+function correctSummaryPrompt(src, tgt) {
+  return `You are an expert ${src} proofreader and language teacher, also fully fluent in ${tgt}.
+
+You will receive the original ${src} text followed by several INDEPENDENT corrections of it (each produced by a different AI system). Each gives a corrected ${src} version and a short explanation, in ${tgt}, of what was fixed and why.
+
+Produce ONE best result, in this order:
+1. FIRST, on a SINGLE line, output the single best fully-corrected ${src} text — the version the corrections most agree on, that fixes the genuine errors while preserving the original meaning and register — wrapped in [[G]]…[[/G]] so it stands out as the agreed result. Put nothing else on that line.
+2. Then a short section heading, written in ${tgt} and on its own "### heading" line (a natural ${tgt} phrase for "What changed"), then, writing ENTIRELY in ${tgt}, summarise the key corrections and why as a few concise "- " bullet points.
+
+Deciding what to include:
+- The more corrections independently AGREE on a specific fix, the more certain it is right — include those confidently.
+- Where they disagree, follow the majority fix and flag a genuine alternative briefly as a caution.
+
+Highlight using ONLY these inline markers (never HTML/markdown), each pair opening and closing on the SAME line:
+- [[G]]…[[/G]] the agreed corrected text (as above) and any fix nearly all sources make.
+- [[B]]…[[/B]] the key correction(s) the learner most needs to notice.
+- [[R]]…[[/R]] cautions — debated fixes, or mistakes that are easy to repeat.
+Highlight only key spans, not whole paragraphs. Do not nest markers.
+
+If the text had no real errors, still show it (unchanged) wrapped in [[G]]…[[/G]], then say so briefly in ${tgt}. Do NOT mention combining sources, do NOT name the AI systems, and add no preamble or sign-off.`;
+}
+
+// Call the summariser model with all the collected LLM outputs.
+async function summariseResults(method, sourceText, outputs) {
+  const src = sourceLang, tgt = targetLang;
+  const system = method === "analyze"
+    ? analyzeSummaryPrompt(src, tgt)
+    : correctSummaryPrompt(src, tgt);
+
+  const blocks = outputs.map((o, i) => {
+    let body = String(o.raw).trim();
+    // Correct outputs are "corrected text [[READING]] explanation" — relabel the
+    // marker so the summariser sees the two parts clearly.
+    if (method === "correct") {
+      const idx = body.indexOf("[[READING]]");
+      if (idx !== -1) {
+        const corrected = body.slice(0, idx).trim();
+        const why = body.slice(idx + "[[READING]]".length).trim();
+        body = `Corrected text:\n${corrected}\n\nWhat was corrected:\n${why || "(no explanation given)"}`;
+      }
+    }
+    return `<result n="${i + 1}">\n${body}\n</result>`;
+  }).join("\n\n");
+
+  const user = `Original ${src} text:\n<source>${sourceText}</source>\n\nHere are ${outputs.length} independent expert results to synthesise:\n\n${blocks}`;
+
+  const res = await workerFetch(CLAUDE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: SUMMARY_MODEL,
+      max_tokens: 1600,
+      system,
+      messages: [{ role: "user", content: user }]
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || data.type === "error") throw await engineError("Summary", res, data);
+  return data.content[0].text.trim();
+}
+
+// Format one line's inline markup: colour markers and simple bold. Each marker
+// pair is expected to be balanced within the line (the summariser is instructed
+// to keep them so), which lets us parse the text safely line by line.
+function formatSummaryInline(line) {
+  return line
+    .replace(/\[\[G\]\]([\s\S]*?)\[\[\/G\]\]/g, '<span class="hl hl-green">$1</span>')
+    .replace(/\[\[B\]\]([\s\S]*?)\[\[\/B\]\]/g, '<span class="hl hl-blue">$1</span>')
+    .replace(/\[\[R\]\]([\s\S]*?)\[\[\/R\]\]/g, '<span class="hl hl-red">$1</span>')
+    .replace(/\[\[\/?[GBR]\]\]/g, "")                 // drop any stray/unbalanced markers
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+// Turn the summariser's marked-up text into structured, highlighted HTML.
+// Escaped first, so nothing the model emits can inject markup.
+function formatSummaryHtml(raw) {
+  const lines = escapeXml(raw).split(/\r?\n/);
+  let html = "", inList = false;
+  const closeList = () => { if (inList) { html += "</ul>"; inList = false; } };
+  for (const rawLine of lines) {
+    const t = rawLine.trim();
+    if (!t) { closeList(); continue; }
+    const h = t.match(/^#{1,6}\s+(.*)$/);
+    if (h) { closeList(); html += `<h4 class="summary-h">${formatSummaryInline(h[1])}</h4>`; continue; }
+    if (/^[-*•]\s+/.test(t)) {
+      if (!inList) { html += `<ul class="summary-list">`; inList = true; }
+      html += `<li>${formatSummaryInline(t.replace(/^[-*•]\s+/, ""))}</li>`;
+      continue;
+    }
+    // A short label line ("Meaning:" or a bold-only line) reads as a heading.
+    const plain = t.replace(/\*\*/g, "").replace(/\[\[\/?[GBR]\]\]/g, "");
+    if (/^\*\*[^*]+\*\*:?$/.test(t) || (/^[^.!?]{1,32}:$/.test(plain))) {
+      closeList();
+      html += `<h4 class="summary-h">${formatSummaryInline(t.replace(/:$/, ""))}</h4>`;
+      continue;
+    }
+    closeList();
+    html += `<p class="summary-p">${formatSummaryInline(t)}</p>`;
+  }
+  closeList();
+  return html;
+}
+
+// The single card that holds the summarised Analyze / Correct result.
+function buildSummaryCard() {
+  const card = document.createElement("div");
+  card.className = "summary-card";
+  card.innerHTML = `
+    <p class="summary-intro">The result below is a single summary of research from all the LLMs — where they agree most, we're most confident, and those points are highlighted as the most reliable.</p>
+    <div class="summary-legend">
+      <span><i style="background:#16c60c"></i>Strong agreement — most reliable</span>
+      <span><i style="background:#0047FF"></i>Key point</span>
+      <span><i style="background:#e3120b"></i>Watch out / debated</span>
+    </div>
+    <p class="summary-status">Starting…</p>
+    <div class="summary-body"></div>
+    <button class="copy-btn summary-copy-btn" type="button" title="Copy summary" aria-label="Copy summary" style="display:none">
+      <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </button>`;
+  return card;
+}
+
+// Update the download button's label without disturbing its icon.
+function setDownloadLabel(label) {
+  const btn = document.getElementById("downloadBtn");
+  if (!btn) return;
+  const last = btn.lastChild;
+  if (last && last.nodeType === 3) last.textContent = " " + label;
+  else btn.appendChild(document.createTextNode(" " + label));
+}
+
+// Run an Analyze / Correct request: gather every LLM's result, then summarise.
+async function runSummarizedMethod(text, method) {
+  const resultsArea = document.getElementById("resultsArea");
+
+  // Per-engine rating doesn't apply to a single summary; keep only the download.
+  document.getElementById("ratingsHeader").style.display = "none";
+  document.getElementById("ratingsFooter").style.display = "none";
+  document.getElementById("downloadBar").style.display = "";
+  setDownloadLabel("Download summary");
+
+  const card = buildSummaryCard();
+  resultsArea.appendChild(card);
+  const statusEl = card.querySelector(".summary-status");
+  const bodyEl   = card.querySelector(".summary-body");
+  const copyBtn  = card.querySelector(".summary-copy-btn");
+
+  // Only LLMs can analyze/correct — NMTs are skipped entirely here.
+  const llmEngines = engines.filter(e => !isEngineLocked(e.id) && engineType(e.id) === "LLM");
+  if (!llmEngines.length) {
+    statusEl.classList.add("error");
+    statusEl.textContent = "No LLM engines are available for this methodology.";
+    return;
+  }
+
+  const TRANSLATION_TIMEOUT_MS = 30000;
+  const callEngine = (engine) => {
+    let t;
+    const to = new Promise((_, reject) => {
+      t = setTimeout(() => reject(new Error("timeout")), TRANSLATION_TIMEOUT_MS);
+    });
+    return Promise.race([engine.translate(text), to])
+      .then(r => stripWrapperTags(r))
+      .finally(() => clearTimeout(t));
+  };
+
+  let done = 0;
+  const total = llmEngines.length;
+  const updateGathering = () => {
+    statusEl.textContent = `Gathering research from the LLMs… (${done}/${total})`;
+  };
+  updateGathering();
+
+  const collected = await Promise.all(llmEngines.map(async engine => {
+    try {
+      const raw = await callEngine(engine);
+      return { name: engine.name, raw: typeof raw === "string" ? raw : "" };
+    } catch (err) {
+      console.warn(engine.name, "failed for summary", err);
+      return { name: engine.name, raw: "" };
+    } finally {
+      done++;
+      updateGathering();
+    }
+  }));
+
+  const outputs = collected.filter(o => o.raw && o.raw.trim());
+  if (!outputs.length) {
+    statusEl.classList.add("error");
+    statusEl.textContent = "None of the LLMs returned a usable result. Please try again.";
+    return;
+  }
+
+  statusEl.textContent = `Summarising research from ${outputs.length} LLM${outputs.length > 1 ? "s" : ""}…`;
+
+  let summaryRaw;
+  try {
+    summaryRaw = await summariseResults(method, text, outputs);
+  } catch (err) {
+    console.error("Summary failed", err);
+    statusEl.classList.add("error");
+    statusEl.textContent = "The summary could not be generated. Please try again.";
+    return;
+  }
+
+  statusEl.style.display = "none";
+  bodyEl.innerHTML = formatSummaryHtml(summaryRaw);
+  card.dataset.plain = bodyEl.textContent.trim();  // clean text for copy / download
+  copyBtn.style.display = "";
+}
+
 // ── Submit ──
 submitEl.addEventListener("click", async () => {
   const text = inputEl.value.trim();
@@ -3101,6 +3426,17 @@ submitEl.addEventListener("click", async () => {
   resultsArea.innerHTML = "";
   submitEl.disabled = true;
 
+  // Analyze and Correct show a single summarised result instead of one card
+  // per engine.
+  if (isSummarizedMethod(effectiveMethod())) {
+    try {
+      await runSummarizedMethod(text, effectiveMethod());
+    } finally {
+      submitEl.disabled = false;
+    }
+    return;
+  }
+
   // Render all engine cards immediately (shows "Translating…")
   engines.forEach(engine => resultsArea.appendChild(buildCard(engine)));
 
@@ -3108,6 +3444,7 @@ submitEl.addEventListener("click", async () => {
   document.getElementById("ratingsHeader").style.display = "";
   document.getElementById("downloadBar").style.display = "";
   document.getElementById("ratingsFooter").style.display = "";
+  setDownloadLabel("Download full list");
 
   // Fire all translations in parallel, each capped by a timeout so a
   // hanging worker can never leave the card stuck on "Translating…".
@@ -3236,6 +3573,21 @@ document.getElementById("resultsArea").addEventListener("click", e => {
   const el = document.getElementById(`result-${btn.dataset.engine}`);
   if (!el || el.classList.contains("loading")) return;
   copyText(el.textContent).then(() => {
+    btn.classList.add("copied");
+    setTimeout(() => btn.classList.remove("copied"), 1400);
+  }).catch(err => console.error("Copy failed", err));
+});
+
+// Copy the summarised Analyze / Correct result (plain text, markers stripped).
+document.getElementById("resultsArea").addEventListener("click", e => {
+  const btn = e.target.closest(".summary-copy-btn");
+  if (!btn) return;
+  const card = btn.closest(".summary-card");
+  const text = card && card.dataset.plain
+    ? card.dataset.plain
+    : (card ? card.querySelector(".summary-body").textContent.trim() : "");
+  if (!text) return;
+  copyText(text).then(() => {
     btn.classList.add("copied");
     setTimeout(() => btn.classList.remove("copied"), 1400);
   }).catch(err => console.error("Copy failed", err));
@@ -3494,6 +3846,24 @@ function buildZip(files) {
 }
 
 function downloadFullList() {
+  // Summarised methodologies (Analyze / Correct) have a single result, not a
+  // per-engine list — export it as plain text instead of a spreadsheet.
+  const summaryCard = document.querySelector(".summary-card");
+  if (summaryCard) {
+    const plain = (summaryCard.dataset.plain || "").trim();
+    if (!plain) return;
+    const blob = new Blob([plain], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "lingonect-summary.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
   const data = engines
     .filter(engine => !isEngineLocked(engine.id))
     .map(engine => {
