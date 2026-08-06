@@ -575,6 +575,9 @@ body{
 .ctx-ex-src{ color:#111; font-size:15px; line-height:1.5; }
 .ctx-ex-tgt{ color:#888; font-size:13px; line-height:1.5; margin-top:1px; }
 .ctx-audio-btn{ flex-shrink:0; margin-top:1px; }
+.ctx-audio-btn.loading{ color:var(--cobalt); opacity:.55; cursor:progress; }
+.ctx-audio-btn.loading .speak-icon{ animation:ctxPulse 1s ease-in-out infinite; }
+@keyframes ctxPulse{ 0%,100%{ opacity:.35; } 50%{ opacity:1; } }
 
 /* Conjugation / declension tables */
 .ctx-table-wrap{ overflow-x:auto; margin:0 0 14px; }
@@ -619,8 +622,6 @@ body{
 .ctx-callout.blue .ctx-callout-h{ color:var(--cobalt); }
 .ctx-callout.red{ border-color:#e3120b; background:rgba(227,18,11,.06); }
 .ctx-callout.red .ctx-callout-h{ color:#e3120b; }
-
-.ctx-copy-btn{ margin-top:6px; }
 
 .result-card{
   display:flex;
@@ -1084,7 +1085,7 @@ body{
 
     <p class="hero-eyebrow">Select methodology</p>
     <p class="hero-headline" id="methodHeadline"><span class="method-word" data-method="translate">Translate</span>. <span class="method-word" data-method="transcreate">Transcreate</span>. <span class="method-word" data-method="localize">Localize</span>. <span class="method-word" data-method="culturalize">Culturalize</span>. <span class="method-word" data-method="analyze">Analyze</span>. <span class="method-word" data-method="correct">Correct</span>. <span class="method-word" data-method="contextualize">Contextualize</span>.</p>
-    <div class="ctx-hint" id="contextualizeHint">Contextualize takes a <strong>single word</strong> in your source language — it returns a concise definition, examples, and grammar.</div>
+    <div class="ctx-hint" id="contextualizeHint">Contextualize takes a <strong>single word</strong> in your source language and returns a concise definition, examples, and grammar.</div>
     <div class="localize-box" id="localizeBox">
       <label for="localizeMaxInput">Max characters</label>
       <input type="number" id="localizeMaxInput" min="1" step="1" inputmode="numeric" placeholder="e.g. 120">
@@ -3613,9 +3614,11 @@ function parseCtxJson(raw) {
   return JSON.parse(s);
 }
 
-// Speaker + stop icons for a source-language audio button.
+// Speaker + stop icons for a source-language audio button. Audio is streamed
+// from OpenAI's TTS (an <audio> element), so this needs no browser speech
+// support and is always enabled.
 function ctxAudioBtnHtml(refAttr) {
-  return `<button class="speak-btn ctx-audio-btn" type="button" ${refAttr} title="Listen" aria-label="Listen" ${ttsSupported ? "" : "disabled"}>
+  return `<button class="speak-btn ctx-audio-btn" type="button" ${refAttr} title="Listen" aria-label="Listen">
       <svg class="speak-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
       <svg class="stop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>
     </button>`;
@@ -3631,7 +3634,6 @@ function renderContextualize(d) {
 
   h += `<div class="ctx-head">`;
   h += `<span class="ctx-word">${esc(d.headword || "")}</span>`;
-  if (d.headword) h += ctxAudioBtnHtml(`data-ctx-word="1"`);
   if (d.partOfSpeech) h += `<span class="ctx-pos">${esc(d.partOfSpeech)}</span>`;
   if (d.pronunciation) h += `<span class="ctx-pron">${esc(d.pronunciation)}</span>`;
   h += `</div>`;
@@ -3693,11 +3695,7 @@ function renderContextualize(d) {
   h += callout("blue", "Key points", d.keyPoints);
   h += callout("red", "Watch out", d.watchOut);
 
-  h += `<button class="copy-btn ctx-copy-btn" type="button" title="Copy notes" aria-label="Copy notes">
-      <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-      <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-    </button>`;
-
+  // No copy button for this methodology — "Download word notes" covers export.
   return h;
 }
 
@@ -3732,23 +3730,68 @@ function ctxPlainText(d) {
   return lines.join("\n").trim();
 }
 
-// Speak arbitrary text in a given BCP-47 language, reusing the shared
-// stop/toggle plumbing. Used for the source-language audio buttons.
-function speakInLang(text, langCode, btn) {
-  if (!ttsSupported || !text) return;
-  const wasThis = btn === speakingBtn;
-  stopSpeaking();
-  if (wasThis) return;
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = langCode || "en-US";
-  const pool = interleaveByGender(voicesForLang(langCode || "en-US"));
-  if (pool.length) utter.voice = pool[0];
-  utter.rate = 0.9;
-  utter.onend   = () => { if (btn === speakingBtn) { btn.classList.remove("speaking"); speakingBtn = null; } };
-  utter.onerror = () => { if (btn === speakingBtn) { btn.classList.remove("speaking"); speakingBtn = null; } };
-  speakingBtn = btn;
-  btn.classList.add("speaking");
-  window.speechSynthesis.speak(utter);
+// Source-language audio for the example sentences. OpenAI's TTS gives far more
+// natural, native-sounding speech than the browser's built-in voices, so we
+// stream the audio from the OpenAI worker's /tts route and play it. Each clip
+// is cached (by sentence) for the session so replays are instant and free.
+const CTX_TTS_URL   = OPENAI_PROXY + "/tts";
+const CTX_TTS_MODEL = "gpt-4o-mini-tts";  // OpenAI's most natural TTS model
+const CTX_TTS_VOICE = "nova";             // warm, clear, works across languages
+let ctxAudioEl  = null;                    // the <audio> currently playing
+let ctxAudioBtn = null;                    // the button that started it
+const ctxAudioCache = new Map();           // sentence -> object URL
+
+function ctxStopAudio() {
+  if (ctxAudioEl) { try { ctxAudioEl.pause(); } catch (_) {} ctxAudioEl = null; }
+  if (ctxAudioBtn) { ctxAudioBtn.classList.remove("speaking", "loading"); ctxAudioBtn = null; }
+}
+
+// Free any cached audio (called when a new contextualize run starts).
+function ctxClearAudioCache() {
+  ctxAudioCache.forEach(url => URL.revokeObjectURL(url));
+  ctxAudioCache.clear();
+}
+
+async function ctxPlayAudio(text, btn) {
+  if (!text) return;
+  const wasThis = btn === ctxAudioBtn;
+  ctxStopAudio();
+  stopSpeaking();               // also halt any per-engine browser-TTS playback
+  if (wasThis) return;          // clicking the active button just stops it
+
+  ctxAudioBtn = btn;
+  btn.classList.add("loading");
+  try {
+    let url = ctxAudioCache.get(text);
+    if (!url) {
+      const res = await workerFetch(CTX_TTS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: CTX_TTS_MODEL,
+          voice: CTX_TTS_VOICE,
+          input: text,
+          instructions: `Read this aloud clearly and naturally, as a native ${sourceLang} speaker.`
+        })
+      });
+      if (!res.ok) throw new Error("TTS request failed: " + res.status);
+      const buf = await res.arrayBuffer();
+      url = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+      ctxAudioCache.set(text, url);
+    }
+    // The user may have clicked another button (or stopped) while we fetched.
+    if (ctxAudioBtn !== btn) return;
+    const audio = new Audio(url);
+    ctxAudioEl = audio;
+    btn.classList.remove("loading");
+    btn.classList.add("speaking");
+    audio.onended = () => { if (ctxAudioBtn === btn) ctxStopAudio(); };
+    audio.onerror = () => { if (ctxAudioBtn === btn) ctxStopAudio(); };
+    await audio.play();
+  } catch (err) {
+    console.error("Contextualize audio failed", err);
+    if (ctxAudioBtn === btn) ctxStopAudio();
+  }
 }
 
 // Run a Contextualize request: one model call, then render the entry.
@@ -3759,6 +3802,8 @@ async function runContextualize(word) {
   document.getElementById("downloadBar").style.display = "";
   setDownloadLabel("Download word notes");
 
+  ctxStopAudio();
+  ctxClearAudioCache();
   ctxData = null;
   const card = document.createElement("div");
   card.className = "ctx-card";
@@ -3802,6 +3847,7 @@ submitEl.addEventListener("click", async () => {
 
   const resultsArea = document.getElementById("resultsArea");
   resultsArea.innerHTML = "";
+  ctxStopAudio();
   submitEl.disabled = true;
 
   const method = effectiveMethod();
@@ -3995,32 +4041,13 @@ document.getElementById("resultsArea").addEventListener("click", e => {
   }).catch(err => console.error("Copy failed", err));
 });
 
-// Contextualize: play a source-language audio clip, or copy the whole entry.
+// Contextualize: play a source-language example sentence (via OpenAI TTS).
 document.getElementById("resultsArea").addEventListener("click", e => {
   const audioBtn = e.target.closest(".ctx-audio-btn");
-  if (audioBtn) {
-    if (!ttsSupported || !ctxData) return;
-    const langCode = SPEECH_LANG_MAP[sourceLang] || "en-US";
-    let text = "";
-    if (audioBtn.dataset.ctxWord) {
-      text = ctxData.headword || "";
-    } else if (audioBtn.dataset.ctxEx != null) {
-      const ex = (ctxData.examples || [])[Number(audioBtn.dataset.ctxEx)];
-      text = ex ? ex.source : "";
-    }
-    speakInLang(text, langCode, audioBtn);
-    return;
-  }
-  const copyBtn = e.target.closest(".ctx-copy-btn");
-  if (copyBtn) {
-    const card = copyBtn.closest(".ctx-card");
-    const text = card && card.dataset.plain ? card.dataset.plain : "";
-    if (!text) return;
-    copyText(text).then(() => {
-      copyBtn.classList.add("copied");
-      setTimeout(() => copyBtn.classList.remove("copied"), 1400);
-    }).catch(err => console.error("Copy failed", err));
-  }
+  if (!audioBtn || !ctxData) return;
+  const ex = (ctxData.examples || [])[Number(audioBtn.dataset.ctxEx)];
+  if (!ex || !ex.source) return;
+  ctxPlayAudio(ex.source, audioBtn);
 });
 
 // ── Speak (text-to-speech) a single engine result in the target language ──
