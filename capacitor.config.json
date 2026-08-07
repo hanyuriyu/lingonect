@@ -2,9 +2,6 @@
   "appId": "com.lingonect.app",
   "appName": "Lingonect",
   "webDir": "www",
-  "server": {
-    "iosScheme": "https"
-  },
   "plugins": {
     "FirebaseAuthentication": {
       "skipNativeAuth": true,
