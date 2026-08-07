@@ -1,5 +1,8 @@
 {
   "appId": "com.lingonect.app",
   "appName": "Lingonect",
-  "webDir": "www"
+  "webDir": "www",
+  "server": {
+    "iosScheme": "https"
+  }
 }
