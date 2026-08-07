@@ -315,11 +315,33 @@ function showError(msg){
 }
 function clearError(){ errorEl.style.display = "none"; }
 
-// Google sign-in
+// Google sign-in.
+// In the native iOS app the OAuth popup is blocked by Google, so we use the
+// Capacitor Firebase Authentication plugin to get a Google ID token natively,
+// then sign the JS SDK in with that credential so the rest of the app (which
+// uses the compat SDK everywhere) sees the signed-in user. On the website we
+// keep the normal popup flow.
+const isNativeApp = !!(window.Capacitor
+  && typeof window.Capacitor.isNativePlatform === "function"
+  && window.Capacitor.isNativePlatform());
+
+function signInWithGoogle() {
+  if (isNativeApp) {
+    return window.Capacitor.Plugins.FirebaseAuthentication.signInWithGoogle()
+      .then(result => {
+        const idToken = result && result.credential && result.credential.idToken;
+        if (!idToken) throw new Error("Google sign-in was cancelled.");
+        const googleCredential = firebase.auth.GoogleAuthProvider.credential(idToken);
+        return auth.signInWithCredential(googleCredential);
+      });
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  return auth.signInWithPopup(provider);
+}
+
 document.getElementById("googleBtn").addEventListener("click", () => {
   clearError();
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider)
+  signInWithGoogle()
     .then(cred => {
       if (!isAllowed(cred.user.email)) {
         auth.signOut();
