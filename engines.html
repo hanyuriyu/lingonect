@@ -2323,6 +2323,25 @@ async function translateWithMistral(text, extra) {
 // ── Claude (via Cloudflare Worker) ──
 const CLAUDE_PROXY = "https://claudetranslate.hanyuriyu.workers.dev";
 
+// Read a JSON reply from a Claude-worker call, failing clearly. Checking
+// res.ok BEFORE parsing matters: a 5xx from the worker (e.g. a 502 when the
+// upstream model misfires) returns an HTML error page, and calling res.json()
+// on that throws a cryptic SyntaxError. This routes any such failure through
+// engineError instead, so the caller gets a proper, status-aware message.
+async function readClaudeJson(engineName, res) {
+  if (!res.ok) throw await engineError(engineName, res);
+  let data;
+  try {
+    data = await res.json();
+  } catch (_) {
+    const err = new Error(`${engineName} returned a malformed response.`);
+    err.status = res.status;
+    throw err;
+  }
+  if (data && data.type === "error") throw await engineError(engineName, res, data);
+  return data;
+}
+
 async function translateWithClaude(text, extra) {
   const res = await workerFetch(CLAUDE_PROXY, {
     method: "POST",
@@ -2334,9 +2353,8 @@ async function translateWithClaude(text, extra) {
       messages: [{ role: "user", content: `<text>${text}</text>` }]
     })
   });
-    const data = await res.json();
-    if (!res.ok || data.type === "error") throw await engineError("Claude", res, data);
-    return data.content[0].text.trim();
+  const data = await readClaudeJson("Claude", res);
+  return data.content[0].text.trim();
 }
 
 // ── OpenAI (via Cloudflare Worker) ──
@@ -3422,8 +3440,7 @@ async function summariseResults(method, sourceText, outputs) {
       messages: [{ role: "user", content: user }]
     })
   });
-  const data = await res.json();
-  if (!res.ok || data.type === "error") throw await engineError("Summary", res, data);
+  const data = await readClaudeJson("Summary", res);
   return data.content[0].text.trim();
 }
 
@@ -3650,8 +3667,7 @@ async function contextualizeCall(word) {
       messages: [{ role: "user", content: `<word>${word}</word>` }]
     })
   });
-  const data = await res.json();
-  if (!res.ok || data.type === "error") throw await engineError("Contextualize", res, data);
+  const data = await readClaudeJson("Contextualize", res);
   return data.content[0].text.trim();
 }
 
@@ -3885,6 +3901,30 @@ async function ctxPlayAudio(text, btn) {
   }
 }
 
+// Turn a failed Contextualize call into a clear, honest message for the card.
+// The engine behind Contextualize is an LLM (via a Cloudflare Worker), so a 5xx
+// means the model or the proxy misfired — nothing to do with the word entered —
+// and a retry almost always succeeds.
+function ctxErrorMessage(err) {
+  const status = err && typeof err.status === "number" ? err.status : 0;
+  if (err && err.message === "timeout") {
+    return "This took too long and timed out. The language model can be slow under load — please try again.";
+  }
+  if (status >= 500) {
+    return `The language model misfired on our side (error ${status}). This is almost always a brief glitch — please try again in a moment.`;
+  }
+  if (status === 429) {
+    return "You've reached the request limit for now. Please wait a moment and try again.";
+  }
+  if (status === 401 || status === 403) {
+    return "The request was rejected on our side, not by your account. Please try again, or report it if it keeps happening.";
+  }
+  if (status === 0) {
+    return "Couldn't reach the service — usually a brief network hiccup. Check your connection and try again.";
+  }
+  return "The contextualization could not be generated. Please try again.";
+}
+
 // Run a Contextualize request: one model call, then render the entry.
 async function runContextualize(word) {
   const resultsArea = document.getElementById("resultsArea");
@@ -3911,7 +3951,7 @@ async function runContextualize(word) {
   } catch (err) {
     console.error("Contextualize failed", err);
     statusEl.classList.add("error");
-    statusEl.textContent = "The contextualization could not be generated. Please try again.";
+    statusEl.textContent = ctxErrorMessage(err);
     return;
   }
 
