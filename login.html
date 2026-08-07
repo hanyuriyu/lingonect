@@ -327,7 +327,12 @@ const isNativeApp = !!(window.Capacitor
 
 function signInWithGoogle() {
   if (isNativeApp) {
-    return window.Capacitor.Plugins.FirebaseAuthentication.signInWithGoogle()
+    const plugin = window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseAuthentication;
+    if (!plugin) {
+      return Promise.reject(new Error(
+        "Google sign-in isn't available in this build. The FirebaseAuthentication plugin is not installed."));
+    }
+    return plugin.signInWithGoogle()
       .then(result => {
         const idToken = result && result.credential && result.credential.idToken;
         if (!idToken) throw new Error("Google sign-in was cancelled.");
