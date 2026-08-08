@@ -81,11 +81,11 @@ async function sign(secretKey, accessKeyId, payload) {
   return { authorization, amzDate };
 }
 
-const CORS = {
+const CORS = (request) => ({
   "Access-Control-Allow-Origin": corsOrigin(request),
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+});
 
 // ---------------------------------------------------------------------------
 // Firebase ID-token verification
@@ -246,7 +246,7 @@ function corsOrigin(request) {
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: { ...CORS, "Access-Control-Max-Age": "86400" } });
+      return new Response(null, { headers: { ...CORS(request), "Access-Control-Max-Age": "86400" } });
     }
     // Reject anything without a valid Firebase ID token before doing any work.
     const __authPayload = await verifyFirebaseToken(request.headers.get("Authorization"));
@@ -361,12 +361,12 @@ export default {
 
       return new Response(JSON.stringify(data), {
         status: res.status,
-        headers: { "Content-Type": "application/json", ...CORS },
+        headers: { "Content-Type": "application/json", ...CORS(request) },
       });
     } catch (err) {
       return new Response(
         JSON.stringify({ error: { message: err.message } }),
-        { status: 500, headers: { "Content-Type": "application/json", ...CORS } }
+        { status: 500, headers: { "Content-Type": "application/json", ...CORS(request) } }
       );
     }
   },
