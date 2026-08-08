@@ -2913,6 +2913,12 @@ async function translateWithBaidu(text) {
     if (String(data.error_code) === "58001" || /INVALID_TO_PARAM|INVALID_FROM_PARAM|unsupported/i.test(data.error_msg || "")) {
       throw new Error("Language not supported");
     }
+    // 58003: Baidu's anti-fraud system has temporarily banned the shared
+    // Cloudflare IP our proxy runs on (it sees many App IDs from one IP and
+    // blocks it for the day). Nothing the user can fix — show a calm message.
+    if (String(data.error_code) === "58003") {
+      throw new Error("Baidu is temporarily unavailable — please try it again later. The other engines still ran.");
+    }
     throw await engineError("Baidu Translate", res, data);
   }
   return data.trans_result.map(r => r.dst).join("\n").trim();

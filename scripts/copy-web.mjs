@@ -15,7 +15,7 @@ const dest = join(root, 'www');
 // .html pages, mobile.css, favicons, logos and other images automatically.
 const DENY = new Set([
   '.git', '.github', 'node_modules', 'www', 'ios', 'android', 'scripts',
-  'workers', 'test-results', '.claude',
+  'workers', 'test-results', '.claude', 'assets',
   'package.json', 'package-lock.json', 'capacitor.config.json',
   'CLAUDE.md', 'CNAME', 'firebase.json', 'firebase-rtdb-rules.json',
   'firestore.rules', 'firestore.indexes.json', 'robots.txt', 'sitemap.xml',
