@@ -1,0 +1,11 @@
+{
+  "appId": "com.lingonect.app",
+  "appName": "Lingonect",
+  "webDir": "www",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

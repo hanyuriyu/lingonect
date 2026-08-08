@@ -158,12 +158,29 @@ async function __resolveUserStatus(uid, authHeader) {
   }
 }
 
+// Origins allowed to call this worker. The website plus the native iOS app
+// (Capacitor serves the bundled app from capacitor://localhost) and localhost
+// for development. Anything else falls back to the canonical site origin, so
+// the browser's CORS check blocks it.
+const CORS_ALLOWED_ORIGINS = [
+  "https://www.lingonect.com",
+  "https://lingonect.com",
+  "https://hanyuriyu.github.io",
+  "capacitor://localhost",
+  "http://localhost",
+  "https://localhost",
+];
+function corsOrigin(request) {
+  const o = request.headers.get("Origin");
+  return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
+          "Access-Control-Allow-Origin": corsOrigin(request),
           "Access-Control-Allow-Methods": "POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
           "Access-Control-Max-Age": "86400",
@@ -179,7 +196,7 @@ export default {
           status: 401,
           headers: {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "https://www.lingonect.com",
+            "Access-Control-Allow-Origin": corsOrigin(request),
           },
         }
       );
@@ -216,7 +233,7 @@ export default {
                 status: 429,
                 headers: {
                   "Content-Type": "application/json",
-                  "Access-Control-Allow-Origin": "https://www.lingonect.com",
+                  "Access-Control-Allow-Origin": corsOrigin(request),
                 },
               }
             );
@@ -235,7 +252,7 @@ export default {
                 status: 429,
                 headers: {
                   "Content-Type": "application/json",
-                  "Access-Control-Allow-Origin": "https://www.lingonect.com",
+                  "Access-Control-Allow-Origin": corsOrigin(request),
                 },
               }
             );
@@ -279,7 +296,7 @@ export default {
         status: res.status,
         headers: {
           "Content-Type": res.headers.get("Content-Type") || "application/json",
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
+          "Access-Control-Allow-Origin": corsOrigin(request),
         },
       });
     } catch (err) {
@@ -287,7 +304,7 @@ export default {
         status: 500,
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "https://www.lingonect.com",
+          "Access-Control-Allow-Origin": corsOrigin(request),
         },
       });
     }

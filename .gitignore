@@ -1,0 +1,14 @@
+# Node / Capacitor tooling
+node_modules/
+
+# Generated web bundle (rebuilt by scripts/copy-web.mjs)
+www/
+
+# iOS build artifacts (the ios/ project itself IS committed)
+ios/App/Pods/
+ios/App/App/public/
+ios/App/build/
+DerivedData/
+
+# macOS
+.DS_Store
