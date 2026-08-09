@@ -34,6 +34,22 @@ if [ -z "$APP_ID" ] || [ -z "$SECRET" ]; then
   echo "Set BAIDU_APP_ID and BAIDU_SECRET_KEY first. See the header of this file." >&2
   exit 1
 fi
+
+# Catch unreplaced placeholders here rather than letting Baidu answer 52003 to
+# them, which reads like a real account fault and sends you to the wrong page.
+case "$APP_ID" in
+  *[!0-9]*)
+    echo "BAIDU_APP_ID is '${APP_ID}', which is not a numeric App ID." >&2
+    echo "Copy the real values from 开发者信息:" >&2
+    echo "  https://fanyi-api.baidu.com/manage/developer" >&2
+    exit 1 ;;
+esac
+if [ "$SECRET" = "your-secret-key" ]; then
+  echo "BAIDU_SECRET_KEY is still the placeholder. See 开发者信息:" >&2
+  echo "  https://fanyi-api.baidu.com/manage/developer" >&2
+  exit 1
+fi
+
 command -v openssl >/dev/null 2>&1 || { echo "openssl is required." >&2; exit 1; }
 
 # Baidu's signature: md5(appid + q + salt + secret), over UTF-8 bytes.

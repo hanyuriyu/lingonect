@@ -1,0 +1,9 @@
+# Terminates TLS for the relay. Caddy issues and renews the certificate itself.
+{$RELAY_DOMAIN} {
+	reverse_proxy relay:8080
+
+	log {
+		output stdout
+		format console
+	}
+}

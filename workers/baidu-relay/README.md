@@ -106,19 +106,28 @@ Any €4–6/month box (Hetzner, DigitalOcean, Vultr) has a dedicated static IP.
 Pick a region near the API — Singapore, Tokyo or Hong Kong — since
 `fanyi-api.baidu.com` is in China.
 
+The worker calls the relay over HTTPS, so `docker-compose.yml` runs the relay
+behind Caddy, which obtains and renews the certificate by itself. Point a
+**DNS-only (grey cloud)** A record — say `relay.lingonect.com` — at the box
+first, and open ports 80 and 443. Grey cloud matters: proxying it through
+Cloudflare would put Cloudflare back in the path.
+
 ```bash
 scp -r workers/baidu-relay youruser@yourhost:~/baidu-relay
 ssh youruser@yourhost
 cd ~/baidu-relay
-docker build -t baidu-relay .
-docker run -d --restart=always -p 8080:8080 \
-  -e RELAY_TOKEN="<a long random string>" \
-  -e BAIDU_APP_ID="<our numeric App ID>" \
-  --name baidu-relay baidu-relay
+
+cp .env.example .env
+openssl rand -hex 32          # paste into RELAY_TOKEN, keep it for the worker
+nano .env                     # set RELAY_DOMAIN, RELAY_TOKEN, BAIDU_APP_ID
+
+docker compose up -d
+curl https://relay.lingonect.com/healthz     # expect: ok
 ```
 
-Put it behind TLS (Caddy, nginx + certbot, or Cloudflare in front of a
-subdomain) so the worker can reach it over HTTPS.
+`.env` is gitignored and holds the shared token. Note that the Baidu **secret
+key never comes here** — it stays in the Cloudflare worker. The relay only
+needs the App ID, to reject anything that is not ours.
 
 ### Option B — Fly.io
 
@@ -140,12 +149,29 @@ from. Check the sending address from inside the running container, and check it
 again after a restart:
 
 ```bash
-docker exec baidu-relay wget -qO- https://ifconfig.me   # VPS
-fly ssh console -C "wget -qO- https://ifconfig.me"      # Fly
+docker compose exec relay wget -qO- https://ifconfig.me   # VPS
+fly ssh console -C "wget -qO- https://ifconfig.me"        # Fly
 ```
 
 If the two answers differ, the host is not giving you a fixed egress IP — move
 to Option A.
+
+Then confirm Baidu is happy with that address *before* wiring the worker to it,
+by running the diagnostic from the box itself:
+
+```bash
+export BAIDU_APP_ID=... BAIDU_SECRET_KEY=...
+bash check-baidu-ip.sh
+unset BAIDU_APP_ID BAIDU_SECRET_KEY
+```
+
+A successful translation means this IP is clean and you can skip the Baidu
+email entirely. A 58003 means you inherited someone else's ban — see "If Baidu
+never replies" below; reassigning the address is usually quicker than asking.
+
+One thing to check in the console while you are there: if a **server IP
+whitelist** is configured against the App ID in 开发者信息, the relay's address
+has to be added to it, or Baidu answers 58000 instead.
 
 ## Wire the worker to the relay
 
@@ -167,17 +193,48 @@ A working call logs nothing; a failing one logs
 
 To roll back to the old direct behaviour, delete the two secrets and redeploy.
 
-## Ask Baidu to whitelist the address
+## Ask Baidu to whitelist the address (optional)
 
-Once the egress IP is fixed and verified, mail **translate_api@baidu.com** and
-ask them to lift the ban and register the address. They ask for:
+**This step is insurance, not the fix.** The relay is the fix: a dedicated
+address carrying exactly one App ID cannot meet either ban condition, so it
+should never earn a 58003 of its own. The email matters in one narrow case —
+the address you were assigned was *already* banned before you got it, because
+a previous tenant abused it.
 
-- company name
-- product name (Lingonect)
-- contact person and contact details
-- **server IP** (the verified egress address)
-- **APPID**
+You can check for that case before it costs you anything: run
+`check-baidu-ip.sh` **on the host**, before pointing the worker at it. A clean
+answer there means you never need to write to anyone.
 
-They reply and lift the ban after checking. This step is not strictly required
-— a dedicated IP carrying one App ID should never trip 58003 in the first place
-— but it stops a stale ban on a recycled address from biting on day one.
+If the address does turn out to be dirty, mail **translate_api@baidu.com**.
+Send every field they ask for — their FAQ warns that incomplete information
+hurts the review — and write it in Chinese; `unban-email-template.md` in this
+directory is ready to fill in and send.
+
+### If Baidu never replies
+
+Very likely you will not need them to, because **58003 expires on its own**.
+Baidu's own wording is 次日解封 — banned for the day, released the next. The
+reason ours never cleared is that Cloudflare's shared pool kept re-triggering
+it around the clock. On a dedicated address carrying one App ID there is
+nothing left to re-trigger it, so an inherited ban simply ages out, typically
+within a day. The email only saves you that wait.
+
+So if the queue stays silent:
+
+1. **Wait 24–48 hours and re-run `check-baidu-ip.sh`.** Nothing is re-arming
+   the ban any more, so it should lapse by itself.
+2. **If it is still banned, change the address.** The ban is on an IP, and IPs
+   are cheap and fungible — swapping one is far quicker than any support
+   queue, and needs nobody's permission:
+
+   ```bash
+   fly ips release <old-ip> && fly ips allocate-v4     # Fly
+   ```
+
+   On a VPS, detach and attach a new floating IP, or rebuild the box (a
+   different region gives you a different pool). Re-run `check-baidu-ip.sh`
+   after each change and keep the first address that answers cleanly.
+3. **Only then chase the email**, and treat a reply as a bonus.
+
+There is no scenario here where a silent support queue leaves Baidu broken.
+The worst case is a day's wait or a few minutes' work reassigning an address.
