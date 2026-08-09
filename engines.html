@@ -504,7 +504,6 @@ body{
 .summary-body .hl-green{ color:#0f9c08; background:rgba(22,198,12,.13); }   /* strong agreement */
 .summary-body .hl-blue{  color:var(--cobalt); background:rgba(0,71,255,.10); } /* key point */
 .summary-body .hl-red{   color:#e3120b; background:rgba(227,18,11,.10); }    /* caution / debated */
-.summary-copy-btn{ margin-top:6px; }
 
 /* ── Contextualize (single-word deep dive) ──
    One word in → a structured, well-laid-out set of notes: definition (in the
@@ -3774,16 +3773,7 @@ function buildSummaryCard() {
       <span><i style="background:#e3120b"></i>Watch out / debated</span>
     </div>
     <p class="summary-status">Starting…</p>
-    <div class="summary-body"></div>
-    <button class="copy-btn summary-copy-btn" type="button" title="Copy summary" aria-label="Copy summary" style="display:none">
-      <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-      </svg>
-      <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12"></polyline>
-      </svg>
-    </button>`;
+    <div class="summary-body"></div>`;
   return card;
 }
 
@@ -3810,7 +3800,6 @@ async function runSummarizedMethod(text, method) {
   resultsArea.appendChild(card);
   const statusEl = card.querySelector(".summary-status");
   const bodyEl   = card.querySelector(".summary-body");
-  const copyBtn  = card.querySelector(".summary-copy-btn");
 
   // Only LLMs can analyze/correct — NMTs are skipped entirely here.
   const llmEngines = engines.filter(e => !isEngineLocked(e.id) && engineType(e.id) === "LLM");
@@ -3872,8 +3861,7 @@ async function runSummarizedMethod(text, method) {
 
   statusEl.style.display = "none";
   bodyEl.innerHTML = formatSummaryHtml(summaryRaw);
-  card.dataset.plain = bodyEl.textContent.trim();  // clean text for copy / download
-  copyBtn.style.display = "";
+  card.dataset.plain = bodyEl.textContent.trim();  // clean text for download
 }
 
 // ── Contextualize (single-word deep dive) ──
@@ -4843,21 +4831,6 @@ document.getElementById("resultsArea").addEventListener("click", e => {
   const el = document.getElementById(`result-${btn.dataset.engine}`);
   if (!el || el.classList.contains("loading")) return;
   copyText(el.textContent).then(() => {
-    btn.classList.add("copied");
-    setTimeout(() => btn.classList.remove("copied"), 1400);
-  }).catch(err => console.error("Copy failed", err));
-});
-
-// Copy the summarised Analyze / Correct result (plain text, markers stripped).
-document.getElementById("resultsArea").addEventListener("click", e => {
-  const btn = e.target.closest(".summary-copy-btn");
-  if (!btn) return;
-  const card = btn.closest(".summary-card");
-  const text = card && card.dataset.plain
-    ? card.dataset.plain
-    : (card ? card.querySelector(".summary-body").textContent.trim() : "");
-  if (!text) return;
-  copyText(text).then(() => {
     btn.classList.add("copied");
     setTimeout(() => btn.classList.remove("copied"), 1400);
   }).catch(err => console.error("Copy failed", err));
