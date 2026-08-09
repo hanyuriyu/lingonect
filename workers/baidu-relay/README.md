@@ -167,17 +167,48 @@ A working call logs nothing; a failing one logs
 
 To roll back to the old direct behaviour, delete the two secrets and redeploy.
 
-## Ask Baidu to whitelist the address
+## Ask Baidu to whitelist the address (optional)
 
-Once the egress IP is fixed and verified, mail **translate_api@baidu.com** and
-ask them to lift the ban and register the address. They ask for:
+**This step is insurance, not the fix.** The relay is the fix: a dedicated
+address carrying exactly one App ID cannot meet either ban condition, so it
+should never earn a 58003 of its own. The email matters in one narrow case —
+the address you were assigned was *already* banned before you got it, because
+a previous tenant abused it.
 
-- company name
-- product name (Lingonect)
-- contact person and contact details
-- **server IP** (the verified egress address)
-- **APPID**
+You can check for that case before it costs you anything: run
+`check-baidu-ip.sh` **on the host**, before pointing the worker at it. A clean
+answer there means you never need to write to anyone.
 
-They reply and lift the ban after checking. This step is not strictly required
-— a dedicated IP carrying one App ID should never trip 58003 in the first place
-— but it stops a stale ban on a recycled address from biting on day one.
+If the address does turn out to be dirty, mail **translate_api@baidu.com**.
+Send every field they ask for — their FAQ warns that incomplete information
+hurts the review — and write it in Chinese; `unban-email-template.md` in this
+directory is ready to fill in and send.
+
+### If Baidu never replies
+
+Very likely you will not need them to, because **58003 expires on its own**.
+Baidu's own wording is 次日解封 — banned for the day, released the next. The
+reason ours never cleared is that Cloudflare's shared pool kept re-triggering
+it around the clock. On a dedicated address carrying one App ID there is
+nothing left to re-trigger it, so an inherited ban simply ages out, typically
+within a day. The email only saves you that wait.
+
+So if the queue stays silent:
+
+1. **Wait 24–48 hours and re-run `check-baidu-ip.sh`.** Nothing is re-arming
+   the ban any more, so it should lapse by itself.
+2. **If it is still banned, change the address.** The ban is on an IP, and IPs
+   are cheap and fungible — swapping one is far quicker than any support
+   queue, and needs nobody's permission:
+
+   ```bash
+   fly ips release <old-ip> && fly ips allocate-v4     # Fly
+   ```
+
+   On a VPS, detach and attach a new floating IP, or rebuild the box (a
+   different region gives you a different pool). Re-run `check-baidu-ip.sh`
+   after each change and keep the first address that answers cleanly.
+3. **Only then chase the email**, and treat a reply as a bonus.
+
+There is no scenario here where a silent support queue leaves Baidu broken.
+The worst case is a day's wait or a few minutes' work reassigning an address.
