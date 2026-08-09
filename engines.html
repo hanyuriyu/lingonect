@@ -1137,6 +1137,52 @@ body{
   .star-rating .star{ width:16px; height:16px; }
 }
 
+/* ── PHONE INPUT STACK ──
+   On a phone there isn't room for the text box and the language/submit
+   column side by side — the textarea gets squeezed to a couple of
+   characters wide. Stack them instead: text box on top, full width, with
+   the language selectors and Submit underneath. Tablets and desktop keep
+   the side-by-side layout. */
+@media (max-width:640px){
+  .input-wrap{
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .text-input{
+    flex:none;
+    width:100%;
+    min-height:110px;
+    font-size:16px;   /* ≥16px stops iOS zooming the page on focus */
+  }
+
+  .input-actions{
+    width:100%;
+  }
+
+  /* Selector fills the row; its "Source" / "Target" label sits beside it. */
+  .lang-row{
+    width:100%;
+  }
+  .lang-row .lang-select-wrap{
+    flex:1;
+    min-width:0;
+  }
+  /* Dropdown spans the (now much wider) button rather than hugging its right edge. */
+  .lang-dropdown{
+    left:0;
+    right:0;
+    min-width:0;
+  }
+  .lang-btn{
+    font-size:15px;
+  }
+  .submit-btn{
+    font-size:15px;
+    padding:13px 22px;
+  }
+}
+
 @media (max-width:420px){
   .logo{ width:110px; height:110px; }
   .hero-headline{ font-size:14px; }
@@ -1228,7 +1274,7 @@ body{
 
       <div class="input-actions">
         <!-- Source language selector -->
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div class="lang-row" style="display:flex;align-items:center;gap:8px;">
         <div class="lang-select-wrap" id="srcLangSelectWrap">
           <button class="lang-btn" id="srcLangBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
             <span id="srcLangLabel">English (US)</span>
@@ -1302,7 +1348,7 @@ body{
         </div>
 
         <!-- Target language selector -->
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div class="lang-row" style="display:flex;align-items:center;gap:8px;">
         <div class="lang-select-wrap" id="langSelectWrap">
           <button class="lang-btn" id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
             <span id="langLabel">German</span>
