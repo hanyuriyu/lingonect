@@ -131,16 +131,37 @@ needs the App ID, to reject anything that is not ours.
 
 ### Option B — Fly.io
 
+The IP that matters here is the **egress** one. Fly's `fly ips allocate-v4`
+buys a dedicated *ingress* address, which is a different thing and does nothing
+for us: Fly's docs are explicit that inbound anycast addresses "are not used
+for outbound connections made from within a Machine". By default outbound
+traffic leaves through a shared NAT pool that rotates — the same class of
+problem as Cloudflare, just a smaller pool. Allocate a **static egress IP**:
+
 ```bash
 cd workers/baidu-relay
 fly launch --no-deploy --copy-config --name lingonect-baidu-relay
-fly ips allocate-v4                     # a dedicated IPv4, not the shared one
 fly secrets set RELAY_TOKEN="<a long random string>" BAIDU_APP_ID="<App ID>"
 fly deploy
+
+fly machines list                       # note the machine ID
+fly machine egress-ip allocate <machine-id>
 ```
 
+That costs about $0.005/hour (~$3.60/month). An app-scoped alternative,
+`fly ips allocate-egress`, survives machines being recreated by a redeploy,
+where a machine-scoped one may not — worth preferring if your flyctl has it.
+
+You do **not** need a dedicated ingress IPv4 ($2/mo) as well; the free shared
+one is fine for reaching the relay.
+
 `fly.toml` keeps one machine always running, because a machine that stops and
-restarts can come back behind a different address.
+restarts can come back behind a different address. Keep it at exactly one
+machine — Fly creates two by default for high availability, and two machines
+mean two egress addresses, which is the "one App ID, many addresses" trigger.
+
+Verify the egress address afterwards regardless: some users report outbound
+traffic still leaving over IPv6, or not using the allocated address at all.
 
 ### Verify the egress IP before telling Baidu about it
 
@@ -149,20 +170,25 @@ from. Check the sending address from inside the running container, and check it
 again after a restart:
 
 ```bash
-docker compose exec relay wget -qO- https://ifconfig.me   # VPS
-fly ssh console -C "wget -qO- https://ifconfig.me"        # Fly
+docker compose exec relay wget -qO- https://ifconfig.me/ip   # VPS
+fly ssh console -C "wget -qO- https://ifconfig.me/ip"     # Fly
 ```
 
 If the two answers differ, the host is not giving you a fixed egress IP — move
 to Option A.
 
-Then confirm Baidu is happy with that address *before* wiring the worker to it,
-by running the diagnostic from the box itself:
+Then confirm Baidu is happy with that address *before* wiring the worker to it.
+Do this **from your laptop, through the relay** — the image carries only
+`server.js`, so there is no shell to run the diagnostic in on the box, and
+going through the relay tests the real path anyway: reachability, the token,
+the App ID guard, and Baidu's verdict on the relay's address.
 
 ```bash
 export BAIDU_APP_ID=... BAIDU_SECRET_KEY=...
+export BAIDU_RELAY_URL=https://your-relay/translate
+export BAIDU_RELAY_TOKEN=...
 bash check-baidu-ip.sh
-unset BAIDU_APP_ID BAIDU_SECRET_KEY
+unset BAIDU_APP_ID BAIDU_SECRET_KEY BAIDU_RELAY_TOKEN
 ```
 
 A successful translation means this IP is clean and you can skip the Baidu
