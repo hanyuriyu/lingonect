@@ -15,20 +15,69 @@ App IDs sending translations from that address on the same day. The ban lifts
 overnight and is re-applied the moment it happens again.
 
 Cloudflare Workers do not have their own egress addresses — a `fetch()` from a
-Worker leaves through Cloudflare's shared pool, which a great many other people
-also proxy Baidu Translate through, each with their own App ID. So Baidu counts
-all of those App IDs against the address our request happens to leave from, and
-bans it. We then inherit a ban we did not earn.
+Worker leaves through Cloudflare's shared pool. That trips Baidu's rule in two
+independent ways at once:
+
+1. **Many App IDs, one address.** A great many other people also proxy Baidu
+   Translate through Cloudflare, each with their own App ID. Baidu counts all
+   of them against whichever address our request leaves from, and bans it. We
+   inherit a ban we did not earn.
+2. **One App ID, many addresses.** Baidu also bans when a single App ID is seen
+   hopping between addresses during a day. Worker requests egress from whatever
+   Cloudflare location served them, so our traffic looks like exactly that.
+
+Either one alone is enough. Both together are why this is constant rather than
+occasional, and why it does not clear itself overnight.
 
 This explains every symptom exactly:
 
-- The Baidu console shows a healthy, paid account with credits remaining — the
-  ban is on an IP, so there is nothing to see there.
+- The Baidu console shows a healthy, paid account with credits remaining. The
+  ban is on an address, and an address is not account state, so there is no
+  place in the console for it to appear — see below.
 - No amount of checking keys, quotas or billing changes anything.
 - It is not caused by the iOS work. That change only rewrote the
   `Access-Control-Allow-Origin` *response* header to admit
   `capacitor://localhost`; response headers cannot influence what Baidu sees.
   The timing was a coincidence.
+
+## Why the console never mentions it
+
+The console reports things that belong to the account: App ID and key, whether
+the service is switched on, usage and credits. A ban on an IP address belongs
+to none of those, and Baidu exposes no screen for it — the ban is stated only
+in the API response body, as `error_code 58003`.
+
+The strongest evidence that there is no console surface is Baidu's own remedy:
+their FAQ tells you to **email translate_api@baidu.com** with your company
+name, product name, contact details, **server IP** and **APPID** to have a ban
+lifted. If it were account state, it would be a screen and a button, not a
+human queue you have to write to and quote your server IP at.
+
+So "the platform doesn't say I'm banned" is the expected observation, not
+evidence against. To see the ban stated directly, run `check-baidu-ip.sh`
+(below) from two different networks.
+
+## Confirm it yourself in a minute
+
+`check-baidu-ip.sh` sends one correctly signed request and prints Baidu's raw
+answer plus the outbound IP it came from:
+
+```bash
+export BAIDU_APP_ID=...      # leading space or export, so it stays out of history
+export BAIDU_SECRET_KEY=...
+bash check-baidu-ip.sh
+```
+
+Run it **from your laptop** and then **from the relay host**. Same credentials,
+different address, so the address is the only variable. A laptop that
+translates fine while the Worker fails proves the account is healthy and the
+egress address is the problem. Run it on any host before you point the worker
+at it, to be sure that IP is clean to begin with.
+
+You can also read the code straight out of the live site with no setup at all:
+open lingonect.com, DevTools → Network → the `baidu.hanyuriyu.workers.dev`
+request → Response. The worker passes Baidu's body through untouched, so the
+`error_code` is right there.
 
 ## The fix
 
