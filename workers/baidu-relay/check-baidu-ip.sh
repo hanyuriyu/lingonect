@@ -30,6 +30,14 @@ SECRET="${BAIDU_SECRET_KEY:-}"
 TEXT="${1:-hello world}"
 API="https://fanyi-api.baidu.com/api/trans/vip/translate"
 
+# Set BAIDU_RELAY_URL (and BAIDU_RELAY_TOKEN) to send the signed request through
+# the relay instead of straight to Baidu. That answers the question that
+# actually matters — what Baidu makes of the *relay's* address — from your own
+# laptop, and exercises the same path the worker will take: relay reachable,
+# token accepted, App ID guard passed, Baidu's verdict returned.
+RELAY_URL="${BAIDU_RELAY_URL:-}"
+RELAY_TOKEN="${BAIDU_RELAY_TOKEN:-}"
+
 if [ -z "$APP_ID" ] || [ -z "$SECRET" ]; then
   echo "Set BAIDU_APP_ID and BAIDU_SECRET_KEY first. See the header of this file." >&2
   exit 1
@@ -56,24 +64,49 @@ command -v openssl >/dev/null 2>&1 || { echo "openssl is required." >&2; exit 1;
 salt="$(date +%s)$$"
 sign="$(printf '%s' "${APP_ID}${TEXT}${salt}${SECRET}" | openssl dgst -md5 | awk '{print $NF}')"
 
-echo "Calling Baidu as App ID ${APP_ID}"
-echo "Outbound IP seen by the internet: $(curl -s --max-time 10 https://ifconfig.me || echo '(could not determine)')"
-echo
-
-body="$(curl -sS --max-time 25 -X POST "$API" \
-  --data-urlencode "q=${TEXT}" \
-  --data "from=auto" --data "to=zh" \
-  --data "appid=${APP_ID}" --data "salt=${salt}" --data "sign=${sign}")"
+if [ -n "$RELAY_URL" ]; then
+  echo "Calling Baidu as App ID ${APP_ID} THROUGH THE RELAY at ${RELAY_URL}"
+  echo "The address being tested is the relay's, not this machine's."
+  echo
+  body="$(curl -sS --max-time 25 -X POST "$RELAY_URL" \
+    -H "X-Relay-Token: ${RELAY_TOKEN}" \
+    --data-urlencode "q=${TEXT}" \
+    --data "from=auto" --data "to=zh" \
+    --data "appid=${APP_ID}" --data "salt=${salt}" --data "sign=${sign}")"
+else
+  echo "Calling Baidu as App ID ${APP_ID} directly."
+  echo "Outbound IP seen by the internet: $(curl -s --max-time 10 https://ifconfig.me/ip || echo '(could not determine)')"
+  echo
+  body="$(curl -sS --max-time 25 -X POST "$API" \
+    --data-urlencode "q=${TEXT}" \
+    --data "from=auto" --data "to=zh" \
+    --data "appid=${APP_ID}" --data "salt=${salt}" --data "sign=${sign}")"
+fi
 
 echo "Baidu replied:"
 echo "  ${body}"
 echo
 
 # Baidu answers HTTP 200 whether it worked or not, so the body is the verdict.
-code="$(printf '%s' "$body" | sed -n 's/.*"error_code"[[:space:]]*:[[:space:]]*"\{0,1\}\([0-9]*\).*/\1/p')"
+code="$(printf '%s' "$body" | sed -n 's/.*"error_code"[[:space:]]*:[[:space:]]*"\{0,1\}\([A-Za-z0-9_]*\).*/\1/p')"
 
 case "$code" in
-  "")      echo "→ Success. This IP can talk to Baidu with this App ID." ;;
+  "")      if [ -n "$RELAY_URL" ]; then
+             echo "→ Success, through the relay. Baidu accepts the relay's IP —"
+             echo "  the whole path works. Wire the worker to it."
+           else
+             echo "→ Success. This IP can talk to Baidu with this App ID."
+           fi ;;
+  relay_forbidden)
+           echo "→ The relay rejected the token. BAIDU_RELAY_TOKEN here must match"
+           echo "  RELAY_TOKEN on the relay exactly." ;;
+  relay_appid)
+           echo "→ The relay refused this App ID. Its BAIDU_APP_ID does not match"
+           echo "  the one used here — check 'fly secrets list' against BAIDU_APP_ID." ;;
+  relay_upstream)
+           echo "→ The relay could not reach Baidu at all. Check it is running." ;;
+  relay_body|relay_method)
+           echo "→ The relay rejected the request shape (${code}). Not a Baidu verdict." ;;
   58003)   echo "→ 58003 此IP已被封禁: this IP is banned. The account is fine — Baidu"
            echo "  bans the address, never the account, which is why the console is"
            echo "  silent. Run this from another network and it will succeed." ;;

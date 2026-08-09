@@ -149,20 +149,25 @@ from. Check the sending address from inside the running container, and check it
 again after a restart:
 
 ```bash
-docker compose exec relay wget -qO- https://ifconfig.me   # VPS
-fly ssh console -C "wget -qO- https://ifconfig.me"        # Fly
+docker compose exec relay wget -qO- https://ifconfig.me/ip   # VPS
+fly ssh console -C "wget -qO- https://ifconfig.me/ip"     # Fly
 ```
 
 If the two answers differ, the host is not giving you a fixed egress IP — move
 to Option A.
 
-Then confirm Baidu is happy with that address *before* wiring the worker to it,
-by running the diagnostic from the box itself:
+Then confirm Baidu is happy with that address *before* wiring the worker to it.
+Do this **from your laptop, through the relay** — the image carries only
+`server.js`, so there is no shell to run the diagnostic in on the box, and
+going through the relay tests the real path anyway: reachability, the token,
+the App ID guard, and Baidu's verdict on the relay's address.
 
 ```bash
 export BAIDU_APP_ID=... BAIDU_SECRET_KEY=...
+export BAIDU_RELAY_URL=https://your-relay/translate
+export BAIDU_RELAY_TOKEN=...
 bash check-baidu-ip.sh
-unset BAIDU_APP_ID BAIDU_SECRET_KEY
+unset BAIDU_APP_ID BAIDU_SECRET_KEY BAIDU_RELAY_TOKEN
 ```
 
 A successful translation means this IP is clean and you can skip the Baidu
