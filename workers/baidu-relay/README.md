@@ -106,19 +106,28 @@ Any €4–6/month box (Hetzner, DigitalOcean, Vultr) has a dedicated static IP.
 Pick a region near the API — Singapore, Tokyo or Hong Kong — since
 `fanyi-api.baidu.com` is in China.
 
+The worker calls the relay over HTTPS, so `docker-compose.yml` runs the relay
+behind Caddy, which obtains and renews the certificate by itself. Point a
+**DNS-only (grey cloud)** A record — say `relay.lingonect.com` — at the box
+first, and open ports 80 and 443. Grey cloud matters: proxying it through
+Cloudflare would put Cloudflare back in the path.
+
 ```bash
 scp -r workers/baidu-relay youruser@yourhost:~/baidu-relay
 ssh youruser@yourhost
 cd ~/baidu-relay
-docker build -t baidu-relay .
-docker run -d --restart=always -p 8080:8080 \
-  -e RELAY_TOKEN="<a long random string>" \
-  -e BAIDU_APP_ID="<our numeric App ID>" \
-  --name baidu-relay baidu-relay
+
+cp .env.example .env
+openssl rand -hex 32          # paste into RELAY_TOKEN, keep it for the worker
+nano .env                     # set RELAY_DOMAIN, RELAY_TOKEN, BAIDU_APP_ID
+
+docker compose up -d
+curl https://relay.lingonect.com/healthz     # expect: ok
 ```
 
-Put it behind TLS (Caddy, nginx + certbot, or Cloudflare in front of a
-subdomain) so the worker can reach it over HTTPS.
+`.env` is gitignored and holds the shared token. Note that the Baidu **secret
+key never comes here** — it stays in the Cloudflare worker. The relay only
+needs the App ID, to reject anything that is not ours.
 
 ### Option B — Fly.io
 
@@ -140,12 +149,29 @@ from. Check the sending address from inside the running container, and check it
 again after a restart:
 
 ```bash
-docker exec baidu-relay wget -qO- https://ifconfig.me   # VPS
-fly ssh console -C "wget -qO- https://ifconfig.me"      # Fly
+docker compose exec relay wget -qO- https://ifconfig.me   # VPS
+fly ssh console -C "wget -qO- https://ifconfig.me"        # Fly
 ```
 
 If the two answers differ, the host is not giving you a fixed egress IP — move
 to Option A.
+
+Then confirm Baidu is happy with that address *before* wiring the worker to it,
+by running the diagnostic from the box itself:
+
+```bash
+export BAIDU_APP_ID=... BAIDU_SECRET_KEY=...
+bash check-baidu-ip.sh
+unset BAIDU_APP_ID BAIDU_SECRET_KEY
+```
+
+A successful translation means this IP is clean and you can skip the Baidu
+email entirely. A 58003 means you inherited someone else's ban — see "If Baidu
+never replies" below; reassigning the address is usually quicker than asking.
+
+One thing to check in the console while you are there: if a **server IP
+whitelist** is configured against the App ID in 开发者信息, the relay's address
+has to be added to it, or Baidu answers 58000 instead.
 
 ## Wire the worker to the relay
 

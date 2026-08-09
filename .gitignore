@@ -12,3 +12,6 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# Relay deployment config — holds the shared token, never commit it
+workers/baidu-relay/.env

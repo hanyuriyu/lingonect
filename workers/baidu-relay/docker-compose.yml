@@ -1,0 +1,37 @@
+# Relay + automatic HTTPS, for a VPS with a dedicated static IP.
+#
+# The worker calls the relay over HTTPS, so the relay token never crosses the
+# wire in clear. Caddy obtains and renews the certificate on its own; it only
+# needs RELAY_DOMAIN to resolve to this box on a grey-cloud (DNS-only) A record,
+# with ports 80 and 443 reachable.
+#
+# Copy .env.example to .env, fill it in, then: docker compose up -d
+services:
+  relay:
+    build: .
+    restart: always
+    environment:
+      RELAY_TOKEN: ${RELAY_TOKEN:?set RELAY_TOKEN in .env}
+      BAIDU_APP_ID: ${BAIDU_APP_ID:?set BAIDU_APP_ID in .env}
+    # Deliberately not published to the host: the only way in is through Caddy.
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?set RELAY_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # certificates — keep, or you will re-issue on every restart
+      - caddy_config:/config
+    depends_on:
+      - relay
+
+volumes:
+  caddy_data:
+  caddy_config:
