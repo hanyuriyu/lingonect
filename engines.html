@@ -2666,13 +2666,32 @@ const DEEPL_LANG_MAP = {
 
 const DEEPL_PROXY = "https://deepl.hanyuriyu.workers.dev";
 
+// DeepL's `source_lang` and `target_lang` do NOT take the same values. The
+// regional variants above (EN-US, EN-GB, ES-419, PT-BR, PT-PT, ZH-HANS,
+// ZH-HANT) are TARGET-ONLY; as a source DeepL accepts only the base code
+// (EN, ES, PT, ZH). Dropping the region gives a valid source code for every
+// language in the map above.
+function deeplSourceCode(lang) {
+  const code = DEEPL_LANG_MAP[lang];
+  return code ? code.split("-")[0] : null;
+}
+
 async function translateWithDeepL(text) {
   assertLangSupported(DEEPL_LANG_MAP);
   const langCode = DEEPL_LANG_MAP[targetLang];
+  const body = { text: [text], target_lang: langCode };
+  // Pin the source language the user picked. Without it DeepL auto-detects,
+  // and a short or loanword-heavy input ("Hotel", "Information", "Bank") is
+  // easily detected AS the target language — in which case DeepL has nothing
+  // to do and hands the input straight back, so the card shows the source text
+  // untranslated. Skipped when source and target are the same base language,
+  // where an identical pair would be rejected and detection is harmless anyway.
+  const srcCode = deeplSourceCode(sourceLang);
+  if (srcCode && srcCode !== langCode.split("-")[0]) body.source_lang = srcCode;
   const res = await workerFetch(DEEPL_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: [text], target_lang: langCode })
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw await engineError("DeepL", res);
   const data = await res.json();

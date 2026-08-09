@@ -555,13 +555,26 @@ async function translateWithOpenAI(text, targetLang) {
   return data.choices[0].message.content.trim();
 }
 
-async function translateWithDeepL(text, targetLang) {
+// DeepL's regional codes (EN-US, EN-GB, ES-419, PT-BR, PT-PT, ZH-HANS,
+// ZH-HANT) are TARGET-ONLY; as a source DeepL accepts only the base code
+// (EN, ES, PT, ZH), so drop the region.
+function deeplSourceCode(lang) {
+  const code = DEEPL_LANG_MAP[lang];
+  return code ? code.split("-")[0] : null;
+}
+
+async function translateWithDeepL(text, targetLang, sourceLang) {
   const langCode = DEEPL_LANG_MAP[targetLang];
   if (!langCode) throw new Error(`DeepL does not support ${targetLang}.`);
+  const body = { text: [text], target_lang: langCode };
+  // Pin the source language: left to auto-detect, DeepL reads a short or
+  // loanword-heavy input as the target language and hands it back untranslated.
+  const srcCode = deeplSourceCode(sourceLang);
+  if (srcCode && srcCode !== langCode.split("-")[0]) body.source_lang = srcCode;
   const res = await workerFetch(DEEPL_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: [text], target_lang: langCode })
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error(`DeepL ${res.status}`);
   const data = await res.json();
