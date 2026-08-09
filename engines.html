@@ -2913,11 +2913,17 @@ async function translateWithBaidu(text) {
     if (String(data.error_code) === "58001" || /INVALID_TO_PARAM|INVALID_FROM_PARAM|unsupported/i.test(data.error_msg || "")) {
       throw new Error("Language not supported");
     }
-    // 58003: Baidu's anti-fraud system has temporarily banned the shared
-    // Cloudflare IP our proxy runs on (it sees many App IDs from one IP and
-    // blocks it for the day). Nothing the user can fix — show a calm message.
-    if (String(data.error_code) === "58003") {
-      throw new Error("Baidu is temporarily unavailable — please try it again later. The other engines still ran.");
+    // 58003 (this IP is banned) and 58000 (client IP not permitted) are both
+    // verdicts on our proxy's egress address rather than on the user, the text
+    // or the account: Baidu bans an IP once it sees several App IDs using it in
+    // one day, and Workers share their egress with everyone else proxying
+    // Baidu. workers/baidu-relay/ moves the call to a fixed IP that only ever
+    // carries our App ID. Until that is deployed, show a calm message.
+    if (String(data.error_code) === "58003" || String(data.error_code) === "58000") {
+      const err = new Error("Baidu is temporarily unavailable — please try it again later. The other engines still ran.");
+      err.detail = `Baidu error_code ${data.error_code}: ${data.error_msg || ""}`.trim();
+      console.error("Baidu Translate failed —", err.detail);
+      throw err;
     }
     throw await engineError("Baidu Translate", res, data);
   }
