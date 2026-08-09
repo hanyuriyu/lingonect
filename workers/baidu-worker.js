@@ -165,6 +165,54 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// ── Baidu's IP risk control, and the relay that gets us out of it ───────────
+//
+// Baidu bans an *IP* (error 58003, 此IP已被封禁) as soon as its risk system sees
+// several App IDs translating from that IP on one day. Workers egress from
+// Cloudflare's shared address pool, which plenty of other people also proxy
+// Baidu through, so we inherit bans earned by strangers. Our account, credits
+// and App ID stay perfectly healthy throughout — which is exactly why nothing
+// ever shows up in the Baidu console.
+//
+// The cure is an egress IP that only ever carries our App ID. Point
+// BAIDU_RELAY_URL at the relay in workers/baidu-relay/ (with the shared
+// BAIDU_RELAY_TOKEN) and the signed request goes out from that fixed IP, which
+// Baidu can then whitelist. Leave both unset and the worker calls Baidu
+// directly, exactly as it always has.
+const BAIDU_API_URL = "https://fanyi-api.baidu.com/api/trans/vip/translate";
+
+// Baidu answers HTTP 200 even when it failed, with the reason in error_code.
+// 52001 (request timeout) and 52002 (system error) are transient and worth one
+// immediate retry; every other code is a verdict to pass straight through.
+const BAIDU_RETRYABLE = ["52001", "52002"];
+
+// POST the already-signed form to Baidu (or to the relay) and parse the reply.
+// A non-JSON body means the relay itself failed rather than Baidu, so it is
+// reshaped into Baidu's error format to keep one response contract for callers.
+async function callBaidu(env, form) {
+  const relay = (env.BAIDU_RELAY_URL || "").trim();
+  const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+  if (relay && env.BAIDU_RELAY_TOKEN) {
+    headers["X-Relay-Token"] = env.BAIDU_RELAY_TOKEN;
+  }
+  const res = await fetch(relay || BAIDU_API_URL, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  const raw = await res.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (_) {
+    data = {
+      error_code: "relay_error",
+      error_msg: raw.trim().slice(0, 200) || "Relay returned HTTP " + res.status,
+    };
+  }
+  return { res, data };
+}
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -270,20 +318,30 @@ export default {
       const signStr = appid + text + salt + key;
       const sign = md5(signStr);
 
-      const res = await fetch("https://fanyi-api.baidu.com/api/trans/vip/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          q: text,
-          from: from || "auto",
-          to: to,
-          appid: appid,
-          salt: salt,
-          sign: sign,
-        }).toString(),
-      });
+      const form = new URLSearchParams({
+        q: text,
+        from: from || "auto",
+        to: to,
+        appid: appid,
+        salt: salt,
+        sign: sign,
+      }).toString();
 
-      const data = await res.json();
+      let { res, data } = await callBaidu(env, form);
+      if (data && BAIDU_RETRYABLE.includes(String(data.error_code))) {
+        ({ res, data } = await callBaidu(env, form));
+      }
+
+      // Baidu hides failures behind HTTP 200, so the only place the real reason
+      // is visible is here. Log it — observability is on for this worker, so
+      // `wrangler tail -c workers/wrangler/baidu.toml` shows the live code.
+      if (data && data.error_code) {
+        console.error(
+          "Baidu error_code=" + data.error_code,
+          data.error_msg || "",
+          (env.BAIDU_RELAY_URL || "").trim() ? "(via relay)" : "(direct from Cloudflare)"
+        );
+      }
 
       return new Response(JSON.stringify(data), {
         status: res.status,
