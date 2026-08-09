@@ -208,7 +208,44 @@ wrangler secret put BAIDU_RELAY_TOKEN -c baidu.toml   # same string as RELAY_TOK
 wrangler deploy -c baidu.toml
 ```
 
-Confirm it took effect — Baidu's real error code is logged by the worker:
+## Troubleshooting
+
+Everything below was hit during the first real deployment, in this order.
+
+**`relay_forbidden` when you are certain the token matches.** Check its length
+before anything else:
+
+```bash
+echo ${#BAIDU_RELAY_TOKEN}
+```
+
+`openssl rand -hex 32` is *exactly* 64 characters. A 66 means a stray pair of
+quotes was captured inside the value, and the relay compares lengths first, so
+it rejects on that alone. Set both sides from one shell variable rather than
+copying by hand, and check the length at each step:
+
+```bash
+NEWTOKEN=$(openssl rand -hex 32)
+echo ${#NEWTOKEN}
+export BAIDU_RELAY_TOKEN="$NEWTOKEN"
+echo ${#BAIDU_RELAY_TOKEN}
+fly secrets set RELAY_TOKEN="$NEWTOKEN"
+```
+
+**`fly secrets list` shows a short mixed-case string, not your token.** That is
+a digest. Fly never displays secret values; it is not evidence of a wrong
+value.
+
+**A secret that does not seem to take effect.** For Machines apps `fly secrets
+set` can *stage* a secret rather than apply it — read its output, and run
+`fly deploy` if it says staged.
+
+**A redeploy can drop a machine-scoped egress IP,** since the machine may be
+recreated. Re-check the address after every deploy, and prefer the app-scoped
+`fly ips allocate-egress` if your flyctl offers it.
+
+Confirm the wiring took effect — Baidu's real error code is logged by the
+worker:
 
 ```bash
 wrangler tail -c baidu.toml
