@@ -282,7 +282,9 @@ body{
   font-family:"Special Elite","Courier New",monospace;
   font-size:14px;
   font-weight:800;
-  background:#fff;
+  /* Barely-there cobalt tint, so the pickers read as distinct from the
+     plain white text box next to them. */
+  background:rgba(0,71,255,.045);
   color:var(--cobalt);
   border:2px solid var(--cobalt);
   border-radius:6px;
@@ -299,7 +301,7 @@ body{
 }
 
 .lang-btn:hover{
-  background:rgba(0,71,255,.06);
+  background:rgba(0,71,255,.1);
 }
 
 .lang-arrow{
