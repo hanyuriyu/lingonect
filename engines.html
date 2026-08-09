@@ -1148,7 +1148,7 @@ body{
   <a href="ratings.html">Ratings</a>
   <a href="chat.html">Chat</a>
   <a href="flashcards.html">Flashcards</a>
-  <a href="subscription.html">Subscription</a>
+  <a href="subscription.html" id="subNavLink" style="display:none">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="profile.html">Profile</a>
@@ -1418,11 +1418,12 @@ async function workerFetch(url, options = {}) {
     try { info = await res.clone().json(); } catch (_) {}
     const code = info && info.code;
     if (code === "free_limit_reached" || code === "daily_limit_reached") {
+      // The subscription page is admin-only while payments are off, so just
+      // report the limit instead of sending the user there.
       __quotaAlerted = true;
       alert(typeof info.error === "string" && info.error
         ? info.error
         : "You've reached your request limit. Please try again later.");
-      if (code === "free_limit_reached") window.location.href = "subscription.html";
     }
   }
   return res;
@@ -1472,6 +1473,7 @@ auth.onAuthStateChanged(async user => {
     return;
   }
   if (user.email === "linguisticsconsulting@gmail.com") {
+    document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
   }
@@ -3514,8 +3516,7 @@ function buildCard(engine) {
       <div class="result-content">
         <p class="engine-name">${engine.name}</p>
         <div class="lock-overlay">
-          Included with Pro.
-          <a href="subscription.html">Subscribe</a>
+          Not available on your plan.
         </div>
       </div>`;
   } else {

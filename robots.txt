@@ -3,6 +3,7 @@ Allow: /
 
 Disallow: /admin.html
 Disallow: /seed-ratings.html
+Disallow: /subscription.html
 Disallow: /workers/
 
 Sitemap: https://www.lingonect.com/sitemap.xml

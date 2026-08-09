@@ -421,15 +421,21 @@ const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
 // Stripe is set up ($2.80/mo, billed $8.40 quarterly).
 const STRIPE_PRO_LINK = "#stripe-pro-link";
 
+// ── Auth guard: admin only ──
+// We are not taking payment yet, so the subscription page is hidden from
+// regular users. Remove this guard (and the `subNavLink` gating in the other
+// pages' navs) once billing goes live.
 auth.onAuthStateChanged(async user => {
   if (!user || !user.emailVerified) {
     window.location.href = "login.html";
     return;
   }
-  if (user.email === ADMIN_EMAIL) {
-    document.getElementById("seedNavLink").style.display = "";
-    document.getElementById("adminNavLink").style.display = "";
+  if (user.email !== ADMIN_EMAIL) {
+    window.location.href = "engines.html";
+    return;
   }
+  document.getElementById("seedNavLink").style.display = "";
+  document.getElementById("adminNavLink").style.display = "";
 
   await loadSubscription(user);
   document.body.style.visibility = "visible";
