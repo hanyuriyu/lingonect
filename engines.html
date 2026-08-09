@@ -531,6 +531,16 @@ body{
 }
 .ctx-status{ font-size:13px; color:var(--cobalt); margin:6px 0; }
 .ctx-status.error{ color:#e3120b; }
+/* Which LLMs the entry was merged from — quiet provenance under the entry. */
+.ctx-sources{
+  margin:20px 0 4px;
+  padding-top:12px;
+  border-top:1px solid #eee;
+  font-size:11px;
+  line-height:1.5;
+  color:#a3a3a3;
+}
+
 /* Collapsed detail under a failed entry: what the reply looked like where it
    stopped being readable. Quiet enough to ignore, specific enough to act on. */
 .ctx-debug{ margin:4px 0 0; font-size:11px; color:#8a8a8a; }
@@ -2376,6 +2386,12 @@ function llmSystemPrompt(extra) {
   else if (m === "culturalize") prompt = culturalizePrompt(src, tgt);
   else if (m === "analyze")     prompt = analyzePrompt(src, tgt);
   else if (m === "correct")     prompt = correctPrompt(src, tgt, applyFormality);
+  // Contextualize asks every LLM for its own entry, then merges them. Each
+  // engine needs the entry prompt, not a translation prompt — and it returns
+  // early: none of the clauses below (length budget, formality, transliteration)
+  // apply to a dictionary entry, and appending them would only invite the model
+  // to reshape the JSON.
+  else if (m === "contextualize") return contextualizePrompt(src, tgt);
   else                          prompt = baseTranslatePrompt(tgt);
   // Localization applies to any method that emits editable text EXCEPT analyze
   // (a prose explanation has no length budget). For correct the limit comes from
@@ -3865,8 +3881,15 @@ async function runSummarizedMethod(text, method) {
 // source language (each with an audio button) plus a target-language
 // backtranslation, full conjugation/declension tables where the language
 // inflects, and language-specific grammar notes. Three coloured callouts carry
-// the signal: green = must-know, blue = key point, red = watch out. A single
-// authoritative model produces the whole entry as JSON, which we render here.
+// the signal: green = must-know, blue = key point, red = watch out.
+//
+// Like Analyze and Correct, this is a research-then-synthesise methodology: EVERY
+// available LLM is asked for its own entry, and one model then merges the best of
+// them into the entry shown. That matters for coverage as well as accuracy — a
+// model native to the target language usually writes better target-language
+// glosses and picks better equivalents than one that isn't, and no single model
+// knows every idiom or inflected form. Only the merge is done by one model, and
+// only because the merged entry has to come back in one strict shape.
 
 let ctxData = null;  // the parsed entry currently on screen (for audio + copy)
 
@@ -3990,6 +4013,65 @@ function ctxSchema(romanizing) {
   return obj(props);
 }
 
+// The synthesis half of the methodology: the same entry specification, plus the
+// rules for merging what the LLMs came back with. Built on contextualizePrompt so
+// the shape, the language rules and the table bounds are defined in exactly one
+// place and cannot drift apart.
+function ctxMergePrompt(src, tgt, n) {
+  return `${contextualizePrompt(src, tgt)}
+
+SYNTHESIS — you are not writing this entry from scratch. You will be given ${n} independent entries for the same word, each produced by a different language model, inside <entry> blocks. Merge them into the single best entry.
+
+- Judge every piece of content on whether it is CORRECT and USEFUL, never on which model supplied it. A model native to ${tgt} often writes the most natural ${tgt} glosses and the best equivalents; a model native to ${src} often knows the rarer forms and idioms. Take the best from each.
+- Where the entries disagree on a form, a reading, a gender or an aspect, work out which is right and use it. Agreement between several entries is evidence, not proof — if they agree on something you know to be wrong, discard it.
+- Where they cover DIFFERENT ground, combine it: take the union of the genuinely good collocations, idioms, examples, synonyms, antonyms and grammar notes, up to the limits above, ordered best-first.
+- Drop anything invented, wrong, duplicated, off-topic, or not actually about the headword. Prefer nothing over a form you cannot vouch for.
+- Where every entry is thin on a section, write the section yourself from your own knowledge. Where all of them missed a grammatical function of the word, add it.
+- The entries are research material and may be incomplete, malformed or in the wrong shape. Read them for content; obey the specification above for structure.
+- Write the merged entry as if it were the only one: no mention of the entries, the models, or any disagreement between them.`;
+}
+
+// Whether a reply is actually research. Engines whose API isn't wired up yet
+// answer with a placeholder string, and an engine that ignored the entry prompt
+// may simply translate the word — neither is an entry, and passing either to the
+// merge would add noise for the merge model to see through.
+function ctxIsEntry(raw) {
+  const s = String(raw || "").trim();
+  if (s.length < 40) return false;                          // a bare translation
+  if (/^API implementation in progress/i.test(s)) return false;
+  return s.includes("{") || s.length > 200;                 // JSON, or real prose
+}
+
+// Ask every available LLM for its own entry. NMT engines are skipped — they
+// translate text and cannot produce an entry — as are engines locked for this
+// user. A slow or failing engine drops out of the merge rather than holding up
+// or breaking the whole request.
+async function ctxResearch(word, onProgress) {
+  const llmEngines = engines.filter(e => !isEngineLocked(e.id) && engineType(e.id) === "LLM");
+  if (!llmEngines.length) return [];
+
+  const PER_ENGINE_TIMEOUT_MS = 40000;
+  let done = 0;
+  const collected = await Promise.all(llmEngines.map(async engine => {
+    let t;
+    try {
+      const to = new Promise((_, rej) => {
+        t = setTimeout(() => rej(new Error("timeout")), PER_ENGINE_TIMEOUT_MS);
+      });
+      const raw = await Promise.race([engine.translate(word), to]);
+      return { name: engine.name, raw: stripWrapperTags(typeof raw === "string" ? raw : "") };
+    } catch (err) {
+      console.warn("Contextualize:", engine.name, "did not contribute", err);
+      return { name: engine.name, raw: "" };
+    } finally {
+      clearTimeout(t);
+      done++;
+      if (onProgress) onProgress(done, llmEngines.length);
+    }
+  }));
+  return collected.filter(o => ctxIsEntry(o.raw));
+}
+
 // Whether schema-constrained requests are working. If the API ever rejects the
 // request shape, losing Contextualize entirely would be a worse outcome than the
 // bug this fixes — so the first rejection flips this and every later call falls
@@ -3997,22 +4079,38 @@ function ctxSchema(romanizing) {
 // below exists to cope with.
 let ctxUseSchema = true;
 
-// Run the model call and hand back the reply plus whether the model ran out of
-// room. A full entry — several senses, tables for every inflecting function,
-// three callouts — is long, and a non-Latin source language doubles every source
-// string with its romanization, so the token ceiling is the one limit this call
-// realistically hits. When it does the reply is cut off mid-write, and the caller
-// needs to know: that is a length problem, not a mystery.
-async function contextualizeCall(word) {
+// Produce the entry that gets shown. Given the LLMs' entries it merges them;
+// given none — every engine failed, or the user has no LLM engines — it writes
+// the entry alone, so the methodology degrades to a usable result instead of an
+// error. Hands back the reply plus whether the model ran out of room: a full
+// entry is long, a non-Latin source doubles every source string with its
+// romanization, and the token ceiling is the one limit this call realistically
+// hits. When it does the reply is cut off mid-write, and the caller needs to
+// know that is a length problem rather than a mystery.
+async function contextualizeCall(word, outputs) {
   const romanizing = !!romanizationGuide(sourceLang);
+  const research = (outputs || []).filter(o => o && ctxIsEntry(o.raw));
+
+  // Each entry is labelled with the model that wrote it: useful provenance for
+  // judging a target-language gloss, and the prompt is explicit that content is
+  // judged on correctness rather than on whose it is.
+  const blocks = research
+    .map(o => `<entry model="${escapeXml(o.name)}">\n${String(o.raw).trim()}\n</entry>`)
+    .join("\n\n");
+  const user = research.length
+    ? `<word>${word}</word>\n\nHere are ${research.length} independent entries for this word to merge:\n\n${blocks}`
+    : `<word>${word}</word>`;
+
   const body = {
     model: ctxUseSchema ? CTX_SCHEMA_MODEL : SUMMARY_MODEL,
     // A romanized entry carries a second reading for every source string, so
     // give the model room for it when the source script is non-Latin. These
     // are ceilings, not targets — the prompt bounds the entry's own size.
     max_tokens: romanizing ? 12000 : 8000,
-    system: contextualizePrompt(sourceLang, targetLang),
-    messages: [{ role: "user", content: `<word>${word}</word>` }]
+    system: research.length
+      ? ctxMergePrompt(sourceLang, targetLang, research.length)
+      : contextualizePrompt(sourceLang, targetLang),
+    messages: [{ role: "user", content: user }]
   };
   if (ctxUseSchema) {
     body.output_config = { format: { type: "json_schema", schema: ctxSchema(romanizing) } };
@@ -4031,7 +4129,7 @@ async function contextualizeCall(word) {
   if (res.status === 400 && ctxUseSchema) {
     console.warn("Contextualize: schema-constrained request rejected; falling back to prompt-only JSON");
     ctxUseSchema = false;
-    return contextualizeCall(word);
+    return contextualizeCall(word, research);
   }
 
   const data = await readClaudeJson("Contextualize", res);
@@ -4472,25 +4570,37 @@ async function runContextualize(word) {
   ctxData = null;
   const card = document.createElement("div");
   card.className = "ctx-card";
-  card.innerHTML = `<p class="ctx-status">Building a deep dive on “${escapeXml(word)}”…</p><div class="ctx-body"></div>`;
+  card.innerHTML = `<p class="ctx-status">Asking every LLM about “${escapeXml(word)}”…</p><div class="ctx-body"></div>`;
   resultsArea.appendChild(card);
   const statusEl = card.querySelector(".ctx-status");
   const bodyEl   = card.querySelector(".ctx-body");
 
-  // A full entry with inflection tables is a long generation, so the wait is
-  // measured in tens of seconds. Say so once it's clear this is one of the slow
-  // ones, rather than letting the card sit there looking stuck.
+  // Phase one: every LLM writes its own entry. ctxResearch never rejects — a
+  // failing engine drops out — so a bad engine cannot take the methodology down.
+  const research = await ctxResearch(word, (done, total) => {
+    if (statusEl.isConnected) {
+      statusEl.textContent = `Gathering entries from the LLMs… (${done}/${total})`;
+    }
+  });
+  if (!statusEl.isConnected) return;   // a new submit replaced this card
+
+  // Phase two: merge them. A full entry with inflection tables is a long
+  // generation, so the wait is measured in tens of seconds. Say so once it's
+  // clear this is one of the slow ones, rather than looking stuck.
+  statusEl.textContent = research.length
+    ? `Merging the best of ${research.length} LLM ${research.length > 1 ? "entries" : "entry"}…`
+    : `Building a deep dive on “${word}”…`;
   const TIMEOUT_MS = 90000;
   const slowHint = setTimeout(() => {
     if (statusEl.isConnected) {
-      statusEl.textContent = `Still building the deep dive on “${word}” — a full entry with tables takes a moment…`;
+      statusEl.textContent = "Still merging — a full entry with tables takes a moment…";
     }
   }, 20000);
 
   let reply;
   try {
     const to = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), TIMEOUT_MS));
-    reply = await Promise.race([contextualizeCall(word), to]);
+    reply = await Promise.race([contextualizeCall(word, research), to]);
   } catch (err) {
     console.error("Contextualize failed", err);
     clearTimeout(slowHint);
@@ -4539,6 +4649,14 @@ async function runContextualize(word) {
     note.className = "ctx-note";
     note.textContent = "This entry was cut short, so some sections may be missing. Run it again for a full one.";
     bodyEl.prepend(note);
+  }
+  // Name who contributed, so the entry's provenance is visible rather than
+  // implied — and so a missing engine is noticeable.
+  if (research.length) {
+    const src = document.createElement("p");
+    src.className = "ctx-sources";
+    src.textContent = `Merged from ${research.length} LLM${research.length > 1 ? "s" : ""}: ${research.map(o => o.name).join(", ")}`;
+    bodyEl.appendChild(src);
   }
   card.dataset.plain = ctxPlainText(data);
 }
