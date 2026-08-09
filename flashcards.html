@@ -798,7 +798,7 @@ body{
   <a href="ratings.html">Ratings</a>
   <a href="chat.html">Chat</a>
   <a href="flashcards.html" class="active">Flashcards</a>
-  <a href="subscription.html">Subscription</a>
+  <a href="subscription.html" id="subNavLink" style="display:none">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="profile.html">Profile</a>
@@ -987,15 +987,14 @@ async function workerFetch(url, options = {}) {
   // free cap). Tell the user once, not once per call.
   if (res.status === 429 && !__quotaAlerted) {
     __quotaAlerted = true;
+    // The subscription page is admin-only while payments are off, so just
+    // report the limit instead of sending the user there.
     let msg = "You've reached your request limit. Please try again later.";
-    let freeCap = false;
     try {
       const info = await res.clone().json();
       if (info && info.error) msg = info.error;
-      if (info && info.code === "free_limit_reached") freeCap = true;
     } catch (_) {}
     alert(msg);
-    if (freeCap) window.location.href = "subscription.html";
   }
   return res;
 }
@@ -1359,6 +1358,7 @@ auth.onAuthStateChanged(async user => {
   }
   currentUser = user;
   if (user.email === ADMIN_EMAIL) {
+    document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
   }

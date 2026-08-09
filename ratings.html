@@ -314,7 +314,7 @@ body{
   <a href="ratings.html" class="active">Ratings</a>
   <a href="chat.html">Chat</a>
   <a href="flashcards.html">Flashcards</a>
-  <a href="subscription.html">Subscription</a>
+  <a href="subscription.html" id="subNavLink" style="display:none">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="profile.html">Profile</a>
@@ -404,6 +404,7 @@ auth.onAuthStateChanged(user => {
     return;
   }
   if (user.email === "linguisticsconsulting@gmail.com") {
+    document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
   }
