@@ -3170,8 +3170,18 @@ async function translateWithSarvam(text, extra) {
 // ── HyperCLOVA X (via Cloudflare Worker → Naver CLOVA Studio) ──
 const HYPERCLOVAX_PROXY = "https://hyperclovax.hanyuriyu.workers.dev";
 
-async function translateWithHyperCloveX(text) {
-  return "API implementation in progress";
+async function translateWithHyperCloveX(text, extra) {
+  const res = await workerFetch(HYPERCLOVAX_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system: llmSystemPrompt(extra),
+      prompt: `<text>${text}</text>`
+    })
+  });
+  if (!res.ok) throw await engineError("HyperCLOVA X", res);
+  const data = await res.json();
+  return (data.result?.message?.content || "").trim();
 }
 
 // ── Naver Papago (via Cloudflare Worker) ──
