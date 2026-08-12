@@ -830,6 +830,8 @@ body{
 .engine-logo-badge.zai        { background:#111827; }
 .engine-logo-badge.cotoha     { background:#00A0B0; }
 .engine-logo-badge.tsuzumi    { background:#E60027; }
+.engine-logo-badge.mirai      { background:#0075C2; }
+.engine-logo-badge.rakuten    { background:#BF0000; }
 
 .result-content{
   flex:1;
@@ -3386,6 +3388,22 @@ async function translateWithTsuzumi(text) {
   return "API implementation in progress";
 }
 
+// ── Mirai Translate (via Cloudflare Worker → Mirai Translate) ──
+// NMT engine. API key not yet provisioned.
+const MIRAI_PROXY = "https://mirai.hanyuriyu.workers.dev";
+
+async function translateWithMirai(text) {
+  return "API implementation in progress";
+}
+
+// ── Rakuten AI (via Cloudflare Worker → Rakuten AI) ──
+// LLM engine. API key not yet provisioned.
+const RAKUTEN_PROXY = "https://rakuten.hanyuriyu.workers.dev";
+
+async function translateWithRakuten(text) {
+  return "API implementation in progress";
+}
+
 // ── Engine registry (add future engines here) ──
 const engines = [
   {
@@ -3611,13 +3629,29 @@ const engines = [
     badgeClass: "tsuzumi",
     badgeText:  "TZ",
     translate:  translateWithTsuzumi
+  },
+  {
+    id:         "mirai",
+    name:       "Mirai Translate",
+    logoUrl:    "mirai.png",
+    badgeClass: "mirai",
+    badgeText:  "MI",
+    translate:  translateWithMirai
+  },
+  {
+    id:         "rakuten",
+    name:       "Rakuten AI",
+    logoUrl:    "rakutenai-logo.png",
+    badgeClass: "rakuten",
+    badgeText:  "RA",
+    translate:  translateWithRakuten
   }
 ];
 
 // Engines that are neural machine translation systems (everything else is an LLM)
 const NMT_ENGINES = new Set([
   "google", "deepl", "baidu", "tencent", "alibaba",
-  "microsoft", "amazon", "meta", "yandex", "papago", "cotoha"
+  "microsoft", "amazon", "meta", "yandex", "papago", "cotoha", "mirai"
 ]);
 function engineType(id) {
   return NMT_ENGINES.has(id) ? "NMT" : "LLM";
