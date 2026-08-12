@@ -3188,7 +3188,18 @@ const PAPAGO_LANG_MAP = {
 
 async function translateWithPapago(text) {
   assertLangSupported(PAPAGO_LANG_MAP);
-  return "API implementation in progress";
+  const res = await workerFetch(PAPAGO_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      source: PAPAGO_LANG_MAP[sourceLang],
+      target: PAPAGO_LANG_MAP[targetLang]
+    })
+  });
+  if (!res.ok) throw await engineError("Naver Papago", res);
+  const data = await res.json();
+  return data.message.result.translatedText.trim();
 }
 
 // ── Baidu Translate (via Cloudflare Worker) ──
