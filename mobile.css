@@ -49,3 +49,14 @@ body{
     bottom:calc(54px + env(safe-area-inset-bottom));
   }
 }
+
+/* ---- Registered-trademark mark ----
+   The little ® after the "Lingonect" wordmark in visible text. Kept small
+   and subtle so it reads as a mark, not a character in the name. */
+.tm{
+  font-size:0.55em;
+  vertical-align:super;
+  line-height:0;
+  font-weight:normal;
+  margin-left:0.05em;
+}
