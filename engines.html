@@ -810,6 +810,7 @@ body{
 .engine-logo-badge.openai     { background:#000000; }
 .engine-logo-badge.gemini     { background:#8B5CF6; }
 .engine-logo-badge.deepseek   { background:#4D6BFE; }
+.engine-logo-badge.kimi       { background:#16161A; }
 .engine-logo-badge.grok       { background:#000000; }
 .engine-logo-badge.tencent    { background:#0052D9; }
 .engine-logo-badge.alibaba    { background:#FF6A00; }
@@ -3146,6 +3147,29 @@ async function translateWithLlama(text, extra) {
   return data.choices[0].message.content.trim();
 }
 
+// ── Kimi (Moonshot AI, via Cloudflare Worker → Together AI) ──
+// Hosted LLM served through the same Together AI OpenAI-compatible endpoint we
+// use for Llama, so it reuses LLAMA_PROXY and the existing Together API key.
+async function translateWithKimi(text, extra) {
+  const res = await workerFetch(LLAMA_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "moonshotai/Kimi-K2-Instruct",
+      messages: [
+        {
+          role: "system",
+          content: llmSystemPrompt(extra)
+        },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw await engineError("Kimi", res);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
 // ── Sarvam AI (via Cloudflare Worker) — Indian-languages specialist ──
 const SARVAM_PROXY = "https://sarvam.hanyuriyu.workers.dev";
 
@@ -3469,6 +3493,14 @@ const engines = [
     badgeClass: "deepseek",
     badgeText:  "DS",
     translate:  translateWithDeepSeek
+  },
+  {
+    id:         "kimi",
+    name:       "Kimi",
+    logoUrl:    "kimilogo.png",
+    badgeClass: "kimi",
+    badgeText:  "KI",
+    translate:  translateWithKimi
   },
   {
     id:         "grok",
