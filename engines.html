@@ -2547,7 +2547,7 @@ const ENGINE_FAILURES = [
     say: n => `Your text is too long for ${n}. Try a shorter passage.` },
   { when: /api[\s_-]?key|unauthorized|forbidden|invalid authentication|access denied|permission/i, status: [401, 403],
     say: n => `${n} rejected our credentials. That is a problem on our side, not with your account.` },
-  { when: /model.*(not found|does not exist|unavailable)|unknown model|no such model|deprecat/i, status: 404,
+  { when: /model.*(not found|does not exist|unavailable)|unknown model|no such model|non-serverless|deprecat/i, status: 404,
     say: n => `${n}'s model is unavailable — the provider may have retired it.` },
   { when: /internal (server )?error|service unavailable|bad gateway|upstream|overloaded|capacity|timed? ?out/i, status: s => s >= 500,
     say: n => `${n} is overloaded or having server trouble. This is usually temporary — try again in a moment.` },
@@ -3150,24 +3150,61 @@ async function translateWithLlama(text, extra) {
 // ── Kimi (Moonshot AI, via Cloudflare Worker → Together AI) ──
 // Hosted LLM served through the same Together AI OpenAI-compatible endpoint we
 // use for Llama, so it reuses LLAMA_PROXY and the existing Together API key.
+//
+// Together rotates which Kimi checkpoint it serves serverless: when a newer
+// one lands, the previous one moves to dedicated-endpoint-only hosting and
+// starts answering "Unable to access non-serverless model …" (this has already
+// happened to K2-Instruct, K2-Instruct-0905 and K2.6). Pinning a single ID
+// therefore breaks on every rotation, so try the known checkpoints
+// newest-first and fall through whenever Together says a model is not
+// serverless. Any other failure — credentials, rate limits, an outage — is a
+// real error and is surfaced immediately instead of burning the whole list.
+const KIMI_MODELS = [
+  "moonshotai/Kimi-K3",
+  "moonshotai/Kimi-K2.6",
+];
+// The checkpoint that last worked, tried first for the rest of the session so
+// repeat translations do not pay for the dead ones again.
+let kimiModel = null;
+
+// True when a provider rejection means "this model is not on serverless" (or
+// is gone) rather than something we should show the user.
+function isModelUnavailable(status, msg) {
+  if (!(status >= 400 && status < 500)) return false;
+  return /non-serverless|dedicated endpoint|model.*(not found|does not exist|unavailable)|unknown model|no such model/i.test(msg || "");
+}
+
 async function translateWithKimi(text, extra) {
-  const res = await workerFetch(LLAMA_PROXY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "moonshotai/Kimi-K2.6",
-      messages: [
-        {
-          role: "system",
-          content: llmSystemPrompt(extra)
-        },
-        { role: "user", content: `<text>${text}</text>` }
-      ]
-    })
-  });
-  if (!res.ok) throw await engineError("Kimi", res);
-  const data = await res.json();
-  return data.choices[0].message.content.trim();
+  const candidates = kimiModel
+    ? [kimiModel].concat(KIMI_MODELS.filter(m => m !== kimiModel))
+    : KIMI_MODELS;
+  let lastErr = null;
+  for (const model of candidates) {
+    const res = await workerFetch(LLAMA_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: llmSystemPrompt(extra)
+          },
+          { role: "user", content: `<text>${text}</text>` }
+        ]
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      kimiModel = model;
+      return data.choices[0].message.content.trim();
+    }
+    const err = await engineError("Kimi", res);
+    if (!isModelUnavailable(err.status, err.detail)) throw err;
+    if (kimiModel === model) kimiModel = null;
+    lastErr = err;
+  }
+  throw lastErr;
 }
 
 // ── Sarvam AI (via Cloudflare Worker) — Indian-languages specialist ──
