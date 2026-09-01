@@ -83,7 +83,10 @@ async function verifyFirebaseToken(authHeader) {
   if (typeof payload.exp !== "number" || payload.exp <= now) return null;
   if (typeof payload.iat !== "number" || payload.iat > now + 300) return null;
   // Mirror the app's own gate: only email-verified accounts may use the proxies.
-  if (payload.email_verified !== true) return null;
+  // Allow anonymous users (no email) through — the free-tier engines are
+  // open to everyone without an account. Verified accounts also pass.
+  const __isAnon = payload.firebase && payload.firebase.sign_in_provider === "anonymous";
+  if (!__isAnon && payload.email_verified !== true) return null;
 
   let keys;
   try {
@@ -207,6 +210,22 @@ export default {
     if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
       try {
         const __uid = __authPayload.sub;
+        // Anonymous (not-logged-in) users get 500 translations per UTC day on
+        // the free engines. After that they must register (free, but approved
+        // case-by-case). Registered/verified users fall through to the normal
+        // per-account limits below.
+        if (__authPayload.firebase && __authPayload.firebase.sign_in_provider === "anonymous") {
+          const __aDay = new Date().toISOString().slice(0, 10);
+          const __aKey = "anon:" + __uid + ":" + __aDay;
+          const __aUsed = parseInt((await env.QUOTA_KV.get(__aKey)) || "0", 10) || 0;
+          if (__aUsed >= 500) {
+            return new Response(
+              JSON.stringify({ error: "You've reached today's free limit of 500 translations. Register for a free account to keep translating.", code: "free_limit_reached" }),
+              { status: 429, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+            );
+          }
+          await env.QUOTA_KV.put(__aKey, String(__aUsed + 1), { expirationTtl: 172800 });
+        }
         // Resolve the user's status, cached in KV so Firestore is hit at most
         // once every 10 minutes per user.
         let __status = await env.QUOTA_KV.get("st:" + __uid);

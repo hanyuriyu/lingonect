@@ -1539,10 +1539,13 @@ function engineRequiresLevel(engineId) {
   return ENGINE_TIERS[engineId] || 0;
 }
 
-// Free users can only use the free-tier engines (tier 0). Everyone with full
-// access (admin, Pro subscribers, grandfathered members) gets every engine.
+// The engines available to EVERYONE without an account. Core translation must
+// work without login (Apple 5.1.1(v)); every other engine needs a (free,
+// review-approved) account. Unknown/newly added engines are locked by default.
+const FREE_ENGINES = new Set(["google", "openai", "mistral"]);
 function isEngineLocked(engineId) {
-  return engineRequiresLevel(engineId) > 0 && !userHasFullAccess;
+  if (userHasFullAccess) return false;
+  return !FREE_ENGINES.has(engineId);
 }
 
 // Mirror of the worker's classifier: who gets every engine (and no 500 cap)?
@@ -1558,17 +1561,31 @@ function computeFullAccess(data) {
 const db = firebase.firestore();
 
 auth.onAuthStateChanged(async user => {
-  if (!user || !user.emailVerified) {
-    window.location.href = "login.html";
+  // No session yet → sign in anonymously so anyone can use the free engines
+  // (Google Translate, OpenAI, Mistral) WITHOUT an account. Apple 5.1.1(v):
+  // core translation must not sit behind a login. Login stays optional and
+  // only unlocks the remaining engines and account features.
+  if (!user) {
+    try {
+      await auth.signInAnonymously();
+    } catch (e) {
+      document.body.style.visibility = "visible";  // still show the page
+    }
+    return; // onAuthStateChanged fires again with the anonymous user
+  }
+
+  // Anonymous or not-yet-verified → free tier: the three open engines only.
+  if (user.isAnonymous || !user.emailVerified) {
+    userHasFullAccess = false;
+    document.body.style.visibility = "visible";
     return;
   }
+
+  // Signed-in, verified account (login already restricts to approved members).
   if (user.email === "linguisticsconsulting@gmail.com") {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
-  }
-
-  if (user.email === "linguisticsconsulting@gmail.com") {
     userHasFullAccess = true;
   } else {
     const profileDoc = await db.collection("profiles").doc(user.uid).get();
@@ -3715,7 +3732,9 @@ function buildCard(engine) {
       <div class="result-content">
         <p class="engine-name">${engine.name}</p>
         <div class="lock-overlay">
-          Not available on your plan.
+          ${(auth.currentUser && !auth.currentUser.isAnonymous)
+            ? "Not available on your plan."
+            : '<a href="login.html" style="color:inherit;text-decoration:underline;">Sign in to unlock</a>'}
         </div>
       </div>`;
   } else {
