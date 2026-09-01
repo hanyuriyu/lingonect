@@ -1235,13 +1235,14 @@ body{
 <nav class="top-nav">
   <a href="about.html">About</a>
   <a href="engines.html" class="active">Engines</a>
-  <a href="ratings.html">Ratings</a>
-  <a href="chat.html">Chat</a>
-  <a href="flashcards.html">Flashcards</a>
+  <a href="ratings.html" class="gated-nav">Ratings</a>
+  <a href="chat.html" class="gated-nav">Chat</a>
+  <a href="flashcards.html" class="gated-nav">Flashcards</a>
   <a href="subscription.html" id="subNavLink" style="display:none">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
-  <a href="profile.html">Profile</a>
+  <a href="profile.html" class="gated-nav">Profile</a>
+  <a href="login.html" id="loginNavLink" style="display:none">Login</a>
 </nav>
 
 <!-- LOGO — fixed left rail on desktop, top-center on mobile -->
@@ -1575,8 +1576,13 @@ auth.onAuthStateChanged(async user => {
   }
 
   // Anonymous or not-yet-verified → free tier: the three open engines only.
+  // Show only About + Engines in the menu; the account-only pages (Ratings,
+  // Chat, Flashcards, Profile) are hidden and a Login link is shown instead.
   if (user.isAnonymous || !user.emailVerified) {
     userHasFullAccess = false;
+    document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = "none"; });
+    document.getElementById("loginNavLink").style.display = "";
+    document.getElementById("logoutBtn").style.display = "none";
     document.body.style.visibility = "visible";
     return;
   }
