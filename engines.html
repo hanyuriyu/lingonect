@@ -158,14 +158,42 @@ body{
   text-shadow:0 0 6px rgba(26,126,58,.5);
 }
 /* Greyed-out methodology — free/anonymous users on the app get only
-   Translate, Transcreate and Localize; the rest are shown but disabled. */
+   Translate, Transcreate and Localize; the rest are shown but disabled.
+   They stay clickable so a tap can explain why (see .method-lock-tip). */
 .method-word.locked-method{
   color:#c2c2c2;
   text-shadow:none;
-  cursor:default;
-  pointer-events:none;
+  cursor:pointer;
 }
 .method-word.locked-method:hover{ text-shadow:none; }
+
+/* Little "Sign in to unlock" bubble shown when a locked methodology is tapped */
+.method-lock-tip{
+  position:fixed;
+  z-index:1000;
+  transform:translate(-50%, -100%);
+  background:#111;
+  color:#fff;
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:6px;
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+.method-lock-tip.show{ opacity:1; }
+.method-lock-tip::after{
+  content:'';
+  position:absolute;
+  top:100%;
+  left:50%;
+  transform:translateX(-50%);
+  border:5px solid transparent;
+  border-top-color:#111;
+}
 
 /* Localize max-character insert box (shown only when Localize is selected) */
 .localize-box{
@@ -2040,9 +2068,37 @@ function applyFreeMethodRestrictions() {
   renderMethodology();
 }
 
+// Transient "Sign in to unlock" bubble anchored above a locked methodology word.
+let methodLockTipTimer = null;
+function showMethodLockTip(wordEl) {
+  let tip = document.getElementById("methodLockTip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "methodLockTip";
+    tip.className = "method-lock-tip";
+    const link = document.createElement("a");
+    link.href = "login.html";
+    link.textContent = "Sign in to unlock";
+    link.style.color = "#fff";
+    link.style.textDecoration = "underline";
+    link.style.pointerEvents = "auto";
+    tip.appendChild(link);
+    document.body.appendChild(tip);
+  }
+  const r = wordEl.getBoundingClientRect();
+  tip.style.left = (r.left + r.width / 2) + "px";
+  tip.style.top = (r.top - 6) + "px";
+  tip.classList.add("show");
+  clearTimeout(methodLockTipTimer);
+  methodLockTipTimer = setTimeout(() => tip.classList.remove("show"), 2200);
+}
+
 methodWords.forEach(w => {
   w.addEventListener("click", () => {
-    if (w.classList.contains("locked-method")) return;   // disabled for free users
+    if (w.classList.contains("locked-method")) {   // disabled for free users
+      showMethodLockTip(w);
+      return;
+    }
     const m = w.dataset.method;
     if (m === "localize") {
       // Localize cannot be combined with Analyze or Contextualize (neither
