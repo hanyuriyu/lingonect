@@ -455,11 +455,16 @@ function layoutStage(){
     stageEl.style.height = "";
     return;
   }
-  const GAP = 22;
   const railBottom = document.querySelector(".logo-rail").getBoundingClientRect().bottom;
   const langTop = document.querySelector(".language-switcher").getBoundingClientRect().top;
-  const top = railBottom + GAP;
-  const height = Math.max(140, (langTop - GAP) - top);
+  const free = langTop - railBottom;
+  // Push the top clip (where text vanishes) well down into the free space —
+  // about a third of the way below the menu — so the break sits around the
+  // middle of the screen instead of hard against the menu items. Bump BREAK_FRAC
+  // up to lower the break further, down to raise it.
+  const BREAK_FRAC = 0.32;
+  const top = railBottom + Math.max(24, free * BREAK_FRAC);
+  const height = Math.max(120, (langTop - 22) - top);
   stageEl.style.top = top + "px";
   stageEl.style.height = height + "px";
 }
