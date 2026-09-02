@@ -442,12 +442,33 @@ const caretEl = document.querySelector(".caret");
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
+// On phones the menu is a bar at the top and the language switcher a bar at the
+// bottom. Size the reading stage to the actual free space between them (with a
+// small gap) so its top clip sits just below the menu and its centre is the
+// true centre of the empty area. Without this the stage's hardcoded top hid
+// behind the menu, biasing the "centre" upward as the menu grew. On desktop the
+// CSS layout is used as-is.
+function layoutStage(){
+  const isMobile = window.matchMedia("(max-width: 820px)").matches;
+  if (!isMobile){
+    stageEl.style.top = "";
+    stageEl.style.height = "";
+    return;
+  }
+  const GAP = 22;
+  const railBottom = document.querySelector(".logo-rail").getBoundingClientRect().bottom;
+  const langTop = document.querySelector(".language-switcher").getBoundingClientRect().top;
+  const top = railBottom + GAP;
+  const height = Math.max(140, (langTop - GAP) - top);
+  stageEl.style.top = top + "px";
+  stageEl.style.height = height + "px";
+}
+
 function recenter(){
   const box = caretEl.getBoundingClientRect();
-  // Keep the caret at the middle of the reading area (the .stage box), not the
-  // middle of the whole screen. On desktop the stage is already screen-centred
-  // so this is unchanged; on the phone the stage sits below the menu, so the
-  // text settles lower and stays clear of the menu items above it.
+  // Keep the caret at the middle of the reading area (the .stage box). Combined
+  // with layoutStage() sizing the stage to the free space, this centres the
+  // text between the menu and the language switcher on every screen.
   const stageBox = stageEl.getBoundingClientRect();
   const mid = stageBox.top + stageBox.height / 2;
   const dy = mid - box.top;
@@ -459,6 +480,7 @@ async function typeText(lang){
   const myRun = ++runId;
   typed.innerHTML = "";
   content.style.transform = "translateY(0)";
+  layoutStage();
   recenter();
 
   for(const p of TEXTS[lang]){
@@ -479,7 +501,7 @@ async function typeText(lang){
   }
 }
 
-window.addEventListener("resize", () => { setTimeout(recenter, 50); });
+window.addEventListener("resize", () => { setTimeout(() => { layoutStage(); recenter(); }, 50); });
 
 document.querySelectorAll(".lang-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
