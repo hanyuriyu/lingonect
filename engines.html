@@ -3703,6 +3703,26 @@ const engines = [
   }
 ];
 
+// On the native iPhone app only, surface the three free-tier engines
+// (OpenAI, Google Translate, Mistral) at the top of the list, so anonymous
+// visitors land on an open engine instead of a locked "Sign in to unlock"
+// card. The website keeps its original order untouched.
+(function reorderFreeEnginesForApp() {
+  const isNativeApp = !!(window.Capacitor
+    && typeof window.Capacitor.isNativePlatform === "function"
+    && window.Capacitor.isNativePlatform());
+  if (!isNativeApp) return;
+  const freeFirst = ["openai", "google", "mistral"];
+  engines.sort((a, b) => {
+    const ai = freeFirst.indexOf(a.id);
+    const bi = freeFirst.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;   // both non-free → keep original order
+    if (ai === -1) return 1;                // only b is free → b first
+    if (bi === -1) return -1;               // only a is free → a first
+    return ai - bi;                         // both free → follow freeFirst order
+  });
+})();
+
 // Engines that are neural machine translation systems (everything else is an LLM)
 const NMT_ENGINES = new Set([
   "google", "deepl", "baidu", "tencent", "alibaba",
