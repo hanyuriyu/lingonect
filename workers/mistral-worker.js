@@ -282,19 +282,30 @@ export default {
     try {
       const body = await request.json();
 
-      const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.MISTRAL_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: body.model || "mistral-small-latest",
-          messages: body.messages,
-          temperature: body.temperature ?? 0.3,
-          max_tokens: body.max_tokens ?? 1024,
-        }),
+      const upstreamBody = JSON.stringify({
+        model: body.model || "mistral-small-latest",
+        messages: body.messages,
+        temperature: body.temperature ?? 0.3,
+        max_tokens: body.max_tokens ?? 1024,
       });
+
+      // Mistral's API has been returning intermittent 401/429/5xx responses
+      // even with a valid key. These are transient, so retry a couple of times
+      // with a short backoff before surfacing the error to the user.
+      const TRANSIENT = new Set([401, 429, 500, 502, 503, 504]);
+      let res;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.MISTRAL_API_KEY}`,
+          },
+          body: upstreamBody,
+        });
+        if (!TRANSIENT.has(res.status)) break;   // success or a non-retryable error
+        if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+      }
 
       const data = await res.json();
 

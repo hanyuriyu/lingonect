@@ -157,6 +157,15 @@ body{
   color:#1a7e3a;
   text-shadow:0 0 6px rgba(26,126,58,.5);
 }
+/* Greyed-out methodology — free/anonymous users on the app get only
+   Translate, Transcreate and Localize; the rest are shown but disabled. */
+.method-word.locked-method{
+  color:#c2c2c2;
+  text-shadow:none;
+  cursor:default;
+  pointer-events:none;
+}
+.method-word.locked-method:hover{ text-shadow:none; }
 
 /* Localize max-character insert box (shown only when Localize is selected) */
 .localize-box{
@@ -1583,6 +1592,11 @@ auth.onAuthStateChanged(async user => {
     document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = "none"; });
     document.getElementById("loginNavLink").style.display = "";
     document.getElementById("logoutBtn").style.display = "none";
+    // On the app, free users get only Translate / Transcreate / Localize.
+    const isNativeApp = !!(window.Capacitor
+      && typeof window.Capacitor.isNativePlatform === "function"
+      && window.Capacitor.isNativePlatform());
+    if (isNativeApp) applyFreeMethodRestrictions();
     document.body.style.visibility = "visible";
     return;
   }
@@ -2011,8 +2025,24 @@ function renderMethodology() {
   contextualizeHint.classList.toggle("show", baseMethod === "contextualize");
 }
 
+// Methodologies available to free/anonymous users on the native app. The
+// website and signed-in members keep the full set.
+const FREE_METHODS = new Set(["translate", "transcreate", "localize"]);
+
+// Grey out (and block) the methodologies that free/anonymous app users can't
+// use. Called once auth resolves for a not-fully-signed-in user on the app.
+function applyFreeMethodRestrictions() {
+  methodWords.forEach(w => {
+    if (!FREE_METHODS.has(w.dataset.method)) w.classList.add("locked-method");
+  });
+  // If a now-locked methodology was somehow active, fall back to plain Translate.
+  if (baseMethod && !FREE_METHODS.has(baseMethod)) baseMethod = null;
+  renderMethodology();
+}
+
 methodWords.forEach(w => {
   w.addEventListener("click", () => {
+    if (w.classList.contains("locked-method")) return;   // disabled for free users
     const m = w.dataset.method;
     if (m === "localize") {
       // Localize cannot be combined with Analyze or Contextualize (neither
