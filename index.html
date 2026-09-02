@@ -437,13 +437,19 @@ let runId = 0;
 const TYPE_MIN=35, TYPE_MAX=75, PARA_PAUSE=400;
 const typed = document.getElementById("typed");
 const content = document.getElementById("content");
+const stageEl = document.querySelector(".stage");
+const caretEl = document.querySelector(".caret");
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
 function recenter(){
-  const caret = document.querySelector(".caret");
-  const box = caret.getBoundingClientRect();
-  const mid = window.innerHeight/2;
+  const box = caretEl.getBoundingClientRect();
+  // Keep the caret at the middle of the reading area (the .stage box), not the
+  // middle of the whole screen. On desktop the stage is already screen-centred
+  // so this is unchanged; on the phone the stage sits below the menu, so the
+  // text settles lower and stays clear of the menu items above it.
+  const stageBox = stageEl.getBoundingClientRect();
+  const mid = stageBox.top + stageBox.height / 2;
   const dy = mid - box.top;
   const current = new DOMMatrix(getComputedStyle(content).transform).m42;
   content.style.transform = `translateY(${current + dy}px)`;
