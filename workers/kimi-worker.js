@@ -8,18 +8,28 @@
  * we ask for. A direct Moonshot key removes that whole failure mode.
  *
  * Note: a Kimi consumer subscription (kimi.com) is NOT API access — the key
- * comes from the developer platform and is billed separately.
+ * comes from the developer console and is billed separately.
+ *
+ * The console and the API sit on different domains, which is an easy hour to
+ * lose: keys are issued at platform.kimi.ai, but calls still go to
+ * api.moonshot.ai/v1. There is no api.kimi.ai endpoint.
+ *
+ * Regions are separate accounts: a key issued on the mainland-China platform
+ * answers 401 against the international host and vice versa. Point
+ * KIMI_BASE_URL at https://api.moonshot.cn/v1 for a .cn key.
  *
  * Deploy steps:
- *   1. npx wrangler secret put MOONSHOT_API_KEY -c workers/wrangler/kimi.toml
+ *   1. npx wrangler secret put KIMI_API_KEY -c workers/wrangler/kimi.toml
  *   2. npx wrangler deploy -c workers/wrangler/kimi.toml
  *
  * Environment:
- *   MOONSHOT_API_KEY  (secret, required) — key from platform.moonshot.ai
- *   MOONSHOT_BASE_URL (var, optional)    — override for the mainland-China
- *                                          platform (https://api.moonshot.cn/v1)
- *   KIMI_MODEL        (var, optional)    — model id, so a rename on Moonshot's
- *                                          side is a dashboard edit, not a deploy
+ *   KIMI_API_KEY      (secret, required) — key from platform.kimi.ai. The name
+ *                                          MOONSHOT_API_KEY is accepted too,
+ *                                          since that is what Moonshot's own
+ *                                          docs call it.
+ *   KIMI_BASE_URL     (var, optional)    — API host, for the .cn region
+ *   KIMI_MODEL        (var, optional)    — model id, so a rename upstream is a
+ *                                          dashboard edit, not a deploy
  *
  * The worker will be available at:
  *   https://kimi.hanyuriyu.workers.dev
@@ -184,6 +194,12 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// Secrets pasted into the Cloudflare dashboard often arrive with a stray
+// newline or space attached. Trimming every credential here stops that from
+// reaching the provider as a malformed key — which comes back as a 401 and
+// reads, wrongly, like a revoked account.
+const __t = (v) => (v == null ? "" : String(v).trim());
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -284,10 +300,12 @@ export default {
     // "Bearer undefined" and come back as a 401, which reads to the user as
     // "our credentials were rejected" — true, but it hides that there are no
     // credentials at all. Say so plainly instead.
-    const apiKey = (env.MOONSHOT_API_KEY || "").trim();
+    // Either name works: the console is branded Kimi, while Moonshot's own
+    // docs say MOONSHOT_API_KEY. Accepting both removes a way to misname it.
+    const apiKey = __t(env.KIMI_API_KEY) || __t(env.MOONSHOT_API_KEY);
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: { message: "Kimi is not configured on our side: MOONSHOT_API_KEY is not set.", code: "not_configured" } }),
+        JSON.stringify({ error: { message: "Kimi is not configured on our side: KIMI_API_KEY is not set.", code: "not_configured" } }),
         {
           status: 503,
           headers: {
@@ -298,7 +316,8 @@ export default {
       );
     }
 
-    const base = ((env.MOONSHOT_BASE_URL || "https://api.moonshot.ai/v1").trim()).replace(/\/+$/, "");
+    // Keys come from platform.kimi.ai, but the API host is api.moonshot.ai.
+    const base = (__t(env.KIMI_BASE_URL) || __t(env.MOONSHOT_BASE_URL) || "https://api.moonshot.ai/v1").replace(/\/+$/, "");
 
     try {
       // GET → model list. Handy for confirming which Kimi ids this key can
@@ -325,7 +344,10 @@ export default {
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: body.model || (env.KIMI_MODEL || "").trim() || "kimi-k2-0905-preview",
+          // kimi-k2-0905-preview, kimi-k2-thinking, kimi-k2.5 and the whole
+          // moonshot-v1 series are retired and answer 404 now. Keep this on a
+          // current id; GET this worker to see what the key can actually reach.
+          model: body.model || __t(env.KIMI_MODEL) || "kimi-k2.6",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,

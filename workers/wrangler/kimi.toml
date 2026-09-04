@@ -9,10 +9,11 @@ preview_urls = false
 binding = "QUOTA_KV"
 id = "f9f80346649545989106f2b6459bbb28"
 
-# Model id lives here so a rename on Moonshot's side is a config edit, not a
-# code change. Override in the dashboard (Settings > Variables) if needed.
+# Model id lives here so a rename upstream is a config edit, not a code change.
+# Override in the dashboard (Settings > Variables) if needed. GET the deployed
+# worker to see which ids the key can actually reach.
 [vars]
-KIMI_MODEL = "kimi-k2-0905-preview"
+KIMI_MODEL = "kimi-k2.6"
 
 [observability]
 enabled = true
