@@ -30,6 +30,9 @@
  *   KIMI_BASE_URL     (var, optional)    — API host, for the .cn region
  *   KIMI_MODEL        (var, optional)    — model id, so a rename upstream is a
  *                                          dashboard edit, not a deploy
+ *   KIMI_TEMPERATURE  (var, optional)    — defaults to 1, which thinking-mode
+ *                                          models require. Instant-mode models
+ *                                          prefer 0.6.
  *
  * The worker will be available at:
  *   https://kimi.hanyuriyu.workers.dev
@@ -337,27 +340,48 @@ export default {
 
       const body = await request.json();
 
-      const res = await fetch(`${base}/chat/completions`, {
+      const payload = {
+        // kimi-k2-0905-preview, kimi-k2-thinking, kimi-k2.5 and the whole
+        // moonshot-v1 series are retired and answer 404 now. Keep this on a
+        // current id; GET this worker to see what the key can actually reach.
+        model: body.model || __t(env.KIMI_MODEL) || "kimi-k2.6",
+        messages: body.messages,
+        // Thinking-mode models pin temperature: kimi-k2.6 accepts only 1 and
+        // rejects the 0.3 the rest of our proxies use for translation. Default
+        // to what the current model wants; the retry below covers the rest.
+        temperature: body.temperature ?? Number(__t(env.KIMI_TEMPERATURE) || "1"),
+        max_tokens: body.max_tokens ?? 1024,
+      };
+
+      const call = (p) => fetch(`${base}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          // kimi-k2-0905-preview, kimi-k2-thinking, kimi-k2.5 and the whole
-          // moonshot-v1 series are retired and answer 404 now. Keep this on a
-          // current id; GET this worker to see what the key can actually reach.
-          model: body.model || __t(env.KIMI_MODEL) || "kimi-k2.6",
-          messages: body.messages,
-          temperature: body.temperature ?? 0.3,
-          max_tokens: body.max_tokens ?? 1024,
-        }),
+        body: JSON.stringify(p),
       });
 
+      let res = await call(payload);
       // Forwarded verbatim: Moonshot's own wording ("model not found",
       // "insufficient balance") is far more useful to the site's error
       // classifier than a re-wrapped message would be.
-      const responseBody = await res.text();
+      let responseBody = await res.text();
+
+      // Moonshot names the value it will accept — "only 1 is allowed for this
+      // model" — so a temperature rejection is self-correcting rather than
+      // something to chase through a redeploy every time a model changes its
+      // mind. Retried once, only for this error.
+      if (!res.ok && /temperature/i.test(responseBody)) {
+        const allowed = responseBody.match(/only\s+([\d.]+)\s+is allowed/i);
+        const retry = Object.assign({}, payload, {
+          temperature: allowed ? Number(allowed[1]) : 1,
+        });
+        if (retry.temperature !== payload.temperature && !Number.isNaN(retry.temperature)) {
+          res = await call(retry);
+          responseBody = await res.text();
+        }
+      }
 
       return new Response(responseBody, {
         status: res.status,
