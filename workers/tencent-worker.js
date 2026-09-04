@@ -165,6 +165,12 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// Secrets pasted into the Cloudflare dashboard often arrive with a stray
+// newline or space attached. Trimming every credential here stops that from
+// reaching the provider as a malformed key — which comes back as a 401 and
+// reads, wrongly, like a revoked account.
+const __t = (v) => (v == null ? "" : String(v).trim());
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -261,6 +267,23 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    // A missing secret would otherwise go upstream as "Bearer undefined" and
+    // come back as a 401 — indistinguishable from a key the provider revoked.
+    // Report the real cause instead, so the engine-health check can name it.
+    const __missing = ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY"].filter((n) => !__t(env[n]));
+    if (__missing.length) {
+      return new Response(
+        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        }
+      );
+    }
+
     try {
       const body = await request.json();
       const { text, source, target } = body;
@@ -303,7 +326,7 @@ export default {
       ].join("\n");
 
       const secretDate = await hmacSha256(
-        new TextEncoder().encode("TC3" + env.TENCENT_SECRET_KEY),
+        new TextEncoder().encode("TC3" + __t(env.TENCENT_SECRET_KEY)),
         dateStr
       );
       const secretService = await hmacSha256(secretDate, service);
@@ -311,7 +334,7 @@ export default {
       const signature = await hmacSha256Hex(secretSigning, stringToSign);
 
       const authorization =
-        `TC3-HMAC-SHA256 Credential=${env.TENCENT_SECRET_ID}/${credentialScope}, ` +
+        `TC3-HMAC-SHA256 Credential=${__t(env.TENCENT_SECRET_ID)}/${credentialScope}, ` +
         `SignedHeaders=content-type;host, Signature=${signature}`;
 
       const res = await fetch(`https://${host}`, {

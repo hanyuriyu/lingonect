@@ -1,12 +1,31 @@
 /**
- * Cloudflare Worker: Gemini Translation Proxy
+ * Cloudflare Worker: Kimi (Moonshot AI) Translation Proxy
  *
- * Environment secrets required:
- *   Settings > Variables and Secrets > Add:
- *     GEMINI_API_KEY (encrypt)
+ * Talks to Moonshot AI's own OpenAI-compatible API rather than routing Kimi
+ * through Together AI. Together serves some Kimi builds only from *dedicated*
+ * deployments, so a stopped deployment there fails every request with
+ * "No deployments are ready to serve this endpoint" no matter which model id
+ * we ask for. A direct Moonshot key removes that whole failure mode.
+ *
+ * Note: a Kimi consumer subscription (kimi.com) is NOT API access — the key
+ * comes from the developer platform and is billed separately.
+ *
+ * Deploy steps:
+ *   1. npx wrangler secret put MOONSHOT_API_KEY -c workers/wrangler/kimi.toml
+ *   2. npx wrangler deploy -c workers/wrangler/kimi.toml
+ *
+ * Environment:
+ *   MOONSHOT_API_KEY  (secret, required) — key from platform.moonshot.ai
+ *   MOONSHOT_BASE_URL (var, optional)    — override for the mainland-China
+ *                                          platform (https://api.moonshot.cn/v1)
+ *   KIMI_MODEL        (var, optional)    — model id, so a rename on Moonshot's
+ *                                          side is a dashboard edit, not a deploy
  *
  * The worker will be available at:
- *   https://geminitranslate.hanyuriyu.workers.dev
+ *   https://kimi.hanyuriyu.workers.dev
+ *
+ * GET returns the upstream model list, which is how you find the current model
+ * id without logging into the console. POST proxies a chat completion.
  */
 
 // ---------------------------------------------------------------------------
@@ -165,12 +184,6 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
-// Secrets pasted into the Cloudflare dashboard often arrive with a stray
-// newline or space attached. Trimming every credential here stops that from
-// reaching the provider as a malformed key — which comes back as a 401 and
-// reads, wrongly, like a revoked account.
-const __t = (v) => (v == null ? "" : String(v).trim());
-
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -178,16 +191,12 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": corsOrigin(request),
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization"
-        }
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Max-Age": "86400",
+        },
       });
     }
-
-    const cors = {
-      "Content-Type":                "application/json",
-      "Access-Control-Allow-Origin": corsOrigin(request),
-    };
     // Reject anything without a valid Firebase ID token before doing any work.
     const __authPayload = await verifyFirebaseToken(request.headers.get("Authorization"));
     if (!__authPayload) {
@@ -267,17 +276,18 @@ export default {
     }
 
 
-    if (request.method !== "POST") {
-      return new Response(JSON.stringify({ error: { message: "Method not allowed" } }), { status: 405, headers: cors });
+    if (request.method !== "POST" && request.method !== "GET") {
+      return new Response("Method not allowed", { status: 405 });
     }
 
-    // A missing secret would otherwise go upstream as "Bearer undefined" and
-    // come back as a 401 — indistinguishable from a key the provider revoked.
-    // Report the real cause instead, so the engine-health check can name it.
-    const __missing = ["GEMINI_API_KEY"].filter((n) => !__t(env[n]));
-    if (__missing.length) {
+    // A missing or unset secret would otherwise reach Moonshot as
+    // "Bearer undefined" and come back as a 401, which reads to the user as
+    // "our credentials were rejected" — true, but it hides that there are no
+    // credentials at all. Say so plainly instead.
+    const apiKey = (env.MOONSHOT_API_KEY || "").trim();
+    if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
+        JSON.stringify({ error: { message: "Kimi is not configured on our side: MOONSHOT_API_KEY is not set.", code: "not_configured" } }),
         {
           status: 503,
           headers: {
@@ -288,43 +298,60 @@ export default {
       );
     }
 
+    const base = ((env.MOONSHOT_BASE_URL || "https://api.moonshot.ai/v1").trim()).replace(/\/+$/, "");
+
     try {
-      const body = await request.json();
-      const { targetLang, text, model, instruction } = body;
-      const modelId = model || "gemini-2.5-flash";
-      // The client sends a methodology-aware system prompt as `instruction`
-      // (translate / transcreate / culturalize, plus any localization length
-      // constraint). Fall back to a plain translation instruction.
-      const promptInstruction = instruction
-        || `Translate into ${targetLang}. Output ONLY translated text.`;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${__t(env.GEMINI_API_KEY)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `${promptInstruction}\n\n<text>${text}</text>`
-              }]
-            }]
-          })
-        }
-      );
-      const raw = await response.text();
-      let data;
-      try { data = JSON.parse(raw); } catch { data = null; }
-      if (!response.ok) {
-        const msg = data?.error?.message || raw.slice(0, 200) || `HTTP ${response.status}`;
-        return new Response(JSON.stringify({ error: { message: msg } }), { status: response.status, headers: cors });
+      // GET → model list. Handy for confirming which Kimi ids this key can
+      // actually reach before pointing the site at one.
+      if (request.method === "GET") {
+        const listRes = await fetch(`${base}/models`, {
+          headers: { "Authorization": `Bearer ${apiKey}` },
+        });
+        return new Response(await listRes.text(), {
+          status: listRes.status,
+          headers: {
+            "Content-Type": listRes.headers.get("Content-Type") || "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        });
       }
-      const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      return new Response(JSON.stringify({ translated }), { headers: cors });
+
+      const body = await request.json();
+
+      const res = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: body.model || (env.KIMI_MODEL || "").trim() || "kimi-k2-0905-preview",
+          messages: body.messages,
+          temperature: body.temperature ?? 0.3,
+          max_tokens: body.max_tokens ?? 1024,
+        }),
+      });
+
+      // Forwarded verbatim: Moonshot's own wording ("model not found",
+      // "insufficient balance") is far more useful to the site's error
+      // classifier than a re-wrapped message would be.
+      const responseBody = await res.text();
+
+      return new Response(responseBody, {
+        status: res.status,
+        headers: {
+          "Content-Type": res.headers.get("Content-Type") || "application/json",
+          "Access-Control-Allow-Origin": corsOrigin(request),
+        },
+      });
     } catch (err) {
-      return new Response(
-        JSON.stringify({ error: { message: err.message || "Gemini worker error" } }),
-        { status: 500, headers: cors }
-      );
+      return new Response(JSON.stringify({ error: { message: err.message } }), {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": corsOrigin(request),
+        },
+      });
     }
-  }
+  },
 };
