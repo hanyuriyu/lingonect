@@ -14,6 +14,10 @@ id = "f9f80346649545989106f2b6459bbb28"
 # worker to see which ids the key can actually reach.
 [vars]
 KIMI_MODEL = "kimi-k2.6"
+# kimi-k2.6 runs in thinking mode and accepts only temperature 1 — it rejects
+# the 0.3 the other translation proxies use. The worker retries once using
+# whatever value Moonshot names in the error, so this rarely needs touching.
+KIMI_TEMPERATURE = "1"
 
 [observability]
 enabled = true
