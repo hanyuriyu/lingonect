@@ -1220,6 +1220,44 @@ body{
   color:#111;
   border-bottom-color:#111;
 }
+
+/* ── Engine health sweep (admin only) ────────────────────────────────────
+   Answers "which engines are broken and why" in one pass, so a report like
+   "some engines are struggling" turns into a list of causes. */
+#healthOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;
+  align-items:flex-start;justify-content:center;z-index:9000;overflow-y:auto;padding:2rem 1rem;}
+#healthOverlay.open{display:flex;}
+.health-card{background:#fff;border-radius:14px;max-width:900px;width:100%;
+  box-shadow:0 18px 50px rgba(0,0,0,0.25);padding:1.4rem 1.5rem 1.6rem;}
+.health-head{display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.35rem;}
+.health-head h2{font-size:1.05rem;margin:0;flex:1 1 auto;}
+.health-sub{font-size:0.78rem;color:#666;margin:0 0 0.9rem;}
+.health-btn{border:1px solid #d0d0d6;background:#f7f7f9;border-radius:8px;
+  padding:0.35rem 0.8rem;font-size:0.78rem;cursor:pointer;}
+.health-btn:hover{background:#eeeef2;}
+.health-btn[disabled]{opacity:0.5;cursor:default;}
+.health-summary{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.8rem;}
+.health-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+.health-table th{text-align:left;font-weight:600;color:#666;font-size:0.72rem;
+  text-transform:uppercase;letter-spacing:0.04em;padding:0.3rem 0.5rem;border-bottom:1px solid #e6e6ea;}
+.health-table td{padding:0.4rem 0.5rem;border-bottom:1px solid #f0f0f3;vertical-align:top;}
+.health-table tr.pending td{color:#999;}
+.health-detail{color:#777;font-size:0.72rem;word-break:break-word;max-width:340px;
+  display:block;overflow:hidden;text-overflow:ellipsis;}
+.health-chip{display:inline-block;border-radius:999px;padding:0.1rem 0.55rem;
+  font-size:0.7rem;font-weight:600;white-space:nowrap;}
+.health-chip.ok{background:#e4f5e9;color:#1c7a3c;}
+.health-chip.warn{background:#fdf0dc;color:#8a5b12;}
+.health-chip.bad{background:#fbe3e3;color:#a32020;}
+.health-chip.idle{background:#eee;color:#777;}
+@media (prefers-color-scheme: dark){
+  .health-card{background:#1c1c20;color:#eee;}
+  .health-table th{color:#999;border-bottom-color:#33333a;}
+  .health-table td{border-bottom-color:#2a2a30;}
+  .health-btn{background:#26262c;border-color:#3a3a42;color:#eee;}
+  .health-btn:hover{background:#31313a;}
+  .health-sub,.health-detail{color:#9a9aa2;}
+}
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1241,8 +1279,28 @@ body{
   <a href="subscription.html" id="subNavLink" style="display:none">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
+  <a href="#" id="healthNavLink" style="display:none">Health</a>
   <a href="profile.html">Profile</a>
 </nav>
+
+<!-- ENGINE HEALTH SWEEP (admin only) -->
+<div id="healthOverlay" role="dialog" aria-modal="true" aria-labelledby="healthTitle">
+  <div class="health-card">
+    <div class="health-head">
+      <h2 id="healthTitle">Engine health</h2>
+      <button class="health-btn" id="healthRunBtn" type="button">Re-run</button>
+      <button class="health-btn" id="healthCopyBtn" type="button">Copy report</button>
+      <button class="health-btn" id="healthCloseBtn" type="button">Close</button>
+    </div>
+    <p class="health-sub">Sends one short translation through every engine and reports what the provider actually said. Uses real API credit — a handful of tokens per engine.</p>
+    <div class="health-summary" id="healthSummary"></div>
+    <table class="health-table">
+      <thead><tr><th>Engine</th><th>Result</th><th>HTTP</th><th>ms</th><th>Provider said</th></tr></thead>
+      <tbody id="healthRows"></tbody>
+    </table>
+  </div>
+</div>
+
 
 <!-- LOGO — fixed left rail on desktop, top-center on mobile -->
 <div class="logo-rail">
@@ -1566,6 +1624,9 @@ auth.onAuthStateChanged(async user => {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
+    document.getElementById("healthNavLink").style.display = "";
+    // engines.html#health from the Admin page opens the sweep straight away.
+    if (location.hash === "#health" && window.__openHealthPanel) window.__openHealthPanel();
   }
 
   if (user.email === "linguisticsconsulting@gmail.com") {
@@ -2536,28 +2597,47 @@ function quoted(msg) {
 // Ordered most-specific-first. A provider's own wording ("Content Exists Risk",
 // "insufficient balance") is far more precise than the status code it happens
 // to arrive with, so every `when` pattern is tried before any `status`.
+// Each rule also carries a `code`: a stable, machine-readable cause used by the
+// admin engine-health check, so a sweep can be read as "3 out of credit, 1 bad
+// key" instead of 25 sentences.
 const ENGINE_FAILURES = [
-  { when: /content[\s_-]*(policy|filter|exists\s*risk)|moderation|sensitive|prohibited|violat|inappropriate|risk[\s_-]*control|unsafe|safety|blocked (due to|by)/i,
+  // Matches only our own workers' wording. Deliberately carries no status: a
+  // provider's own 503 means "overloaded", and must not land here.
+  { code: "not_configured", when: /not configured on our side/i,
+    say: n => `${n} has no API key configured on our side yet. Nothing is wrong with your account.` },
+  { code: "content_filter", when: /content[\s_-]*(policy|filter|exists\s*risk)|moderation|sensitive|prohibited|violat|inappropriate|risk[\s_-]*control|unsafe|safety|blocked (due to|by)/i,
     say: n => `${n} refused this text — its content filter flagged the input. Rephrasing usually helps; the other engines still ran.` },
-  { when: /insufficient|balance|billing|payment|out of credit|quota (exceeded|exhausted)|exceeded your current quota|free amount|arrears/i, status: 402,
+  // Deliberately ahead of the credentials rule: a provider whose billing lapsed
+  // answers 401/403 with wording about the *account*, not the key. Calling that
+  // "rejected our credentials" sends us rotating a key that was never the problem.
+  { code: "account_suspended", when: /(account|cloud|subscription|billing account|organization).{0,40}(suspend|blocked|deactivat|disabled|frozen|not active|inactive|closed)|(suspend|blocked|deactivat|disabled|frozen).{0,40}(account|cloud|billing)|payment method|add a payment|card (declined|expired)/i,
+    say: n => `${n}'s account on our side is suspended — usually lapsed billing, not a broken key. Please report it.` },
+  { code: "no_credit", when: /insufficient|balance|billing|payment|out of credit|quota (exceeded|exhausted)|exceeded your current quota|free amount|arrears/i, status: 402,
     say: n => `${n} has run out of API credit on our side. This is not your request limit — please report it.` },
-  { when: /rate.?limit|too many requests|access limit|qps/i, status: 429,
+  { code: "rate_limited", when: /rate.?limit|too many requests|access limit|qps/i, status: 429,
     say: n => `${n} is rate-limiting us right now. Wait a few seconds and translate again.` },
-  { when: /context length|too long|maximum.*token|payload too large|string too long/i, status: 413,
+  { code: "too_long", when: /context length|too long|maximum.*token|payload too large|string too long/i, status: 413,
     say: n => `Your text is too long for ${n}. Try a shorter passage.` },
-  { when: /api[\s_-]?key|unauthorized|forbidden|invalid authentication|access denied|permission/i, status: [401, 403],
+  // A stopped hosted deployment (Together AI, Azure, Volcengine endpoints) is a
+  // switch someone has to flip on our side — not a retired model, and no amount
+  // of changing the model id fixes it. It has to be said in those words.
+  { code: "deployment_stopped", when: /no deployments are ready|deployments are stopped|endpoint.{0,30}(stopped|not (running|started))|start (one|an endpoint)|scale.{0,20}zero/i,
+    say: n => `${n}'s hosted endpoint is switched off on our side. Someone has to start it again — please report it.` },
+  { code: "bad_credentials", when: /api[\s_-]?key|unauthorized|forbidden|invalid authentication|access denied|permission/i, status: [401, 403],
     say: n => `${n} rejected our credentials. That is a problem on our side, not with your account.` },
-  { when: /model.*(not found|does not exist|unavailable)|unknown model|no such model|deprecat/i, status: 404,
+  { code: "model_gone", when: /model.*(not found|does not exist|unavailable)|unknown model|no such model|deprecat/i, status: 404,
     say: n => `${n}'s model is unavailable — the provider may have retired it.` },
-  { when: /internal (server )?error|service unavailable|bad gateway|upstream|overloaded|capacity|timed? ?out/i, status: s => s >= 500,
+  { code: "provider_down", when: /internal (server )?error|service unavailable|bad gateway|upstream|overloaded|capacity|timed? ?out/i, status: s => s >= 500,
     say: n => `${n} is overloaded or having server trouble. This is usually temporary — try again in a moment.` },
-  { status: 400, say: (n, msg) => `${n} rejected this request${quoted(msg)}.` }
+  { code: "rejected", status: 400, say: (n, msg) => `${n} rejected this request${quoted(msg)}.` }
 ];
 
-function describeEngineFailure(engineName, status, providerMsg) {
+// Find the rule that explains a failure. The provider's own wording wins over
+// the status code it happened to arrive with, so every `when` is tried first.
+function matchEngineFailure(status, providerMsg) {
   const msg = providerMsg || "";
   for (const rule of ENGINE_FAILURES) {          // pass 1: what the provider said
-    if (rule.when && rule.when.test(msg)) return rule.say(engineName, msg);
+    if (rule.when && rule.when.test(msg)) return rule;
   }
   for (const rule of ENGINE_FAILURES) {          // pass 2: the status code alone
     const s = rule.status;
@@ -2565,9 +2645,21 @@ function describeEngineFailure(engineName, status, providerMsg) {
     const hit = typeof s === "function" ? s(status)
       : Array.isArray(s) ? s.includes(status)
       : s === status;
-    if (hit) return rule.say(engineName, msg);
+    if (hit) return rule;
   }
-  return `${engineName} failed${status ? ` (HTTP ${status})` : ""}${quoted(msg)}.`;
+  return null;
+}
+
+function describeEngineFailure(engineName, status, providerMsg) {
+  const rule = matchEngineFailure(status, providerMsg);
+  if (rule) return rule.say(engineName, providerMsg || "");
+  return `${engineName} failed${status ? ` (HTTP ${status})` : ""}${quoted(providerMsg)}.`;
+}
+
+// The stable cause code behind a failure, for the admin health sweep.
+function classifyEngineFailure(status, providerMsg) {
+  const rule = matchEngineFailure(status, providerMsg);
+  return rule ? rule.code : "unknown";
 }
 
 // Build the Error to throw for a failed engine call. Pass `body` when the call
@@ -2589,6 +2681,7 @@ async function engineError(engineName, res, body) {
   const providerMsg = providerErrorText(data, raw);
   const err = new Error(describeEngineFailure(engineName, status, providerMsg));
   err.status = status;
+  err.code = classifyEngineFailure(status, providerMsg);
   err.detail = providerMsg || raw;
   console.error(`${engineName} failed (HTTP ${status}):`, err.detail || "(empty response)");
   return err;
@@ -3147,15 +3240,20 @@ async function translateWithLlama(text, extra) {
   return data.choices[0].message.content.trim();
 }
 
-// ── Kimi (Moonshot AI, via Cloudflare Worker → Together AI) ──
-// Hosted LLM served through the same Together AI OpenAI-compatible endpoint we
-// use for Llama, so it reuses LLAMA_PROXY and the existing Together API key.
+// ── Kimi (Moonshot AI, via Cloudflare Worker) ──
+// Kimi used to ride on LLAMA_PROXY (Together AI). Together serves several Kimi
+// builds only from *dedicated* deployments, so once ours stopped, every call
+// failed with "No deployments are ready to serve this endpoint" whichever model
+// id we tried. This now goes straight to Moonshot's own OpenAI-compatible API,
+// which has no dedicated-deployment concept. The model id lives in the worker
+// (KIMI_MODEL) so a rename upstream is a config change, not a site deploy.
+const KIMI_PROXY = "https://kimi.hanyuriyu.workers.dev";
+
 async function translateWithKimi(text, extra) {
-  const res = await workerFetch(LLAMA_PROXY, {
+  const res = await workerFetch(KIMI_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "moonshotai/Kimi-K2.6",
       messages: [
         {
           role: "system",
@@ -5325,6 +5423,170 @@ function downloadFullList() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+
+// ── Engine health sweep (admin only) ────────────────────────────────────
+// Every engine here is a proxy in front of somebody else's paid API, and they
+// break for boringly different reasons: a key with a stray newline, a lapsed
+// card, a hosted endpoint someone switched off. Guessing which from a user's
+// screenshot is slow, so this runs the real translate path for every engine at
+// once and prints the provider's own words next to a stable cause code.
+const HEALTH_PROBE_TEXT = "Good morning.";
+const HEALTH_TIMEOUT_MS = 30000;
+const HEALTH_CONCURRENCY = 4;
+
+// How a cause reads, and how alarming it is. Anything unlisted is treated as a
+// hard failure — better to over-report than to hide a broken engine.
+const HEALTH_CAUSES = {
+  not_configured:    { label: "No API key",        tone: "bad"  },
+  bad_credentials:   { label: "Bad credentials",   tone: "bad"  },
+  account_suspended: { label: "Account suspended", tone: "bad"  },
+  no_credit:         { label: "Out of credit",     tone: "bad"  },
+  deployment_stopped:{ label: "Endpoint stopped",  tone: "bad"  },
+  model_gone:        { label: "Model retired",     tone: "bad"  },
+  rejected:          { label: "Request rejected",  tone: "bad"  },
+  rate_limited:      { label: "Rate limited",      tone: "warn" },
+  provider_down:     { label: "Provider down",     tone: "warn" },
+  content_filter:    { label: "Content filter",    tone: "warn" },
+  too_long:          { label: "Text too long",     tone: "warn" },
+  timeout:           { label: "Timed out",         tone: "warn" },
+  unknown:           { label: "Failed",            tone: "bad"  }
+};
+
+let __healthRunning = false;
+
+function healthRowId(id) { return "health-row-" + id; }
+
+function renderHealthRow(engine, state) {
+  const tr = document.getElementById(healthRowId(engine.id));
+  if (!tr) return;
+  if (state.status === "pending") {
+    tr.className = "pending";
+    tr.innerHTML = `<td>${engine.name}</td><td><span class="health-chip idle">Checking…</span></td><td></td><td></td><td></td>`;
+    return;
+  }
+  tr.className = "";
+  const cause = state.ok ? { label: "OK", tone: "ok" }
+                         : (HEALTH_CAUSES[state.code] || HEALTH_CAUSES.unknown);
+  const detail = state.detail || "";
+  tr.innerHTML =
+    `<td>${engine.name}</td>` +
+    `<td><span class="health-chip ${cause.tone}">${cause.label}</span></td>` +
+    `<td>${state.http || ""}</td>` +
+    `<td>${state.ms}</td>` +
+    `<td><span class="health-detail" title="${detail.replace(/"/g, "&quot;")}">${detail}</span></td>`;
+}
+
+function renderHealthSummary(results) {
+  const el = document.getElementById("healthSummary");
+  const done = results.filter(r => r.status === "done");
+  if (!done.length) { el.innerHTML = ""; return; }
+  const ok = done.filter(r => r.ok).length;
+  const chips = [`<span class="health-chip ok">${ok} OK</span>`];
+  const byCause = {};
+  done.filter(r => !r.ok).forEach(r => { byCause[r.code] = (byCause[r.code] || 0) + 1; });
+  Object.keys(byCause).sort().forEach(code => {
+    const c = HEALTH_CAUSES[code] || HEALTH_CAUSES.unknown;
+    chips.push(`<span class="health-chip ${c.tone}">${byCause[code]} ${c.label.toLowerCase()}</span>`);
+  });
+  el.innerHTML = chips.join(" ");
+}
+
+// One engine, one probe. Never throws: a failure is a result too.
+async function probeEngine(engine) {
+  const started = Date.now();
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error("timeout"), { code: "timeout" })), HEALTH_TIMEOUT_MS);
+  });
+  try {
+    const out = await Promise.race([engine.translate(HEALTH_PROBE_TEXT), timeout]);
+    return {
+      status: "done", ok: true, ms: Date.now() - started, http: 200,
+      detail: String(out || "").replace(/\s+/g, " ").slice(0, 120)
+    };
+  } catch (err) {
+    return {
+      status: "done", ok: false, ms: Date.now() - started,
+      http: err && err.status ? err.status : "",
+      // engineError stamps `code`; anything else (a timeout, a thrown parse
+      // error) falls back to its own code or "unknown".
+      code: (err && err.code) || "unknown",
+      detail: String((err && (err.detail || err.message)) || "").replace(/\s+/g, " ").slice(0, 300)
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function runHealthSweep() {
+  if (__healthRunning) return;
+  __healthRunning = true;
+  const runBtn = document.getElementById("healthRunBtn");
+  runBtn.disabled = true;
+  runBtn.textContent = "Running…";
+
+  const tbody = document.getElementById("healthRows");
+  tbody.innerHTML = engines.map(e => `<tr id="${healthRowId(e.id)}"></tr>`).join("");
+  const results = engines.map(() => ({ status: "pending" }));
+  engines.forEach((e, i) => renderHealthRow(e, results[i]));
+  renderHealthSummary(results);
+
+  // A small pool rather than all at once: 25 simultaneous LLM calls trip the
+  // per-user request limit in our own workers and muddy the diagnosis.
+  let next = 0;
+  async function worker() {
+    while (next < engines.length) {
+      const i = next++;
+      results[i] = await probeEngine(engines[i]);
+      renderHealthRow(engines[i], results[i]);
+      renderHealthSummary(results);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(HEALTH_CONCURRENCY, engines.length) }, worker));
+
+  __healthRunning = false;
+  runBtn.disabled = false;
+  runBtn.textContent = "Re-run";
+  window.__healthResults = engines.map((e, i) => Object.assign({ engine: e.name }, results[i]));
+}
+
+function healthReportText() {
+  const rows = window.__healthResults || [];
+  if (!rows.length) return "No engine health results yet.";
+  const lines = ["Lingonect engine health — " + new Date().toISOString(), ""];
+  rows.forEach(r => {
+    const cause = r.ok ? "OK" : (HEALTH_CAUSES[r.code] || HEALTH_CAUSES.unknown).label;
+    lines.push(`${r.engine}: ${cause}${r.http ? " (HTTP " + r.http + ")" : ""} — ${r.detail || ""}`);
+  });
+  return lines.join("\n");
+}
+
+(function wireHealthPanel() {
+  const overlay  = document.getElementById("healthOverlay");
+  const navLink  = document.getElementById("healthNavLink");
+  const open = (e) => {
+    if (e) e.preventDefault();
+    overlay.classList.add("open");
+    if (!window.__healthResults) runHealthSweep();
+  };
+  navLink.addEventListener("click", open);
+  document.getElementById("healthRunBtn").addEventListener("click", () => runHealthSweep());
+  document.getElementById("healthCloseBtn").addEventListener("click", () => overlay.classList.remove("open"));
+  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.classList.remove("open"); });
+  document.getElementById("healthCopyBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("healthCopyBtn");
+    try {
+      await navigator.clipboard.writeText(healthReportText());
+      btn.textContent = "Copied";
+    } catch (_) {
+      btn.textContent = "Copy failed";
+    }
+    setTimeout(() => { btn.textContent = "Copy report"; }, 1500);
+  });
+  // Deep link, so the Admin page can send you straight here.
+  window.__openHealthPanel = open;
+})();
 
 document.getElementById("downloadBtn").addEventListener("click", downloadFullList);
 </script>

@@ -15,3 +15,7 @@ DerivedData/
 
 # Relay deployment config — holds the shared token, never commit it
 workers/baidu-relay/.env
+
+# Firebase Admin service-account private key — full database access, bypasses
+# firebase-rtdb-rules.json entirely. Never commit it.
+serviceAccount.json
