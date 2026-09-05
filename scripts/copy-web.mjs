@@ -17,7 +17,8 @@ const DENY = new Set([
   '.git', '.github', 'node_modules', 'www', 'ios', 'android', 'scripts',
   'workers', 'test-results', '.claude', 'assets',
   'package.json', 'package-lock.json', 'capacitor.config.json',
-  'CLAUDE.md', 'CNAME', 'firebase.json', 'firebase-rtdb-rules.json',
+  'CLAUDE.md', 'ANDROID.md', 'BACKUP.md',
+  'CNAME', 'firebase.json', 'firebase-rtdb-rules.json',
   'firestore.rules', 'firestore.indexes.json', 'robots.txt', 'sitemap.xml',
   '.gitignore', '.DS_Store',
 ]);
