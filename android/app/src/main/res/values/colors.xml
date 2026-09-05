@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lingonect brand palette. #0047FF is the blue used across the website
+         (see index.html); the launcher/splash background stays white to match
+         the site's own background and the iOS app icon. -->
+    <color name="colorPrimary">#0047FF</color>
+    <color name="colorPrimaryDark">#0038CC</color>
+    <color name="colorAccent">#0047FF</color>
+
+    <!-- Splash screen background, referenced by AppTheme.NoActionBarLaunch. -->
+    <color name="splashBackground">#FFFFFF</color>
+</resources>

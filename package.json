@@ -2,18 +2,27 @@
   "name": "lingonect-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Lingonect iOS app — a Capacitor native wrapper of the Lingonect web app.",
+  "description": "Lingonect mobile apps — Capacitor native wrappers (iOS + Android) of the Lingonect web app.",
   "type": "module",
   "scripts": {
     "copy-web": "node scripts/copy-web.mjs",
     "sync": "npm run copy-web && cap sync",
-    "ios": "npm run sync && cap open ios"
+    "ios": "npm run sync && cap open ios",
+    "android": "npm run sync && cap open android",
+    "android:run": "npm run sync && cap run android",
+    "android:apk": "npm run sync && cd android && ./gradlew assembleDebug",
+    "android:bundle": "npm run sync && cd android && ./gradlew bundleRelease",
+    "assets": "capacitor-assets generate --android --ios"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^7.5.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.0.0",
     "@capacitor/ios": "^7.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.0.0"
   }
 }

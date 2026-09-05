@@ -1,0 +1,98 @@
+# Builds the Lingonect Android app and publishes an installable APK as a
+# workflow artifact. Android needs no Mac, so CI can produce a testable build
+# on every push — download the artifact, copy it to a phone, install.
+#
+# The release/AAB job only runs when the repository has the signing secrets
+# configured (see ANDROID.md); until then this workflow just produces the
+# debug APK used for sideloading.
+
+name: Android
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+    paths:
+      - "**.html"
+      - "*.css"
+      - "app-native.js"
+      - "android/**"
+      - "assets/**"
+      - "scripts/copy-web.mjs"
+      - "capacitor.config.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android.yml"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+# Cancel an in-flight run when a newer commit lands on the same branch.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debug-apk:
+    name: Debug APK (sideload)
+    runs-on: ubuntu-latest
+    # The `secrets` context is not available in step-level `if:`, so surface the
+    # optional Firebase config as an env var the steps can test and consume.
+    env:
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      # Capacitor 7 requires JDK 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      # copy-web.mjs stages the plain HTML/CSS/images into www/, then Capacitor
+      # copies www/ into the native project. No bundler involved.
+      - name: Build web bundle and sync Capacitor
+        run: |
+          npm run copy-web
+          npx cap sync android
+
+      # google-services.json is not in the repo by default. Without it the app
+      # still builds and email/password login works; Google Sign-In needs it.
+      # Add it as a repository secret to enable Google Sign-In in CI builds.
+      - name: Write google-services.json (if configured)
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          echo "google-services.json written ($(wc -c < android/app/google-services.json) bytes)"
+
+      - name: Report Google Sign-In availability
+        run: |
+          if [ -f android/app/google-services.json ]; then
+            echo "::notice::google-services.json present — Google Sign-In enabled in this build."
+          else
+            echo "::warning::No google-services.json — this build has email/password login only. Google Sign-In will show an error. See ANDROID.md."
+          fi
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Name the artifact after the commit
+        id: name
+        run: echo "apk=lingonect-debug-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.apk }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
