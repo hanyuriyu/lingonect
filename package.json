@@ -12,7 +12,7 @@
     "android:run": "npm run sync && cap run android",
     "android:apk": "npm run sync && cd android && ./gradlew assembleDebug",
     "android:bundle": "npm run sync && cd android && ./gradlew bundleRelease",
-    "assets": "capacitor-assets generate --android --ios"
+    "assets": "npx --yes @capacitor/assets@3 generate --android --ios"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^7.5.0",
@@ -22,7 +22,6 @@
     "@capacitor/ios": "^7.0.0"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.0.0"
   }
 }
