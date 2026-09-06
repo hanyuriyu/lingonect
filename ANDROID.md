@@ -91,6 +91,31 @@ git commit -m "Add Firebase Android client config"
 git push
 ```
 
+> **It must be `android/app/`, not `android/`.** Gradle looks for the file in
+> the *module* directory (`android/app/`), which is what the arrow in Firebase's
+> "move it into your module (app-level) root directory" diagram points at. Put
+> it one level up in `android/` and nothing complains: the build still succeeds,
+> the google-services plugin just silently never applies, and Google Sign-In
+> keeps failing with no clue why.
+
+> **The SHA-1 fingerprint is not optional.** Firebase lets you register the app
+> without one, and the resulting `google-services.json` looks perfectly normal —
+> but it will contain only a web `oauth_client` (`client_type: 3`) and no
+> Android one (`client_type: 1` with a `certificate_hash`). Google Sign-In then
+> fails on the device with `ApiException: 10` (DEVELOPER_ERROR), because Google
+> cannot verify which app is calling. If you already registered without it: add
+> the fingerprint under Project settings → Your apps → the Android app → **Add
+> fingerprint**, then **download `google-services.json` again** — the file only
+> gains the Android client once a fingerprint exists.
+
+To check a file you have already downloaded:
+
+```bash
+python3 -c "import json;print([c['client_type'] for c in json.load(open('android/app/google-services.json'))['client'][0]['oauth_client']])"
+```
+
+`[1, 3]` is what you want. `[3]` alone means the fingerprint is missing.
+
 If you would rather not commit it, add its **contents** as a repository secret
 named `GOOGLE_SERVICES_JSON` (GitHub → Settings → Secrets and variables →
 Actions) instead; the workflow writes it out at build time either way.

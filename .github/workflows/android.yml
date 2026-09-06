@@ -27,8 +27,12 @@ on:
   workflow_dispatch:
 
 # Cancel an in-flight run when a newer commit lands on the same branch.
+# The event name is part of the group because a manual run and a push share the
+# same github.ref: without it, dispatching a build cancels the branch's push
+# build, and GitHub then reports that cancelled run as a failing check on the
+# pull request even though nothing actually broke.
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -99,6 +103,34 @@ jobs:
           ANDROID_VERSION_CODE: ${{ steps.version.outputs.code }}
           ANDROID_VERSION_NAME: ${{ steps.version.outputs.name }}
         run: ./gradlew --no-daemon assembleDebug
+
+      # Both ways this went wrong once are silent by default, so assert on them.
+      # The google-services plugin is applied conditionally, so a misplaced
+      # config file leaves a perfectly green build that simply has no Firebase
+      # config in it; and Firebase happily issues a google-services.json with no
+      # Android OAuth client if the app was registered without a SHA-1, which
+      # only shows up as ApiException 10 on the device.
+      - name: Verify the Firebase config was actually compiled in
+        if: ${{ hashFiles('android/app/google-services.json') != '' }}
+        run: |
+          set -euo pipefail
+          GEN=android/app/build/generated/res/google-services/debug/values/values.xml
+          if [ ! -f "$GEN" ]; then
+            echo "::error::google-services.json exists but the google-services plugin produced no resources. It is probably in the wrong directory — it must be android/app/, not android/. See ANDROID.md."
+            exit 1
+          fi
+          grep -q "google_app_id" "$GEN" || {
+            echo "::error::google-services resources were generated but contain no google_app_id."
+            exit 1
+          }
+          echo "::notice::Firebase Android config compiled into the APK."
+
+          if jq -e '[.client[]?.oauth_client[]?.client_type] | index(1) != null' \
+               android/app/google-services.json >/dev/null 2>&1; then
+            echo "::notice::Android OAuth client present — SHA-1 fingerprint is registered."
+          else
+            echo "::warning::google-services.json has no Android OAuth client (client_type 1), so no SHA-1 fingerprint is registered in Firebase. Google Sign-In will fail on the device with ApiException 10. Add the fingerprint in Firebase, re-download the file, and replace it. See ANDROID.md."
+          fi
 
       - name: Name the artifact after the commit
         id: name
