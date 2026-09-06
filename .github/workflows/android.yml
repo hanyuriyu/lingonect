@@ -145,10 +145,12 @@ jobs:
             echo "It is replaced by the next build on main; the download link stays the same."
           } > notes.md
 
-          # Recreate rather than edit, so the tag follows the newest commit and
-          # no stale asset is left behind.
+          # Recreate rather than edit, so no stale asset is left behind. --target
+          # pins the tag to the commit actually built; without it gh points the
+          # tag at the default branch, which would misreport a manual run.
           gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
           gh release create "$TAG" lingonect.apk \
+            --target "$GITHUB_SHA" \
             --title "Lingonect Android — latest test build" \
             --notes-file notes.md \
             --prerelease
