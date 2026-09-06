@@ -113,21 +113,23 @@ jobs:
       - name: Verify the Firebase config was actually compiled in
         if: ${{ hashFiles('android/app/google-services.json') != '' }}
         run: |
-          set -euo pipefail
-          GEN=android/app/build/generated/res/google-services/debug/values/values.xml
-          if [ ! -f "$GEN" ]; then
-            echo "::error::google-services.json exists but the google-services plugin produced no resources. It is probably in the wrong directory — it must be android/app/, not android/. See ANDROID.md."
+          set -uo pipefail
+          # Search by content rather than a fixed path: the google-services
+          # plugin has moved its output directory between versions (it was
+          # res/google-services/<variant>/, now res/processDebugGoogleServices/),
+          # and what actually matters is that the google_app_id resource exists.
+          HIT=$(grep -rl "google_app_id" android/app/build/generated 2>/dev/null | head -1)
+          if [ -z "$HIT" ]; then
+            echo "::error::google-services.json exists but the plugin generated no google_app_id resource, so the APK has no Firebase config. The file is probably in the wrong directory — it must be android/app/, not android/. See ANDROID.md."
+            echo "--- what the build did generate under android/app/build/generated/res ---"
+            find android/app/build/generated/res -maxdepth 3 2>/dev/null | head -40 || echo "(no generated res directory at all)"
             exit 1
           fi
-          grep -q "google_app_id" "$GEN" || {
-            echo "::error::google-services resources were generated but contain no google_app_id."
-            exit 1
-          }
-          echo "::notice::Firebase Android config compiled into the APK."
+          echo "::notice::Firebase Android config compiled into the APK (found in ${HIT})."
 
           if jq -e '[.client[]?.oauth_client[]?.client_type] | index(1) != null' \
                android/app/google-services.json >/dev/null 2>&1; then
-            echo "::notice::Android OAuth client present — SHA-1 fingerprint is registered."
+            echo "::notice::Android OAuth client present — a SHA-1 fingerprint is registered."
           else
             echo "::warning::google-services.json has no Android OAuth client (client_type 1), so no SHA-1 fingerprint is registered in Firebase. Google Sign-In will fail on the device with ApiException 10. Add the fingerprint in Firebase, re-download the file, and replace it. See ANDROID.md."
           fi
