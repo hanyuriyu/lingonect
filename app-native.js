@@ -46,18 +46,22 @@
   // feels broken: users expect Back to walk back through the pages they came
   // from and only exit from the first one. Registering a listener replaces that
   // default, so we implement the expected behaviour ourselves.
-  if (platform === "android") {
-    var App = cap.Plugins && cap.Plugins.App;
-    if (App && typeof App.addListener === "function") {
-      App.addListener("backButton", function (event) {
-        // `canGoBack` comes from the native WebView's own history, which is more
-        // reliable here than window.history.length.
-        if (event && event.canGoBack) {
-          window.history.back();
-        } else if (typeof App.exitApp === "function") {
-          App.exitApp();
-        }
-      });
-    }
+  //
+  // Note we talk to the plugin through Capacitor.addListener / nativePromise
+  // rather than Capacitor.Plugins.App. Capacitor only fills in
+  // Capacitor.Plugins for plugins whose JS wrapper has been imported and has
+  // called registerPlugin(); the bridge injected into the WebView never
+  // populates it. These pages load no bundled JS, so Capacitor.Plugins is
+  // always empty here — but the lower-level bridge calls below work fine.
+  if (platform === "android" && typeof cap.addListener === "function") {
+    cap.addListener("App", "backButton", function (event) {
+      // `canGoBack` comes from the native WebView's own history, which is more
+      // reliable here than window.history.length.
+      if (event && event.canGoBack) {
+        window.history.back();
+      } else {
+        cap.nativePromise("App", "exitApp", {});
+      }
+    });
   }
 })();
