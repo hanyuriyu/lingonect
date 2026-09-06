@@ -179,14 +179,27 @@ jobs:
             echo "It is replaced by the next build on main; the download link stays the same."
           } > notes.md
 
-          # Recreate rather than edit, so no stale asset is left behind. --target
-          # pins the tag to the commit actually built; without it gh points the
-          # tag at the default branch, which would misreport a manual run.
-          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
-          gh release create "$TAG" lingonect.apk \
-            --target "$GITHUB_SHA" \
-            --title "Lingonect Android — latest test build" \
-            --notes-file notes.md \
-            --prerelease
+          # Update the release in place rather than deleting and recreating it.
+          # Deleting first raced with the recreate (gh could still see the tag it
+          # had just removed, and the publish failed), and it left a window where
+          # the download URL 404'd — bad for a link meant to be bookmarked on a
+          # phone. --clobber replaces the asset atomically instead.
+          #
+          # The tag therefore stays on the commit where the release was first
+          # created. That is deliberate: a stable link matters more here than a
+          # moving tag, and the notes above name the exact commit that was built.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "Lingonect Android — latest test build" \
+              --notes-file notes.md \
+              --prerelease
+            gh release upload "$TAG" lingonect.apk --clobber
+          else
+            gh release create "$TAG" lingonect.apk \
+              --target "$GITHUB_SHA" \
+              --title "Lingonect Android — latest test build" \
+              --notes-file notes.md \
+              --prerelease
+          fi
 
           echo "::notice::Install link: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/lingonect.apk"

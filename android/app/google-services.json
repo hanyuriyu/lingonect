@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "97117277218-d89nighuk3ihae2ffgdjdtv0quru5jpt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lingonect.app",
+            "certificate_hash": "240dcd9dae43e625e98a8a652f7fcfed1bf399c3"
+          }
+        },
+        {
           "client_id": "97117277218-5m2gcanbmgbp82oa6h8mphitlv2evp2q.apps.googleusercontent.com",
           "client_type": 3
         }
