@@ -19,8 +19,12 @@ android {
         applicationId "com.lingonect.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // CI stamps these so each published test build is distinguishable and
+        // Android treats a newer download as an update rather than refusing to
+        // install it. Locally they fall back to the plain 1.0 defaults.
+        versionCode System.getenv("ANDROID_VERSION_CODE") ?
+                    System.getenv("ANDROID_VERSION_CODE").toInteger() : 1
+        versionName System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
