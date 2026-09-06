@@ -102,12 +102,31 @@ login, and the Google button reports that sign-in is unavailable.
 
 ### Getting the APK
 
-Every push to `main` or a `claude/**` branch runs the **Android** workflow and
-attaches the APK as a build artifact.
+Every push to `main` publishes the build to a **GitHub Release under a fixed
+tag**, so there is one permanent link that always serves the newest build:
 
-1. GitHub → **Actions** tab → the most recent **Android** run.
-2. Scroll to **Artifacts** → download `lingonect-debug-<sha>.zip`.
-3. Unzip it. Inside is `app-debug.apk`.
+> **<https://github.com/hanyuriyu/lingonect/releases/download/android-latest/lingonect.apk>**
+
+Open that link **directly in the browser on the phone** and it downloads the APK
+ready to install — no GitHub login, no zip to unpack, and it never expires.
+Bookmark it on both devices; the URL does not change between builds.
+
+The release page itself, which shows which commit the build came from, is at
+<https://github.com/hanyuriyu/lingonect/releases/tag/android-latest>.
+
+Each build is stamped with a version like `1.0.7-a1b2c3d` (run number and
+commit), visible on the phone under Settings → Apps → Lingonect. Check it to
+confirm you are testing the build you think you are.
+
+> Because the repository is public, so is this download link. If you would
+> rather test builds not be publicly downloadable, use the workflow artifacts
+> below instead and the release step can be dropped.
+
+**Builds from branches and pull requests** do not touch that link. They are
+attached to the workflow run as an artifact instead: GitHub → **Actions** → the
+run → scroll to the bottom → **Artifacts** → `lingonect-debug-<sha>.zip`.
+Downloading an artifact requires being signed in to GitHub, and it arrives as a
+zip, which is why `main` builds go to a Release instead.
 
 You can also trigger a build by hand: Actions → Android → **Run workflow**.
 

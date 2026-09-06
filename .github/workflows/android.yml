@@ -2,9 +2,9 @@
 # workflow artifact. Android needs no Mac, so CI can produce a testable build
 # on every push — download the artifact, copy it to a phone, install.
 #
-# The release/AAB job only runs when the repository has the signing secrets
-# configured (see ANDROID.md); until then this workflow just produces the
-# debug APK used for sideloading.
+# Builds on main are also published to a GitHub Release under a fixed tag, so
+# there is one permanent URL you can open directly on a phone to install the
+# latest test build — no GitHub login, no zip, no expiry.
 
 name: Android
 
@@ -35,6 +35,8 @@ jobs:
   debug-apk:
     name: Debug APK (sideload)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to publish the release below
     # The `secrets` context is not available in step-level `if:`, so surface the
     # optional Firebase config as an env var the steps can test and consume.
     env:
@@ -82,8 +84,20 @@ jobs:
             echo "::warning::No google-services.json — this build has email/password login only. Google Sign-In will show an error. See ANDROID.md."
           fi
 
+      # Stamp a distinguishable version into the APK. The version name shows up
+      # under Settings > Apps > Lingonect on the phone, so you can confirm which
+      # build you are actually looking at while testing.
+      - name: Work out the version
+        id: version
+        run: |
+          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "name=1.0.${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
         working-directory: android
+        env:
+          ANDROID_VERSION_CODE: ${{ steps.version.outputs.code }}
+          ANDROID_VERSION_NAME: ${{ steps.version.outputs.name }}
         run: ./gradlew --no-daemon assembleDebug
 
       - name: Name the artifact after the commit
@@ -96,3 +110,47 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      # ---- Publish the installable link ----
+      # A single rolling release under a fixed tag. The download URL therefore
+      # never changes and can be bookmarked on a phone:
+      #   https://github.com/<owner>/<repo>/releases/download/android-latest/lingonect.apk
+      # Only main publishes, so branch and PR builds do not overwrite the link;
+      # a manual run can publish too, for testing this workflow itself.
+      - name: Publish rolling release
+        if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: android-latest
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/debug/app-debug.apk lingonect.apk
+
+          {
+            echo "Latest Lingonect Android test build."
+            echo
+            echo "**Install on a phone:** open this page on the device and tap"
+            echo "\`lingonect.apk\` below. Android will ask you to allow installs"
+            echo "from your browser the first time. On Samsung devices also turn off"
+            echo "Auto Blocker (Settings > Security and privacy)."
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`$VERSION\` |"
+            echo "| Commit | ${GITHUB_SHA} |"
+            echo "| Built | $(date -u '+%Y-%m-%d %H:%M UTC') |"
+            echo
+            echo "This is a debug-signed build for testing, not a Play Store release."
+            echo "It is replaced by the next build on main; the download link stays the same."
+          } > notes.md
+
+          # Recreate rather than edit, so the tag follows the newest commit and
+          # no stale asset is left behind.
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" lingonect.apk \
+            --title "Lingonect Android — latest test build" \
+            --notes-file notes.md \
+            --prerelease
+
+          echo "::notice::Install link: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/lingonect.apk"
