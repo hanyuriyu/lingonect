@@ -274,11 +274,22 @@ html,body{
 
   .stage{
     left:50%;
+    /* These are only the pre-measurement fallback: layoutStage() measures the
+       real gap between the logo rail and the language switcher and writes the
+       result to .stage's inline top/height. The hard-coded offsets can't know
+       how tall the rail actually is (the typewriter font swaps in late and the
+       safe-area inset varies per device). */
     top:calc(330px + env(safe-area-inset-top));
     transform:translateX(-50%);
     width:min(92vw, 560px);
-    height:calc(100dvh - 410px - env(safe-area-inset-top));
     height:calc(100vh - 410px - env(safe-area-inset-top));
+  }
+  /* iOS Safari/Chrome report 100vh as the LARGE viewport - taller than the
+     part of the page you can actually see - so the stage used to run down
+     behind the browser toolbar. dvh tracks the visible area, so it must come
+     AFTER the vh declaration to win where it is supported. */
+  @supports (height: 100dvh){
+    .stage{ height:calc(100dvh - 410px - env(safe-area-inset-top)); }
   }
 
   #typed{
@@ -302,8 +313,10 @@ html,body{
   .stage{
     width:92vw;
     top:calc(310px + env(safe-area-inset-top));
-    height:calc(100dvh - 390px - env(safe-area-inset-top));
     height:calc(100vh - 390px - env(safe-area-inset-top));
+  }
+  @supports (height: 100dvh){
+    .stage{ height:calc(100dvh - 390px - env(safe-area-inset-top)); }
   }
   #typed{ font-size:17px; }
   .logo{ width:140px; height:140px; }
@@ -435,23 +448,88 @@ let runId = 0;
 const TYPE_MIN=35, TYPE_MAX=75, PARA_PAUSE=400;
 const typed = document.getElementById("typed");
 const content = document.getElementById("content");
+const stage = document.querySelector(".stage");
+const caret = document.querySelector(".caret");
+const logoRail = document.querySelector(".logo-rail");
+const langSwitcher = document.querySelector(".language-switcher");
+
+/* Gaps between the stage and the chrome above/below it, in the same CSS px
+   as the stage's own `top`/`height`. */
+const STAGE_GAP_TOP = 14, STAGE_GAP_BOTTOM = 14, STAGE_MIN_HEIGHT = 140;
+
+/* How far down the stage the caret line is held. The desktop stage is tall
+   and viewport-centred, so the middle reads well; the phone stage is only a
+   few lines tall, so sitting the caret lower keeps more of the text that has
+   already been typed on screen instead of wasting the bottom half. */
+const CARET_ANCHOR_DESKTOP = 0.5, CARET_ANCHOR_MOBILE = 0.78;
+let caretAnchor = CARET_ANCHOR_DESKTOP;
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
+/* The page renders at `zoom:0.75`, so getBoundingClientRect() (visual pixels)
+   and the CSS px we write into `transform`/`top`/`height` are not the same
+   unit. This zero-height probe lives in the same coordinate space as the
+   typed text and converts between the two, instead of us assuming a factor
+   (mobile.css overrides the zoom on small screens). */
+const scaleProbe = document.createElement("div");
+scaleProbe.setAttribute("aria-hidden", "true");
+scaleProbe.style.cssText = "position:absolute;top:0;left:0;width:100px;height:0;visibility:hidden;pointer-events:none;";
+content.appendChild(scaleProbe);
+
+function localScale(){
+  const w = scaleProbe.getBoundingClientRect().width;
+  return w > 0 ? w / 100 : 1;
+}
+
+/* Size and position the typing stage from the elements that really bound it.
+   The mobile CSS can only guess (top:330px, height:100vh - 410px) and both
+   guesses are wrong in a mobile browser: the logo rail's height depends on
+   the font and the safe-area inset, and 100vh is taller than the visible
+   area while the browser toolbars are on screen. Measuring the rail and the
+   language switcher gets it right on every device. */
+function layoutStage(){
+  if(!window.matchMedia("(max-width: 820px)").matches){
+    stage.style.top = "";
+    stage.style.height = "";
+    caretAnchor = CARET_ANCHOR_DESKTOP;
+    return;
+  }
+  const scale = localScale();
+  const railBottom = logoRail.getBoundingClientRect().bottom / scale;
+  const switcherTop = langSwitcher.getBoundingClientRect().top / scale;
+  const top = railBottom + STAGE_GAP_TOP;
+  const height = Math.max(STAGE_MIN_HEIGHT, switcherTop - STAGE_GAP_BOTTOM - top);
+  stage.style.top = top + "px";
+  stage.style.height = height + "px";
+  caretAnchor = CARET_ANCHOR_MOBILE;
+}
+
 function recenter(){
-  const caret = document.querySelector(".caret");
-  const box = caret.getBoundingClientRect();
-  const mid = window.innerHeight/2;
-  const dy = mid - box.top;
+  const stageBox = stage.getBoundingClientRect();
+  const caretBox = caret.getBoundingClientRect();
+  /* Anchor the caret inside the STAGE, not the viewport. Aiming at
+     window.innerHeight/2 was the bug behind the unreadable animation on
+     iPhone Safari/Chrome: the stage is not vertically centred in the viewport
+     on a phone, so every keystroke dragged the text up towards the viewport
+     middle - above the stage's top edge, where it was clipped mid-line behind
+     the white logo rail. In the native app there is no browser chrome, so the
+     viewport middle happened to land inside the stage and it looked fine. */
+  const target = stageBox.top + stageBox.height * caretAnchor;
+  const dy = (target - caretBox.top) / localScale();
   const current = new DOMMatrix(getComputedStyle(content).transform).m42;
   content.style.transform = `translateY(${current + dy}px)`;
+}
+
+function relayout(){
+  layoutStage();
+  recenter();
 }
 
 async function typeText(lang){
   const myRun = ++runId;
   typed.innerHTML = "";
   content.style.transform = "translateY(0)";
-  recenter();
+  relayout();
 
   for(const p of TEXTS[lang]){
     if(myRun !== runId) return;
@@ -471,7 +549,20 @@ async function typeText(lang){
   }
 }
 
-window.addEventListener("resize", () => { setTimeout(recenter, 50); });
+window.addEventListener("resize", () => { setTimeout(relayout, 50); });
+window.addEventListener("orientationchange", () => { setTimeout(relayout, 150); });
+
+/* Showing or hiding the iOS browser toolbars changes the visible height
+   without firing a window resize event. */
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize", () => { setTimeout(relayout, 50); });
+}
+
+/* "Special Elite" loads asynchronously; when it swaps in, the logo rail grows
+   or shrinks and the stage has to follow it. */
+if(document.fonts && document.fonts.ready){
+  document.fonts.ready.then(relayout);
+}
 
 document.querySelectorAll(".lang-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
@@ -484,6 +575,7 @@ document.querySelectorAll(".lang-btn").forEach(btn=>{
   });
 });
 
+layoutStage();
 typeText("en");
 </script>
 

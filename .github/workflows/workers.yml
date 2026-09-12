@@ -1,0 +1,86 @@
+# Deploys a Cloudflare Worker from CI, so a worker change can go live without a
+# desktop: open Actions > Deploy workers > Run workflow on a phone, type the
+# worker name, done. `workers/wrangler/deploy-all.sh` is still the way to do it
+# locally; this runs the same wrangler configs.
+#
+# Requires one repository secret:
+#   CLOUDFLARE_API_TOKEN   Cloudflare dashboard > My Profile > API Tokens >
+#                          Create Token > "Edit Cloudflare Workers" template.
+#   CLOUDFLARE_ACCOUNT_ID  Optional; only needed if the token can reach more
+#                          than one account.
+#
+# API keys (TOGETHER_API_KEY, KIMI_API_KEY, …) are worker *secrets* held by
+# Cloudflare. A deploy uploads code and the [vars] from the .toml; it never
+# reads or replaces those secrets, so they do not belong here.
+#
+# Deliberately manual: a deploy overwrites the live worker's [vars] with the
+# ones in its .toml, so a value changed in the Cloudflare dashboard (KIMI_MODEL,
+# say) would be reverted by an automatic push-triggered run.
+
+name: Deploy workers
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker:
+        description: 'Which worker — a wrangler config name without .toml (together, kimi, openai, …), or "all"'
+        required: true
+        default: together
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.inputs.worker }}
+    runs-on: ubuntu-latest
+    # The `secrets` context is not available in step-level `if:`, so surface the
+    # token as an env var the steps can test and consume.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WORKER: ${{ github.event.inputs.worker }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Without this the run fails deep inside wrangler with an auth error that
+      # does not say the secret is simply missing.
+      - name: Check the Cloudflare token is configured
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not set. Add it under Settings > Secrets and variables > Actions. See the comment at the top of this workflow."
+            exit 1
+          fi
+
+      # Pinned to a major so a new wrangler release cannot change deploy
+      # behaviour without an edit here. deploy-all.sh calls bare `wrangler`,
+      # hence the global install rather than npx.
+      - name: Install wrangler
+        run: npm install -g wrangler@4
+
+      - name: Deploy
+        run: |
+          set -euo pipefail
+          if [ "$WORKER" = "all" ]; then
+            bash workers/wrangler/deploy-all.sh
+          else
+            CFG="workers/wrangler/${WORKER}.toml"
+            if [ ! -f "$CFG" ]; then
+              echo "::error::No such worker config: ${WORKER}.toml. Available: $(cd workers/wrangler && ls *.toml | sed 's/\.toml//' | tr '\n' ' ')"
+              exit 1
+            fi
+            # `yes` auto-confirms wrangler's "local config differs from
+            # remote" prompt, as deploy-all.sh does: our .toml is the intended
+            # target. It is then killed by SIGPIPE once wrangler stops reading
+            # stdin, which `pipefail` would report as a failed deploy (141), so
+            # take wrangler's own status out of PIPESTATUS instead.
+            set +e +o pipefail
+            yes 2>/dev/null | wrangler deploy -c "$CFG"
+            status=${PIPESTATUS[1]}
+            set -e -o pipefail
+            if [ "$status" -ne 0 ]; then
+              echo "::error::wrangler deploy failed for ${WORKER} (exit ${status})."
+              exit "$status"
+            fi
+          fi

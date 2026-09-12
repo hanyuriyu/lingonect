@@ -21,4 +21,6 @@ if [ ${#failed[@]} -eq 0 ]; then
   echo "All workers deployed."
 else
   echo "Deployed, but these failed (re-run is safe): ${failed[*]}"
+  # Non-zero so a CI run that loses a worker shows red rather than green.
+  exit 1
 fi
