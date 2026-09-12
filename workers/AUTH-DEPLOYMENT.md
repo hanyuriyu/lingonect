@@ -45,3 +45,26 @@ merge — so redeploy the workers around merge time.
 For defense in depth against a compromised/abusive *logged-in* account, add a
 Cloudflare **Rate Limiting** rule per worker route in the dashboard. That's
 configuration, not code, so it isn't part of this change.
+
+## Deploying a worker without a desktop
+
+`workers/wrangler/deploy-all.sh` needs a machine with wrangler on it. When you
+only have a phone or tablet, use CI instead: **Actions > Deploy workers > Run
+workflow**, and give it the worker name (a `workers/wrangler/*.toml` name
+without the extension — `together`, `kimi`, …) or `all`.
+
+Two things have to be in place first:
+
+1. The `CLOUDFLARE_API_TOKEN` repository secret (Settings > Secrets and
+   variables > Actions). Create the token in the Cloudflare dashboard under
+   My Profile > API Tokens with the **Edit Cloudflare Workers** template. Add
+   `CLOUDFLARE_ACCOUNT_ID` too if that token can reach several accounts.
+2. `.github/workflows/workers.yml` on `main` — GitHub only offers "Run
+   workflow" for workflows on the default branch. The run itself can still
+   target any branch.
+
+A deploy uploads the worker code and the `[vars]` from its `.toml`. It does not
+touch worker **secrets** (`TOGETHER_API_KEY`, `KIMI_API_KEY`, …), which stay as
+Cloudflare holds them. It does overwrite `[vars]`, so a value edited in the
+dashboard — `KIMI_MODEL`, say — goes back to what the `.toml` says: change it
+there as well, or the next deploy reverts it.
