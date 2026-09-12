@@ -6,6 +6,11 @@
  * Llama 3.3 70B Instruct Turbo — the Llama model Together serves serverless
  * (Llama 4 variants require a paid dedicated endpoint).
  *
+ * It also carries a compatibility shim for Kimi, which used to be served from
+ * here: native app builds bundle a frozen copy of the site, so shipped ones go
+ * on asking this proxy for a Together Kimi model long after the site moved
+ * Kimi to its own worker. Those requests are forwarded there — see fetch().
+ *
  * Deploy steps:
  *   1. npx wrangler init together
  *   2. Replace the generated worker code with this file
@@ -172,6 +177,9 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// Where Kimi lives now. See the compatibility shim in fetch() below.
+const KIMI_WORKER_URL = "https://kimi.hanyuriyu.workers.dev";
+
 // Secrets pasted into the Cloudflare dashboard often arrive with a stray
 // newline or space attached. Trimming every credential here stops that from
 // reaching the provider as a malformed key — which comes back as a 401 and
@@ -204,6 +212,78 @@ export default {
           },
         }
       );
+    }
+
+    if (request.method !== "POST") {
+      return new Response("Method not allowed", { status: 405 });
+    }
+
+    // Read the body before the quota block: the model id decides which
+    // upstream this request belongs to, and Kimi requests are handed off
+    // whole (quota included) to the worker that owns Kimi now.
+    let body;
+    try {
+      body = await request.json();
+    } catch (_) {
+      return new Response(
+        JSON.stringify({ error: { message: "Malformed request body." } }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        }
+      );
+    }
+
+    // ── Legacy Kimi compatibility shim ─────────────────────────
+    // Kimi used to ride on this proxy, with the Together model id baked into
+    // the page. Together serves those Kimi builds only from *dedicated*
+    // deployments, so once ours stopped, every such call failed with "No
+    // deployments are ready to serve this endpoint". The site has since moved
+    // Kimi to its own worker (Moonshot's API, no dedicated deployments), but
+    // the native apps bundle a frozen copy of the page and keep asking this
+    // proxy for a Kimi model until a new build ships — so route those calls
+    // to the Kimi worker instead of failing them.
+    //
+    // The caller's own Firebase token is forwarded, so that worker applies its
+    // own auth, quota accounting and model config. Hence the early return,
+    // ahead of this worker's quota block: one translation still counts once.
+    // The Together-style model id is dropped on purpose — Moonshot has no
+    // "moonshotai/Kimi-…" ids, and KIMI_MODEL over there names the live one.
+    if (/kimi/i.test(body.model || "")) {
+      try {
+        const kimiRes = await fetch(KIMI_WORKER_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": request.headers.get("Authorization"),
+          },
+          body: JSON.stringify({
+            messages: body.messages,
+            max_tokens: body.max_tokens,
+          }),
+        });
+        return new Response(await kimiRes.text(), {
+          status: kimiRes.status,
+          headers: {
+            "Content-Type": kimiRes.headers.get("Content-Type") || "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        });
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ error: { message: "Could not reach the Kimi proxy: " + err.message } }),
+          {
+            status: 502,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": corsOrigin(request),
+            },
+          }
+        );
+      }
     }
 
     // ── Per-user request limits ─────────────────────────────
@@ -270,10 +350,6 @@ export default {
     }
 
 
-    if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 });
-    }
-
     // A missing secret would otherwise go upstream as "Bearer undefined" and
     // come back as a 401 — indistinguishable from a key the provider revoked.
     // Report the real cause instead, so the engine-health check can name it.
@@ -292,8 +368,6 @@ export default {
     }
 
     try {
-      const body = await request.json();
-
       const res = await fetch("https://api.together.xyz/v1/chat/completions", {
         method: "POST",
         headers: {
