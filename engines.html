@@ -314,38 +314,56 @@ body{
   transform:rotate(180deg);
 }
 
-/* "auto" tag shown beside Source while the language was filled in by the
-   detector rather than by the user. Intentionally faint - it is a status, not
-   a control. */
-.lang-auto-badge{
-  font-size:10px;
-  font-weight:800;
-  letter-spacing:.06em;
-  text-transform:uppercase;
-  color:var(--cobalt);
-  background:rgba(0,71,255,.08);
-  border:1px solid rgba(0,71,255,.25);
-  border-radius:4px;
-  padding:2px 5px;
-  cursor:help;
-  white-space:nowrap;
-  animation:autoBadgeIn .25s ease;
+/* The "Source" / "Target" words beside each picker. */
+.lang-role{
+  color:#2196F3;
+  font-weight:600;
 }
 
-@keyframes autoBadgeIn{
-  from{ opacity:0; transform:translateY(-2px); }
-  to  { opacity:1; transform:none; }
+/* Both pickers share the row width so the two rows line up. Without this the
+   picker is only as wide as its language name, "Spanish (EU)" and "German"
+   end up different widths, and the words beside them never form a column for
+   the swap button to sit in. */
+.lang-row{
+  width:100%;
+}
+
+.lang-row .lang-select-wrap{
+  flex:1;
+  min-width:0;
+}
+
+/* The swap row mirrors a language row, so its contents land in the label
+   column rather than under the pickers. */
+.lang-swap-row{
+  display:flex;
+  justify-content:flex-end;
+  margin:-2px 0;
+}
+
+/* Stacks the button on top of a hidden label-width word: the grid gives both
+   the same cell, so the button ends up centred on the column the words form. */
+.lang-swap-slot{
+  display:inline-grid;
+  place-items:center;
+}
+
+.lang-swap-slot > *{
+  grid-area:1 / 1;
+}
+
+.lang-swap-ghost{
+  visibility:hidden;
+  pointer-events:none;
 }
 
 /* Swap source <-> target. Deliberately quiet: a small outlined square that
    only takes on the cobalt fill on hover, so it never competes with the two
    pickers it sits between. */
 .lang-swap-btn{
-  align-self:center;
   width:30px;
   height:30px;
   padding:0;
-  margin:-2px 0;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -1229,14 +1247,6 @@ body{
     width:100%;
   }
 
-  /* Selector fills the row; its "Source" / "Target" label sits beside it. */
-  .lang-row{
-    width:100%;
-  }
-  .lang-row .lang-select-wrap{
-    flex:1;
-    min-width:0;
-  }
   /* Dropdown spans the (now much wider) button rather than hugging its right edge. */
   .lang-dropdown{
     left:0;
@@ -1472,18 +1482,23 @@ body{
           </div>
           <div class="lang-scroll-track" id="srcScrollTrack"><div class="lang-scroll-thumb"></div></div>
         </div>
-        <span style="color:#2196F3;font-weight:600;">Source</span>
-        <span class="lang-auto-badge" id="srcAutoBadge" hidden
-              title="Detected from your text. Pick a language yourself to switch this off.">auto</span>
+        <span class="lang-role">Source</span>
         </div>
 
-        <!-- Swap the two languages. Sits between the pickers because that is
-             where the mistake shows up: the pair is simply the wrong way
-             round, and this puts it right in one click. -->
-        <button class="lang-swap-btn" id="langSwapBtn" type="button"
-                title="Swap source and target" aria-label="Swap source and target languages">
-          <span class="lang-swap-icon" aria-hidden="true">⇅</span>
-        </button>
+        <!-- Swap the two languages. It sits in the label column, directly
+             between the words "Source" and "Target", because that names
+             exactly what it exchanges. The hidden word behind it is a spacer:
+             it reserves the same width a label takes, so the button centres
+             under "Source" whatever the two picker buttons happen to be. -->
+        <div class="lang-swap-row">
+          <span class="lang-swap-slot">
+            <span class="lang-role lang-swap-ghost" aria-hidden="true">Source</span>
+            <button class="lang-swap-btn" id="langSwapBtn" type="button"
+                    title="Swap source and target" aria-label="Swap source and target languages">
+              <span class="lang-swap-icon" aria-hidden="true">⇅</span>
+            </button>
+          </span>
+        </div>
 
         <!-- Target language selector -->
         <div class="lang-row" style="display:flex;align-items:center;gap:8px;">
@@ -1557,7 +1572,7 @@ body{
           </div>
           <div class="lang-scroll-track" id="tgtScrollTrack"><div class="lang-scroll-thumb"></div></div>
         </div>
-        <span style="color:#2196F3;font-weight:600;">Target</span>
+        <span class="lang-role">Target</span>
         </div>
 
         <button class="submit-btn" id="submitBtn" type="button" disabled>Submit</button>
@@ -2330,21 +2345,20 @@ function detectSourceLanguage(text) {
 // ── Applying a detection ──
 // Auto-detection is a convenience, never an override: the first time the user
 // picks a source language (or presses swap) it stands down for the rest of the
-// session and the "auto" tag disappears.
-const srcAutoBadge = document.getElementById("srcAutoBadge");
+// session. The change is its own feedback - the source picker visibly moves to
+// the language you just typed - so nothing is badged.
 let autoDetectEnabled = true;
 let autoDetectTimer = null;
 
 function suspendAutoDetect() {
   autoDetectEnabled = false;
   clearTimeout(autoDetectTimer);
-  srcAutoBadge.hidden = true;
 }
 
 function runAutoDetect() {
   if (!autoDetectEnabled) return;
   const text = inputEl.value;
-  if (!text.trim()) { srcAutoBadge.hidden = true; return; }
+  if (!text.trim()) return;
 
   const detected = detectSourceLanguage(text);
   if (!detected || sameLanguageFamily(detected, sourceLang)) return;
@@ -2356,7 +2370,6 @@ function runAutoDetect() {
   if (detected === targetLang) setTargetLang(sourceLang);
 
   setSourceLang(detected);
-  srcAutoBadge.hidden = false;
 }
 
 inputEl.addEventListener("input", () => {
