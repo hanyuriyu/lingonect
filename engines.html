@@ -375,7 +375,7 @@ body{
 .lang-swap-row{
   display:flex;
   justify-content:flex-end;
-  margin:-2px 0;
+  margin:-7px 0;
 }
 
 /* Stacks the button on top of a hidden label-width word: the grid gives both
@@ -394,43 +394,48 @@ body{
   pointer-events:none;
 }
 
-/* Swap source <-> target. Deliberately quiet: a small outlined square that
-   only takes on the cobalt fill on hover, so it never competes with the two
-   pickers it sits between. */
+/* Swap source <-> target. A soft cobalt disc holding two curved arrows: the
+   round, borderless shape stays clearly subordinate to the two outlined
+   pickers it sits between, while the arrows say "exchange these" far more
+   plainly than a bare arrow glyph did. */
 .lang-swap-btn{
-  width:30px;
-  height:30px;
+  width:40px;
+  height:40px;
   padding:0;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:none;
-  border:2px solid rgba(0,71,255,.3);
-  border-radius:6px;
+  background:rgba(0,71,255,.07);
+  border:none;
+  border-radius:50%;
   color:var(--cobalt);
   cursor:pointer;
-  opacity:.65;
-  transition:opacity .15s, background .15s, border-color .15s;
+  transition:background .15s, transform .15s, box-shadow .15s;
+  -webkit-tap-highlight-color:transparent;
 }
 
 .lang-swap-btn:hover,
 .lang-swap-btn:focus-visible{
-  opacity:1;
-  background:rgba(0,71,255,.08);
-  border-color:var(--cobalt);
+  background:rgba(0,71,255,.15);
+  transform:scale(1.06);
 }
 
+.lang-swap-btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(0,71,255,.22);
+}
+
+.lang-swap-btn:active{
+  transform:scale(.93);
+}
+
+/* The arrows turn a further half-circle on every press (see the click
+   handler), so the swap is visible even when both names look alike. */
 .lang-swap-icon{
-  font-size:16px;
-  line-height:1;
+  width:22px;
+  height:22px;
   display:block;
-  transition:transform .25s ease;
-}
-
-/* Spin the arrows a half-turn on each click, so the swap is visible even when
-   both language names are a similar length. */
-.lang-swap-btn.swapping .lang-swap-icon{
-  transform:rotate(180deg);
+  transition:transform .35s cubic-bezier(.4,0,.2,1);
 }
 
 .lang-dropdown{
@@ -1533,7 +1538,14 @@ body{
             <span class="lang-role lang-swap-ghost" aria-hidden="true">Source</span>
             <button class="lang-swap-btn" id="langSwapBtn" type="button"
                     title="Swap source and target" aria-label="Swap source and target languages">
-              <span class="lang-swap-icon" aria-hidden="true">⇅</span>
+              <svg class="lang-swap-icon" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
             </button>
           </span>
         </div>
@@ -2052,7 +2064,9 @@ function setTargetLang(lang) {
 // ── Swap source <-> target ──
 // The commonest way to get a pair wrong is to have it backwards, so make
 // undoing that one click rather than two trips through a 60-item dropdown.
-const langSwapBtn = document.getElementById("langSwapBtn");
+const langSwapBtn  = document.getElementById("langSwapBtn");
+const langSwapIcon = langSwapBtn.querySelector(".lang-swap-icon");
+let   swapTurn     = 0;
 
 langSwapBtn.addEventListener("click", e => {
   e.stopPropagation();
@@ -2061,9 +2075,10 @@ langSwapBtn.addEventListener("click", e => {
   // pick: the detector must not immediately flip the source back.
   setSourceLang(targetLang, { manual: true });
   setTargetLang(prevSource);
-  // Half-turn on every press, so a swap between two similar-looking names is
-  // still visibly a swap.
-  langSwapBtn.classList.toggle("swapping");
+  // Half-turn on every press, always the same way round, so a swap between two
+  // similar-looking names is still visibly a swap.
+  swapTurn += 180;
+  langSwapIcon.style.transform = `rotate(${swapTurn}deg)`;
 });
 
 document.addEventListener("click", () => {
