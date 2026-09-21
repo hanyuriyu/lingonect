@@ -11,6 +11,7 @@ engines. The main entry points are plain HTML files in the repo root:
   tools
 - `workers/` — Cloudflare Worker source for the AI proxies
   (`claudetranslate`, `openai`, `deepseek`, etc.)
+- `ios/` — Capacitor native iOS project (committed). See `IOS.md`.
 - `android/` — Capacitor native Android project (committed). See `ANDROID.md`.
 
 Flashcard data is persisted in Firebase Realtime Database, not in the repo.
@@ -66,7 +67,9 @@ native projects. So:
 - `android/lingonect-debug.keystore` is committed **on purpose**: it gives every
   test build one stable SHA-1 so a single fingerprint works in Firebase. Release
   keystores (`*.jks`, `keystore.properties`) must never be committed.
-- Android setup, signing, and Play Store steps live in `ANDROID.md`.
+- Android setup, signing, and Play Store steps live in `ANDROID.md`;
+  the iPhone equivalent — archiving, version/build rules and what to test
+  before uploading — lives in `IOS.md`.
 
 ## Conventions
 
