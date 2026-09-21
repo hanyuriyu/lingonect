@@ -216,21 +216,42 @@ export default {
     if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
       try {
         const __uid = __authPayload.sub;
-        // Anonymous (not-logged-in) users get 500 translations per UTC day on
-        // the free engines. After that they must register (free, but approved
-        // case-by-case). Registered/verified users fall through to the normal
-        // per-account limits below.
+        // Anonymous (not-logged-in) users get a small daily allowance on the
+        // free engines, under a shared ceiling for all of them together. Both
+        // numbers are [vars] in the worker's wrangler config, so tightening
+        // them is a dashboard edit rather than a deploy.
+        //
+        // The shared ceiling is the one that actually bounds spend. A per-user
+        // cap cannot: an anonymous uid costs nothing to mint, and a reinstall
+        // or cleared storage hands out a fresh one with a fresh allowance, so
+        // the per-user number only decides how fast one install drains the
+        // pool. Registered users are never subject to either and fall through
+        // to the per-account limits below.
         if (__authPayload.firebase && __authPayload.firebase.sign_in_provider === "anonymous") {
           const __aDay = new Date().toISOString().slice(0, 10);
-          const __aKey = "anon:" + __uid + ":" + __aDay;
-          const __aUsed = parseInt((await env.QUOTA_KV.get(__aKey)) || "0", 10) || 0;
-          if (__aUsed >= 500) {
+          const __anonMax = parseInt(env.ANON_DAILY_PER_USER, 10) || 50;
+          const __anonTotalMax = parseInt(env.ANON_DAILY_TOTAL, 10) || 5000;
+
+          const __allKey = "anon:all:" + __aDay;
+          const __allUsed = parseInt((await env.QUOTA_KV.get(__allKey)) || "0", 10) || 0;
+          if (__allUsed >= __anonTotalMax) {
             return new Response(
-              JSON.stringify({ error: "You've reached today's free limit of 500 translations. Register for a free account to keep translating.", code: "free_limit_reached" }),
+              JSON.stringify({ error: "Today's free translations have all been used. Register for a free account to keep translating.", code: "free_limit_reached" }),
               { status: 429, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
             );
           }
+
+          const __aKey = "anon:" + __uid + ":" + __aDay;
+          const __aUsed = parseInt((await env.QUOTA_KV.get(__aKey)) || "0", 10) || 0;
+          if (__aUsed >= __anonMax) {
+            return new Response(
+              JSON.stringify({ error: "You've reached today's free limit of " + __anonMax + " translations. Register for a free account to keep translating.", code: "free_limit_reached" }),
+              { status: 429, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+            );
+          }
+
           await env.QUOTA_KV.put(__aKey, String(__aUsed + 1), { expirationTtl: 172800 });
+          await env.QUOTA_KV.put(__allKey, String(__allUsed + 1), { expirationTtl: 172800 });
         }
         // Resolve the user's status, cached in KV so Firestore is hit at most
         // once every 10 minutes per user.
