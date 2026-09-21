@@ -320,20 +320,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
-const ALLOWED_EMAILS = [
-  "linguisticsconsulting@gmail.com",
-  "hanyuriyu@googlemail.com",
-  "hob122020@gmail.com",
-  "h.ben@lingonect.com"
-];
+// Sign-up is open. What a signed-in account can reach is decided per profile
+// by computeFullAccess() on engines.html (plan / subscribed / signup date) and
+// enforced by firebase-rtdb-rules.json and firestore.rules - not by a list of
+// addresses here. An allowlist is also incompatible with Sign in with Apple:
+// Hide My Email hands back a random @privaterelay.appleid.com address that
+// cannot be known in advance, so every such user would be refused.
 
-function isAllowed(email) {
-  return ALLOWED_EMAILS.includes(email.toLowerCase());
-}
-
-// Redirect already-authenticated users straight to dashboard
+// Redirect already-authenticated users straight to dashboard.
+// OAuth accounts (Google, Apple) arrive verified by the provider; only the
+// email/password path has an unverified state to wait on.
 auth.onAuthStateChanged(user => {
-  if (user && user.emailVerified && isAllowed(user.email)) {
+  if (user && !user.isAnonymous && (user.emailVerified || user.providerData.some(
+        p => p.providerId === "google.com" || p.providerId === "apple.com"))) {
     window.location.href = "engines.html";
   }
 });
@@ -384,14 +383,7 @@ function signInWithGoogle() {
 document.getElementById("googleBtn").addEventListener("click", () => {
   clearError();
   signInWithGoogle()
-    .then(cred => {
-      if (!isAllowed(cred.user.email)) {
-        auth.signOut();
-        showError("Access is currently restricted.");
-        return;
-      }
-      window.location.href = "engines.html";
-    })
+    .then(() => { window.location.href = "engines.html"; })
     .catch(err => showError(err.message));
 });
 
@@ -399,12 +391,12 @@ document.getElementById("googleBtn").addEventListener("click", () => {
 // app (OAuth popups are blocked there), fall back to a web popup on the site.
 function signInWithApple() {
   if (isNativeApp) {
-    const plugin = window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseAuthentication;
-    if (!plugin) {
-      return Promise.reject(new Error(
-        "Apple sign-in isn't available in this build. The FirebaseAuthentication plugin is not installed."));
+    // Through the bridge, not Capacitor.Plugins - see signInWithGoogle above.
+    const cap = window.Capacitor;
+    if (typeof cap.nativePromise !== "function") {
+      return Promise.reject(new Error("Apple sign-in isn't available in this build."));
     }
-    return plugin.signInWithApple()
+    return cap.nativePromise("FirebaseAuthentication", "signInWithApple", {})
       .then(result => {
         const idToken = result && result.credential && result.credential.idToken;
         const nonce   = result && result.credential && result.credential.nonce;
@@ -423,14 +415,7 @@ function signInWithApple() {
 document.getElementById("appleBtn").addEventListener("click", () => {
   clearError();
   signInWithApple()
-    .then(cred => {
-      if (!isAllowed(cred.user.email)) {
-        auth.signOut();
-        showError("Access is currently restricted.");
-        return;
-      }
-      window.location.href = "engines.html";
-    })
+    .then(() => { window.location.href = "engines.html"; })
     .catch(err => showError(err.message));
 });
 
@@ -444,11 +429,6 @@ document.getElementById("loginBtn").addEventListener("click", () => {
 
   auth.signInWithEmailAndPassword(email, password)
     .then(cred => {
-      if (!isAllowed(cred.user.email)) {
-        auth.signOut();
-        showError("Access is currently restricted.");
-        return;
-      }
       if (!cred.user.emailVerified) {
         auth.signOut();
         showError("Please verify your email before logging in. Check your inbox.");

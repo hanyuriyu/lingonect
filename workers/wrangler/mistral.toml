@@ -11,3 +11,16 @@ id = "f9f80346649545989106f2b6459bbb28"
 
 [observability]
 enabled = true
+
+# Anonymous (not-signed-up) allowance on the free-tier engines. All three free
+# workers share one KV namespace, so ANON_DAILY_TOTAL is a single ceiling
+# across Google, OpenAI and Mistral together, not one each.
+#
+# ANON_DAILY_TOTAL is the real cost bound. A per-user cap cannot be one: an
+# anonymous uid is free to mint and a reinstall yields a fresh allowance, so
+# ANON_DAILY_PER_USER only decides how fast one install drains the shared pool.
+# Override either in the dashboard (Settings > Variables) to retune without a
+# deploy; the worker falls back to these same defaults if they are unset.
+[vars]
+ANON_DAILY_PER_USER = "50"
+ANON_DAILY_TOTAL = "5000"
