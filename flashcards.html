@@ -1027,6 +1027,28 @@ function isNonLatinLang(lang){
   return NON_LATIN_LANGS.has(lang);
 }
 
+// A couple of picker entries are not plain standard languages a model can be
+// trusted to get right from the name alone. Asked for "Hinglish" a model will
+// often just produce Hindi in Devanagari, which is the opposite of what the
+// learner wants, so spell out what it actually is whenever it is on either
+// side of the pair.
+const LANGUAGE_NOTES = {
+  "Hinglish": `Hinglish is everyday Hindi-English code-mixing as it is really spoken and typed in India: Hindi grammar and core vocabulary written in the LATIN alphabet (romanised), with common English words mixed in naturally - e.g. "Main office ja raha hoon", "Thoda wait karo, meeting abhi start hui hai". Write it the way people actually type it on a phone. NEVER use Devanagari script. It is conversational and urban - not formal Hindi, and not English with a couple of Hindi words sprinkled on top.`
+};
+
+// Returns a LANGUAGE NOTE block for any of the given languages that has one,
+// de-duplicated, or "" when none of them need explaining.
+function languageNote(...langs){
+  const seen = new Set();
+  let out = "";
+  for (const lang of langs) {
+    if (!lang || seen.has(lang) || !LANGUAGE_NOTES[lang]) continue;
+    seen.add(lang);
+    out += `\n\nLANGUAGE NOTE - ${lang.toUpperCase()}: ${LANGUAGE_NOTES[lang]}`;
+  }
+  return out;
+}
+
 // Build the prompt snippet that tells a model how to attach a transliteration
 // to ${targetLang} text. The transliteration is given ONCE for the whole piece
 // of text (not per word), in square brackets, and always carries stress/accent
@@ -1085,6 +1107,7 @@ const LANG_LOCALE = {
   "Hebrew": "he-IL",
   "Persian (Farsi)": "fa-IR",
   "Hindi": "hi-IN",
+  "Hinglish": "en-IN",
   "Urdu": "ur-PK",
   "Bengali": "bn-BD",
   "Japanese": "ja-JP",
@@ -1214,7 +1237,7 @@ const ALL_LANGUAGES = [
   "Russian","Ukrainian","Turkish","Greek","Romanian","Hungarian",
   "Czech","Slovak","Bulgarian","Croatian","Serbian","Lithuanian",
   "Latvian","Estonian","Slovenian","Catalan","Icelandic","Georgian",
-  "Arabic","Hebrew","Persian (Farsi)","Hindi","Urdu","Bengali",
+  "Arabic","Hebrew","Persian (Farsi)","Hindi","Hinglish","Urdu","Bengali",
   "Japanese","Chinese (Simplified)","Chinese (Traditional)","Korean",
   "Thai","Vietnamese","Indonesian","Malay","Tagalog (Filipino)"
 ];
@@ -1544,7 +1567,7 @@ For each item, provide:
 6. "emoji": A simple, clear visualization of the word or phrase using 1-3 emojis. Pick the most concrete, recognisable emoji(s) that will help the learner visually remember the meaning. For abstract concepts, pick the most evocative symbol available (e.g. "freedom" -> "🕊️", "idea" -> "💡", "love" -> "❤️"). Always return at least one emoji.
 
 Return ONLY a valid JSON array, one element per input item, in the same order. Each element must have exactly these keys: "word", "transliteration", "translation", "definition", "example", "emoji"
-${translitBlock}${ukrainianStressBlock}
+${translitBlock}${ukrainianStressBlock}${languageNote(sourceLang, targetLang)}
 Input items:
 ${numbered}`;
 
@@ -1644,7 +1667,7 @@ ${translitInstr}
 
 IMPORTANT: Every example sentence MUST use the given word or phrase. The word/phrase must appear in the sentence itself.
 ${translitBlock}
-Return ONLY a valid JSON array of strings, in the same order as the input. The array must have exactly ${words.length} elements — one per word. Each element must be the full example sentence string (including the ${sourceLang} translation in parentheses). Do not add any commentary, numbering, or keys.
+Return ONLY a valid JSON array of strings, in the same order as the input. The array must have exactly ${words.length} elements — one per word. Each element must be the full example sentence string (including the ${sourceLang} translation in parentheses). Do not add any commentary, numbering, or keys.${languageNote(sourceLang, targetLang)}
 
 Words/phrases:
 ${numbered}`;

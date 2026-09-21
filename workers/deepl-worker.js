@@ -165,6 +165,12 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// Secrets pasted into the Cloudflare dashboard often arrive with a stray
+// newline or space attached. Trimming every credential here stops that from
+// reaching the provider as a malformed key — which comes back as a 401 and
+// reads, wrongly, like a revoked account.
+const __t = (v) => (v == null ? "" : String(v).trim());
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -264,13 +270,30 @@ export default {
       return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: cors });
     }
 
+    // A missing secret would otherwise go upstream as "Bearer undefined" and
+    // come back as a 401 — indistinguishable from a key the provider revoked.
+    // Report the real cause instead, so the engine-health check can name it.
+    const __missing = ["DEEPL_API_KEY"].filter((n) => !__t(env[n]));
+    if (__missing.length) {
+      return new Response(
+        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        }
+      );
+    }
+
     try {
       const body = await request.json();
       const res = await fetch("https://api-free.deepl.com/v2/translate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `DeepL-Auth-Key ${env.DEEPL_API_KEY}`,
+          "Authorization": `DeepL-Auth-Key ${__t(env.DEEPL_API_KEY)}`,
         },
         body: JSON.stringify(body),
       });

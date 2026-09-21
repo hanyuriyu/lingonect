@@ -11,6 +11,7 @@ engines. The main entry points are plain HTML files in the repo root:
   tools
 - `workers/` — Cloudflare Worker source for the AI proxies
   (`claudetranslate`, `openai`, `deepseek`, etc.)
+- `android/` — Capacitor native Android project (committed). See `ANDROID.md`.
 
 Flashcard data is persisted in Firebase Realtime Database, not in the repo.
 Rules live in `firebase-rtdb-rules.json`.
@@ -46,6 +47,26 @@ This rule applies to:
 A PostToolUse hook in `.claude/settings.json` validates `flashcards.html`
 after every edit and will fail loudly if the third-example wiring is
 missing. Fix the code rather than bypassing the hook.
+
+## Mobile apps (iOS + Android)
+
+Both apps are [Capacitor](https://capacitorjs.com) wrappers around the *same*
+web pages — there is no separate mobile codebase. `scripts/copy-web.mjs` copies
+the root HTML/CSS/images into `www/`, and `npx cap sync` copies `www/` into the
+native projects. So:
+
+- Edit the root `.html` files as usual; then run `npm run sync` for the change
+  to reach the apps. Never edit the copies under
+  `android/app/src/main/assets/public/` — they are regenerated and gitignored.
+- `app-native.js` holds behaviour that must apply *only* inside the native apps.
+  It early-returns on the website, and tags `<html>` with `native-app` plus
+  `native-ios` / `native-android`. Both stores forbid external payment links for
+  digital goods, so it strips all subscription UI in the apps — keep it that way
+  unless asked.
+- `android/lingonect-debug.keystore` is committed **on purpose**: it gives every
+  test build one stable SHA-1 so a single fingerprint works in Firebase. Release
+  keystores (`*.jks`, `keystore.properties`) must never be committed.
+- Android setup, signing, and Play Store steps live in `ANDROID.md`.
 
 ## Conventions
 

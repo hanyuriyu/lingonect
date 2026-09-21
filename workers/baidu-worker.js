@@ -190,10 +190,10 @@ const BAIDU_RETRYABLE = ["52001", "52002"];
 // A non-JSON body means the relay itself failed rather than Baidu, so it is
 // reshaped into Baidu's error format to keep one response contract for callers.
 async function callBaidu(env, form) {
-  const relay = (env.BAIDU_RELAY_URL || "").trim();
+  const relay = __t(env.BAIDU_RELAY_URL);
   const headers = { "Content-Type": "application/x-www-form-urlencoded" };
-  if (relay && env.BAIDU_RELAY_TOKEN) {
-    headers["X-Relay-Token"] = env.BAIDU_RELAY_TOKEN;
+  if (relay && __t(env.BAIDU_RELAY_TOKEN)) {
+    headers["X-Relay-Token"] = __t(env.BAIDU_RELAY_TOKEN);
   }
   const res = await fetch(relay || BAIDU_API_URL, {
     method: "POST",
@@ -212,6 +212,12 @@ async function callBaidu(env, form) {
   }
   return { res, data };
 }
+
+// Secrets pasted into the Cloudflare dashboard often arrive with a stray
+// newline or space attached. Trimming every credential here stops that from
+// reaching the provider as a malformed key — which comes back as a 401 and
+// reads, wrongly, like a revoked account.
+const __t = (v) => (v == null ? "" : String(v).trim());
 
 export default {
   async fetch(request, env) {
@@ -309,11 +315,28 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    // A missing secret would otherwise go upstream as "Bearer undefined" and
+    // come back as a 401 — indistinguishable from a key the provider revoked.
+    // Report the real cause instead, so the engine-health check can name it.
+    const __missing = ["BAIDU_APP_ID", "BAIDU_SECRET_KEY"].filter((n) => !__t(env[n]));
+    if (__missing.length) {
+      return new Response(
+        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        }
+      );
+    }
+
     try {
       const { text, from, to } = await request.json();
 
-      const appid = (env.BAIDU_APP_ID || "").trim();
-      const key = (env.BAIDU_SECRET_KEY || "").trim();
+      const appid = __t(env.BAIDU_APP_ID);
+      const key = __t(env.BAIDU_SECRET_KEY);
       const salt = String(Math.floor(Math.random() * 1e10));
       const signStr = appid + text + salt + key;
       const sign = md5(signStr);
@@ -339,7 +362,7 @@ export default {
         console.error(
           "Baidu error_code=" + data.error_code,
           data.error_msg || "",
-          (env.BAIDU_RELAY_URL || "").trim() ? "(via relay)" : "(direct from Cloudflare)"
+          __t(env.BAIDU_RELAY_URL) ? "(via relay)" : "(direct from Cloudflare)"
         );
       }
 

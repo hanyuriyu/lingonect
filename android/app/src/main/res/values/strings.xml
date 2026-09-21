@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lingonect</string>
+    <string name="title_activity_main">Lingonect</string>
+    <string name="package_name">com.lingonect.app</string>
+    <string name="custom_url_scheme">com.lingonect.app</string>
+</resources>

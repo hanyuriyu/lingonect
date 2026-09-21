@@ -165,6 +165,12 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// Secrets pasted into the Cloudflare dashboard often arrive with a stray
+// newline or space attached. Trimming every credential here stops that from
+// reaching the provider as a malformed key — which comes back as a 401 and
+// reads, wrongly, like a revoked account.
+const __t = (v) => (v == null ? "" : String(v).trim());
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -261,6 +267,23 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    // A missing secret would otherwise go upstream as "Bearer undefined" and
+    // come back as a 401 — indistinguishable from a key the provider revoked.
+    // Report the real cause instead, so the engine-health check can name it.
+    const __missing = ["AZURE_TRANSLATOR_KEY"].filter((n) => !__t(env[n]));
+    if (__missing.length) {
+      return new Response(
+        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        }
+      );
+    }
+
     try {
       const { text, from, to } = await request.json();
 
@@ -275,8 +298,8 @@ export default {
         {
           method: "POST",
           headers: {
-            "Ocp-Apim-Subscription-Key": env.AZURE_TRANSLATOR_KEY,
-            "Ocp-Apim-Subscription-Region": env.AZURE_TRANSLATOR_REGION,
+            "Ocp-Apim-Subscription-Key": __t(env.AZURE_TRANSLATOR_KEY),
+            "Ocp-Apim-Subscription-Region": __t(env.AZURE_TRANSLATOR_REGION),
             "Content-Type": "application/json",
           },
           body: JSON.stringify([{ Text: text }]),

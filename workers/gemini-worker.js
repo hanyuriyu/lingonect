@@ -165,6 +165,12 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// Secrets pasted into the Cloudflare dashboard often arrive with a stray
+// newline or space attached. Trimming every credential here stops that from
+// reaching the provider as a malformed key — which comes back as a 401 and
+// reads, wrongly, like a revoked account.
+const __t = (v) => (v == null ? "" : String(v).trim());
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -265,6 +271,23 @@ export default {
       return new Response(JSON.stringify({ error: { message: "Method not allowed" } }), { status: 405, headers: cors });
     }
 
+    // A missing secret would otherwise go upstream as "Bearer undefined" and
+    // come back as a 401 — indistinguishable from a key the provider revoked.
+    // Report the real cause instead, so the engine-health check can name it.
+    const __missing = ["GEMINI_API_KEY"].filter((n) => !__t(env[n]));
+    if (__missing.length) {
+      return new Response(
+        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        }
+      );
+    }
+
     try {
       const body = await request.json();
       const { targetLang, text, model, instruction } = body;
@@ -275,7 +298,7 @@ export default {
       const promptInstruction = instruction
         || `Translate into ${targetLang}. Output ONLY translated text.`;
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${__t(env.GEMINI_API_KEY)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
