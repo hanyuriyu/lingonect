@@ -157,6 +157,43 @@ body{
   color:#1a7e3a;
   text-shadow:0 0 6px rgba(26,126,58,.5);
 }
+/* Greyed-out methodology — free/anonymous users on the app get only
+   Translate, Transcreate and Localize; the rest are shown but disabled.
+   They stay clickable so a tap can explain why (see .method-lock-tip). */
+.method-word.locked-method{
+  color:#c2c2c2;
+  text-shadow:none;
+  cursor:pointer;
+}
+.method-word.locked-method:hover{ text-shadow:none; }
+
+/* Little "Sign in to unlock" bubble shown when a locked methodology is tapped */
+.method-lock-tip{
+  position:fixed;
+  z-index:1000;
+  transform:translate(-50%, -100%);
+  background:#111;
+  color:#fff;
+  font-family:"Special Elite","Courier New",monospace;
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:6px;
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+.method-lock-tip.show{ opacity:1; }
+.method-lock-tip::after{
+  content:'';
+  position:absolute;
+  top:100%;
+  left:50%;
+  transform:translateX(-50%);
+  border:5px solid transparent;
+  border-top-color:#111;
+}
 
 /* Localize max-character insert box (shown only when Localize is selected) */
 .localize-box{
@@ -1347,14 +1384,15 @@ body{
 <nav class="top-nav">
   <a href="about.html">About</a>
   <a href="engines.html" class="active">Engines</a>
-  <a href="ratings.html">Ratings</a>
-  <a href="chat.html">Chat</a>
-  <a href="flashcards.html">Flashcards</a>
+  <a href="ratings.html" class="gated-nav">Ratings</a>
+  <a href="chat.html" class="gated-nav">Chat</a>
+  <a href="flashcards.html" class="gated-nav">Flashcards</a>
   <a href="subscription.html" id="subNavLink" style="display:none">Subscription</a>
   <a href="seed-ratings.html" id="seedNavLink" style="display:none">Seed Ratings</a>
   <a href="admin.html" id="adminNavLink" style="display:none">Admin</a>
   <a href="#" id="healthNavLink" style="display:none">Health</a>
-  <a href="profile.html">Profile</a>
+  <a href="profile.html" class="gated-nav">Profile</a>
+  <a href="login.html" id="loginNavLink" style="display:none">Login</a>
 </nav>
 
 <!-- ENGINE HEALTH SWEEP (admin only) -->
@@ -1688,10 +1726,13 @@ function engineRequiresLevel(engineId) {
   return ENGINE_TIERS[engineId] || 0;
 }
 
-// Free users can only use the free-tier engines (tier 0). Everyone with full
-// access (admin, Pro subscribers, grandfathered members) gets every engine.
+// The engines available to EVERYONE without an account. Core translation must
+// work without login (Apple 5.1.1(v)); every other engine needs a (free,
+// review-approved) account. Unknown/newly added engines are locked by default.
+const FREE_ENGINES = new Set(["google", "openai", "mistral"]);
 function isEngineLocked(engineId) {
-  return engineRequiresLevel(engineId) > 0 && !userHasFullAccess;
+  if (userHasFullAccess) return false;
+  return !FREE_ENGINES.has(engineId);
 }
 
 // Mirror of the worker's classifier: who gets every engine (and no 500 cap)?
@@ -1707,10 +1748,37 @@ function computeFullAccess(data) {
 const db = firebase.firestore();
 
 auth.onAuthStateChanged(async user => {
-  if (!user || !user.emailVerified) {
-    window.location.href = "login.html";
+  // No session yet → sign in anonymously so anyone can use the free engines
+  // (Google Translate, OpenAI, Mistral) WITHOUT an account. Apple 5.1.1(v):
+  // core translation must not sit behind a login. Login stays optional and
+  // only unlocks the remaining engines and account features.
+  if (!user) {
+    try {
+      await auth.signInAnonymously();
+    } catch (e) {
+      document.body.style.visibility = "visible";  // still show the page
+    }
+    return; // onAuthStateChanged fires again with the anonymous user
+  }
+
+  // Anonymous or not-yet-verified → free tier: the three open engines only.
+  // Show only About + Engines in the menu; the account-only pages (Ratings,
+  // Chat, Flashcards, Profile) are hidden and a Login link is shown instead.
+  if (user.isAnonymous || !user.emailVerified) {
+    userHasFullAccess = false;
+    document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = "none"; });
+    document.getElementById("loginNavLink").style.display = "";
+    document.getElementById("logoutBtn").style.display = "none";
+    // On the app, free users get only Translate / Transcreate / Localize.
+    const isNativeApp = !!(window.Capacitor
+      && typeof window.Capacitor.isNativePlatform === "function"
+      && window.Capacitor.isNativePlatform());
+    if (isNativeApp) applyFreeMethodRestrictions();
+    document.body.style.visibility = "visible";
     return;
   }
+
+  // Signed-in, verified account (login already restricts to approved members).
   if (user.email === "linguisticsconsulting@gmail.com") {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
@@ -1718,9 +1786,6 @@ auth.onAuthStateChanged(async user => {
     document.getElementById("healthNavLink").style.display = "";
     // engines.html#health from the Admin page opens the sweep straight away.
     if (location.hash === "#health" && window.__openHealthPanel) window.__openHealthPanel();
-  }
-
-  if (user.email === "linguisticsconsulting@gmail.com") {
     userHasFullAccess = true;
   } else {
     const profileDoc = await db.collection("profiles").doc(user.uid).get();
@@ -2465,8 +2530,52 @@ function renderMethodology() {
   contextualizeHint.classList.toggle("show", baseMethod === "contextualize");
 }
 
+// Methodologies available to free/anonymous users on the native app. The
+// website and signed-in members keep the full set.
+const FREE_METHODS = new Set(["translate", "transcreate", "localize"]);
+
+// Grey out (and block) the methodologies that free/anonymous app users can't
+// use. Called once auth resolves for a not-fully-signed-in user on the app.
+function applyFreeMethodRestrictions() {
+  methodWords.forEach(w => {
+    if (!FREE_METHODS.has(w.dataset.method)) w.classList.add("locked-method");
+  });
+  // If a now-locked methodology was somehow active, fall back to plain Translate.
+  if (baseMethod && !FREE_METHODS.has(baseMethod)) baseMethod = null;
+  renderMethodology();
+}
+
+// Transient "Sign in to unlock" bubble anchored above a locked methodology word.
+let methodLockTipTimer = null;
+function showMethodLockTip(wordEl) {
+  let tip = document.getElementById("methodLockTip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "methodLockTip";
+    tip.className = "method-lock-tip";
+    const link = document.createElement("a");
+    link.href = "login.html";
+    link.textContent = "Sign in to unlock";
+    link.style.color = "#fff";
+    link.style.textDecoration = "underline";
+    link.style.pointerEvents = "auto";
+    tip.appendChild(link);
+    document.body.appendChild(tip);
+  }
+  const r = wordEl.getBoundingClientRect();
+  tip.style.left = (r.left + r.width / 2) + "px";
+  tip.style.top = (r.top - 6) + "px";
+  tip.classList.add("show");
+  clearTimeout(methodLockTipTimer);
+  methodLockTipTimer = setTimeout(() => tip.classList.remove("show"), 2200);
+}
+
 methodWords.forEach(w => {
   w.addEventListener("click", () => {
+    if (w.classList.contains("locked-method")) {   // disabled for free users
+      showMethodLockTip(w);
+      return;
+    }
     const m = w.dataset.method;
     if (m === "localize") {
       // Localize cannot be combined with Analyze or Contextualize (neither
@@ -4220,6 +4329,26 @@ const engines = [
   }
 ];
 
+// On the native iPhone app only, surface the three free-tier engines
+// (OpenAI, Google Translate, Mistral) at the top of the list, so anonymous
+// visitors land on an open engine instead of a locked "Sign in to unlock"
+// card. The website keeps its original order untouched.
+(function reorderFreeEnginesForApp() {
+  const isNativeApp = !!(window.Capacitor
+    && typeof window.Capacitor.isNativePlatform === "function"
+    && window.Capacitor.isNativePlatform());
+  if (!isNativeApp) return;
+  const freeFirst = ["openai", "google", "mistral"];
+  engines.sort((a, b) => {
+    const ai = freeFirst.indexOf(a.id);
+    const bi = freeFirst.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;   // both non-free → keep original order
+    if (ai === -1) return 1;                // only b is free → b first
+    if (bi === -1) return -1;               // only a is free → a first
+    return ai - bi;                         // both free → follow freeFirst order
+  });
+})();
+
 // Engines that are neural machine translation systems (everything else is an LLM)
 const NMT_ENGINES = new Set([
   "google", "deepl", "baidu", "tencent", "alibaba",
@@ -4255,7 +4384,9 @@ function buildCard(engine) {
       <div class="result-content">
         <p class="engine-name">${engine.name}</p>
         <div class="lock-overlay">
-          Not available on your plan.
+          ${(auth.currentUser && !auth.currentUser.isAnonymous)
+            ? "Not available on your plan."
+            : '<a href="login.html" style="color:inherit;text-decoration:underline;">Sign in to unlock</a>'}
         </div>
       </div>`;
   } else {

@@ -458,6 +458,45 @@ body{
 }
 .contact-note a:hover{ text-decoration:underline; }
 
+/* ── DANGER ZONE ── */
+.danger-zone{
+  margin-top:40px;
+  padding:20px;
+  border:1px solid #f0c0c0;
+  border-radius:12px;
+  background:#fdf5f5;
+}
+.danger-zone h3{
+  margin:0 0 8px;
+  font-size:15px;
+  color:#c0392b;
+}
+.danger-note{
+  font-size:13px;
+  color:#8a5a5a;
+  line-height:1.6;
+  margin:0 0 14px;
+}
+.delete-account-btn{
+  border:1px solid #c0392b;
+  background:#fff;
+  color:#c0392b;
+  font-weight:800;
+  font-size:14px;
+  padding:10px 18px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.delete-account-btn:hover{ background:#c0392b; color:#fff; }
+.delete-account-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+.delete-msg{
+  margin-top:12px;
+  font-size:13px;
+  min-height:1em;
+}
+.delete-msg.ok{ color:green; }
+.delete-msg.err{ color:#c00; }
+
 /* ── MOBILE ── */
 @media (max-width:820px){
   .logo-rail{
@@ -578,6 +617,18 @@ body{
       <button class="save-btn" id="saveBtn" type="button">Save Profile</button>
       <div class="save-msg" id="saveMsg"></div>
     </div>
+
+    <!-- DANGER ZONE: delete account (hidden when an admin views another user) -->
+    <div id="dangerZone" class="danger-zone" style="display:none;">
+      <h3>Delete Account</h3>
+      <p class="danger-note">
+        Permanently delete your account and all associated data — your profile,
+        username, and every flashcard stack you have created. This cannot be
+        undone.
+      </p>
+      <button class="delete-account-btn" id="deleteAccountBtn" type="button">Delete My Account</button>
+      <div class="delete-msg" id="deleteMsg"></div>
+    </div>
   </main>
 </div>
 
@@ -655,12 +706,140 @@ auth.onAuthStateChanged(async user => {
   }
 
   await loadProfile();
+
+  // Only offer account deletion when viewing your own profile (not when an
+  // admin is inspecting someone else's via ?uid=).
+  if (viewingUid === user.uid) {
+    document.getElementById("dangerZone").style.display = "";
+  }
+
   document.body.style.visibility = "visible";
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
 });
+
+// ── Account deletion ──
+const isNativeApp = !!(window.Capacitor
+  && typeof window.Capacitor.isNativePlatform === "function"
+  && window.Capacitor.isNativePlatform());
+
+// Re-authenticate the user so Firebase will allow a destructive account
+// operation. Firebase requires a recent login before delete(); the exact flow
+// depends on how the user originally signed in.
+async function reauthenticate(user) {
+  const providerId = (user.providerData[0] && user.providerData[0].providerId) || "password";
+
+  if (providerId === "password") {
+    const pwd = window.prompt("To confirm, please re-enter your password:");
+    if (!pwd) throw new Error("cancelled");
+    const cred = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
+    return user.reauthenticateWithCredential(cred);
+  }
+
+  if (providerId === "google.com") {
+    if (isNativeApp) {
+      const plugin = window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseAuthentication;
+      const result = await plugin.signInWithGoogle();
+      const idToken = result && result.credential && result.credential.idToken;
+      if (!idToken) throw new Error("cancelled");
+      const cred = firebase.auth.GoogleAuthProvider.credential(idToken);
+      return user.reauthenticateWithCredential(cred);
+    }
+    return user.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+  }
+
+  if (providerId === "apple.com") {
+    if (isNativeApp) {
+      const plugin = window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseAuthentication;
+      const result = await plugin.signInWithApple();
+      const idToken = result && result.credential && result.credential.idToken;
+      const nonce   = result && result.credential && result.credential.nonce;
+      if (!idToken) throw new Error("cancelled");
+      const provider = new firebase.auth.OAuthProvider("apple.com");
+      const cred = provider.credential({ idToken: idToken, rawNonce: nonce });
+      return user.reauthenticateWithCredential(cred);
+    }
+    return user.reauthenticateWithPopup(new firebase.auth.OAuthProvider("apple.com"));
+  }
+
+  // Unknown provider — let delete() surface a requires-recent-login error.
+  return Promise.resolve();
+}
+
+// Delete all of the user's Firestore data, then the auth account itself.
+async function deleteAllUserData(uid) {
+  // Flashcard stacks (each stack stores its cards as an array field, so there
+  // is no cards subcollection to walk).
+  const stacksSnap = await db.collection("flashcards").doc(uid).collection("stacks").get();
+  for (const d of stacksSnap.docs) {
+    await d.ref.delete();
+  }
+  // Username reservation index.
+  if (savedUsername) {
+    await db.collection("usernames").doc(savedUsername.toLowerCase()).delete().catch(() => {});
+  }
+  // Profile document.
+  await db.collection("profiles").doc(uid).delete().catch(() => {});
+}
+
+const deleteBtn = document.getElementById("deleteAccountBtn");
+const deleteMsg = document.getElementById("deleteMsg");
+
+if (deleteBtn) {
+  deleteBtn.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user) { window.location.href = "login.html"; return; }
+
+    const ok = window.confirm(
+      "Delete your account permanently?\n\n" +
+      "This removes your profile, username, and all your flashcard stacks. " +
+      "This action cannot be undone."
+    );
+    if (!ok) return;
+
+    deleteBtn.disabled = true;
+    deleteMsg.className = "delete-msg";
+    deleteMsg.textContent = "Deleting your account…";
+
+    async function performDelete() {
+      await deleteAllUserData(user.uid);
+      await user.delete();
+    }
+
+    try {
+      await performDelete();
+    } catch (err) {
+      if (err && err.code === "auth/requires-recent-login") {
+        // Firebase needs a fresh sign-in before it will delete the account.
+        try {
+          deleteMsg.textContent = "Please confirm your identity to continue…";
+          await reauthenticate(user);
+          deleteMsg.textContent = "Deleting your account…";
+          await performDelete();
+        } catch (reErr) {
+          deleteBtn.disabled = false;
+          deleteMsg.className = "delete-msg err";
+          deleteMsg.textContent = (reErr && reErr.message === "cancelled")
+            ? "Account deletion cancelled."
+            : "Could not verify your identity. Please try again.";
+          return;
+        }
+      } else {
+        deleteBtn.disabled = false;
+        deleteMsg.className = "delete-msg err";
+        deleteMsg.textContent = "Something went wrong. Please try again or contact contact@lingonect.com.";
+        return;
+      }
+    }
+
+    deleteMsg.className = "delete-msg ok";
+    deleteMsg.textContent = "Your account has been deleted.";
+    try { await auth.signOut(); } catch (e) {}
+    setTimeout(() => { window.location.href = "index.html"; }, 1500);
+  });
+}
 
 // ── Username validation (debounced) ──
 let usernameTimer = null;
