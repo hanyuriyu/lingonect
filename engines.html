@@ -5464,6 +5464,77 @@ async function runContextualize(word) {
   card.dataset.plain = ctxPlainText(data);
 }
 
+// ── Search history (registered users only) ──
+// Every search a signed-in, verified user runs is logged to
+// history/{uid}/entries for later review on the Profile page ("History"
+// download). The full output is NOT kept — only a short summary of its main
+// points (max 150 words). Each user keeps at most HISTORY_MAX entries: once a
+// new entry pushes past the cap, the oldest ones are deleted.
+const HISTORY_MAX = 100;
+const HISTORY_MAX_WORDS = 150;
+const HISTORY_SUMMARY_MODEL = "claude-haiku-4-5";
+
+// Anonymous (logged-out) and unverified users get no history.
+function historyEnabled() {
+  const u = auth.currentUser;
+  return !!(u && !u.isAnonymous && u.emailVerified);
+}
+
+function capWords(text, max) {
+  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+  return words.length <= max ? words.join(" ") : words.slice(0, max).join(" ") + "…";
+}
+
+// Condense a search's full output into its main points for the history log.
+async function summariseForHistory(method, src, tgt, input, resultText) {
+  const system = `You write entries for a user's search history log on a translation comparison site. Summarise the MAIN POINTS of the result below in at most ${HISTORY_MAX_WORDS} words (shorter is better). For translations, give the consensus rendering(s) and note any notable disagreement between engines. For analyses, corrections and word deep dives, give the key findings. Plain text only — no markdown, no headings, no preamble.`;
+  const user = `Methodology: ${method}\nFrom ${src} to ${tgt}\n\nSearch:\n<input>${input}</input>\n\nResult:\n<result>${resultText.slice(0, 20000)}</result>`;
+  const res = await workerFetch(CLAUDE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: HISTORY_SUMMARY_MODEL,
+      max_tokens: 400,
+      system,
+      messages: [{ role: "user", content: user }]
+    })
+  });
+  const data = await readClaudeJson("History", res);
+  return data.content[0].text.trim();
+}
+
+// Save one search to the user's history, then trim to the newest HISTORY_MAX.
+// Never throws: history is a side feature and must not disturb the search.
+async function recordHistory({ method, src, tgt, input, resultText }) {
+  if (!historyEnabled() || !resultText || !resultText.trim()) return;
+  const uid = auth.currentUser.uid;
+  try {
+    let summary;
+    try {
+      summary = await summariseForHistory(method, src, tgt, input, resultText);
+    } catch (err) {
+      console.warn("History summary failed; storing a shortened result instead", err);
+      summary = resultText;
+    }
+    summary = capWords(summary, HISTORY_MAX_WORDS).slice(0, 2000);
+
+    const col = db.collection("history").doc(uid).collection("entries");
+    await col.add({
+      createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+      method,
+      sourceLang: src,
+      targetLang: tgt,
+      input:      input.slice(0, 1000),
+      summary
+    });
+
+    const snap = await col.orderBy("createdAt", "desc").get();
+    await Promise.all(snap.docs.slice(HISTORY_MAX).map(d => d.ref.delete()));
+  } catch (err) {
+    console.warn("History entry not saved", err);
+  }
+}
+
 // ── Submit ──
 submitEl.addEventListener("click", async () => {
   const text = inputEl.value.trim();
@@ -5475,6 +5546,16 @@ submitEl.addEventListener("click", async () => {
   submitEl.disabled = true;
 
   const method = effectiveMethod();
+  // Snapshot the search for the history log — the user may change the
+  // language pickers before the results finish arriving.
+  const histBase = {
+    method: localizeOn && method !== "contextualize" ? `${method} + localize` : method,
+    src: sourceLang, tgt: targetLang, input: text
+  };
+  const singleResultText = (sel) => {
+    const card = resultsArea.querySelector(sel);
+    return (card && card.dataset.plain) || "";
+  };
 
   // Contextualize is a single-word deep dive — validate the input and render its
   // own structured card.
@@ -5495,6 +5576,7 @@ submitEl.addEventListener("click", async () => {
     } finally {
       submitEl.disabled = false;
     }
+    recordHistory({ ...histBase, resultText: singleResultText(".ctx-card") });
     return;
   }
 
@@ -5506,6 +5588,7 @@ submitEl.addEventListener("click", async () => {
     } finally {
       submitEl.disabled = false;
     }
+    recordHistory({ ...histBase, resultText: singleResultText(".summary-card") });
     return;
   }
 
@@ -5529,7 +5612,7 @@ submitEl.addEventListener("click", async () => {
   // for a shorter SOURCE-language version; every other method outputs the target.
   const budgetLang = effectiveMethod() === "correct" ? sourceLang : targetLang;
 
-  engines.forEach(async engine => {
+  const engineJobs = engines.map(async engine => {
     if (isEngineLocked(engine.id)) return;
     const el = document.getElementById(`result-${engine.id}`);
     if (!el) return;
@@ -5606,6 +5689,7 @@ submitEl.addEventListener("click", async () => {
       el.textContent = typeof translation === "string" ? translation.trim() : translation;
       el.classList.remove("loading");
       showReading(reading);
+      return { name: engine.name, text: el.textContent };
     } catch (err) {
       el.textContent = err.message || "Translation failed.";
       el.classList.remove("loading");
@@ -5615,6 +5699,15 @@ submitEl.addEventListener("click", async () => {
   });
 
   submitEl.disabled = false;
+
+  // Log the search once every engine has answered (or failed / timed out).
+  Promise.all(engineJobs).then(results => {
+    const resultText = results
+      .filter(r => r && r.text && r.text.trim())
+      .map(r => `${r.name}: ${r.text.trim()}`)
+      .join("\n");
+    recordHistory({ ...histBase, resultText });
+  });
 });
 
 // ── Copy a single engine result to the clipboard ──

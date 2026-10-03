@@ -125,6 +125,33 @@ service cloud.firestore {
         && (isAdmin() || stackId in ['s1', 's2', 's3', 's4']);
     }
 
+    // ---- search history (owner-scoped, registered users only) ----
+    // engines.html logs each search with a short (<=150 word) summary and keeps
+    // the newest 100 per user, deleting older entries itself. Entries are
+    // immutable; the owner and admin may read (Profile "History" download) and
+    // delete them.
+    match /history/{uid}/entries/{entryId} {
+      allow read, delete: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['createdAt', 'method', 'sourceLang', 'targetLang', 'input', 'summary'])
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.method is string
+        && request.resource.data.method.size() <= 40
+        && request.resource.data.sourceLang is string
+        && request.resource.data.sourceLang.size() <= 80
+        && request.resource.data.targetLang is string
+        && request.resource.data.targetLang.size() <= 80
+        && request.resource.data.input is string
+        && request.resource.data.input.size() <= 1000
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() <= 2000;
+
+      allow update: if false;
+    }
+
     // Everything not matched above is denied by default.
   }
 }
