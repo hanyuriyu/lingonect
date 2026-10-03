@@ -4654,7 +4654,7 @@ async function runSummarizedMethod(text, method) {
     }
   }));
 
-  const outputs = collected.filter(o => o.raw && o.raw.trim());
+  const outputs = collected.filter(o => o.raw && o.raw.trim() && !isPlaceholderResult(o.raw));
   if (!outputs.length) {
     statusEl.classList.add("error");
     statusEl.textContent = "None of the LLMs returned a usable result. Please try again.";
@@ -4834,6 +4834,12 @@ SYNTHESIS — you are not writing this entry from scratch. You will be given ${n
 - Write the merged entry as if it were the only one: no mention of the entries, the models, or any disagreement between them.`;
 }
 
+// Engines whose API isn't wired up yet (Jais, Cotoha, tsuzumi, Mirai, Rakuten)
+// answer with this placeholder instead of a result.
+function isPlaceholderResult(text) {
+  return /^API implementation in progress/i.test(String(text || "").trim());
+}
+
 // Whether a reply is actually research. Engines whose API isn't wired up yet
 // answer with a placeholder string, and an engine that ignored the entry prompt
 // may simply translate the word — neither is an entry, and passing either to the
@@ -4841,7 +4847,7 @@ SYNTHESIS — you are not writing this entry from scratch. You will be given ${n
 function ctxIsEntry(raw) {
   const s = String(raw || "").trim();
   if (s.length < 40) return false;                          // a bare translation
-  if (/^API implementation in progress/i.test(s)) return false;
+  if (isPlaceholderResult(s)) return false;
   return s.includes("{") || s.length > 200;                 // JSON, or real prose
 }
 
@@ -5491,11 +5497,14 @@ function capWords(text, max) {
 
 // The best of the per-engine results: the rendering the most engines agree on
 // (compared ignoring case, spacing and trailing punctuation). Ties go to the
-// engine listed first, so Claude / OpenAI win when nothing agrees.
+// engine listed first, so Claude / OpenAI win when nothing agrees. Placeholder
+// replies from engines not yet connected never count — several of them return
+// the identical string, which would otherwise win the vote.
 function bestEngineResult(results) {
   const norm = t => t.toLowerCase().replace(/\s+/g, " ").replace(/[\s.。!！?？]+$/u, "").trim();
   const groups = new Map();
   results.forEach(r => {
+    if (isPlaceholderResult(r.text)) return;
     const key = norm(r.text);
     if (!key) return;
     if (!groups.has(key)) groups.set(key, { text: r.text.trim(), count: 0 });
