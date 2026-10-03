@@ -862,7 +862,7 @@ function buildHistoryXlsx(rows) {
   const row = (r, values) =>
     `<row r="${r}">${values.map((v, i) => cell(cols[i] + r, v)).join("")}</row>`;
 
-  let rowsXml = row(1, ["#", "Date", "Time", "Methodology", "From", "To", "Search", "Summary"]);
+  let rowsXml = row(1, ["#", "Date", "Time", "Methodology", "From", "To", "Search", "Output summary"]);
   rows.forEach((v, i) => { rowsXml += row(i + 2, v); });
 
   const widths = [5, 12, 10, 18, 18, 18, 40, 80];
