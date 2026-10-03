@@ -5465,11 +5465,15 @@ async function runContextualize(word) {
 }
 
 // ── Search history (registered users only) ──
-// Every search a signed-in, verified user runs is logged to
-// history/{uid}/entries for later review on the Profile page ("History"
-// download). The full output is NOT kept — only a short summary of its main
-// points (max 150 words). Each user keeps at most HISTORY_MAX entries: once a
-// new entry pushes past the cap, the oldest ones are deleted.
+// Every search a signed-in, verified user runs — whatever the methodology — is
+// logged to history/{uid}/entries for later review on the Profile page
+// ("History" download). Per-engine results are never stored individually; each
+// entry keeps ONE output (max 150 words):
+//   - translate / transcreate / culturalize (± localize): the best result,
+//     i.e. the rendering most engines agree on (see bestEngineResult).
+//   - analyze / correct / contextualize: a short summary of the main points.
+// Each user keeps at most HISTORY_MAX entries: once a new entry pushes past the
+// cap, the oldest ones are deleted.
 const HISTORY_MAX = 100;
 const HISTORY_MAX_WORDS = 150;
 const HISTORY_SUMMARY_MODEL = "claude-haiku-4-5";
@@ -5485,9 +5489,26 @@ function capWords(text, max) {
   return words.length <= max ? words.join(" ") : words.slice(0, max).join(" ") + "…";
 }
 
+// The best of the per-engine results: the rendering the most engines agree on
+// (compared ignoring case, spacing and trailing punctuation). Ties go to the
+// engine listed first, so Claude / OpenAI win when nothing agrees.
+function bestEngineResult(results) {
+  const norm = t => t.toLowerCase().replace(/\s+/g, " ").replace(/[\s.。!！?？]+$/u, "").trim();
+  const groups = new Map();
+  results.forEach(r => {
+    const key = norm(r.text);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, { text: r.text.trim(), count: 0 });
+    groups.get(key).count++;
+  });
+  let best = null;
+  groups.forEach(g => { if (!best || g.count > best.count) best = g; });
+  return best ? best.text : "";
+}
+
 // Condense a search's full output into its main points for the history log.
 async function summariseForHistory(method, src, tgt, input, resultText) {
-  const system = `You write entries for a user's search history log on a translation comparison site. Summarise the MAIN POINTS of the result below in at most ${HISTORY_MAX_WORDS} words (shorter is better). For translations, give the consensus rendering(s) and note any notable disagreement between engines. For analyses, corrections and word deep dives, give the key findings. Plain text only — no markdown, no headings, no preamble.`;
+  const system = `You write entries for a user's search history log on a translation comparison site. Summarise the MAIN POINTS of the result below in at most ${HISTORY_MAX_WORDS} words (shorter is better). For a correction, start with the corrected text; for analyses and word deep dives, give the key findings. Plain text only — no markdown, no headings, no preamble.`;
   const user = `Methodology: ${method}\nFrom ${src} to ${tgt}\n\nSearch:\n<input>${input}</input>\n\nResult:\n<result>${resultText.slice(0, 20000)}</result>`;
   const res = await workerFetch(CLAUDE_PROXY, {
     method: "POST",
@@ -5504,17 +5525,20 @@ async function summariseForHistory(method, src, tgt, input, resultText) {
 }
 
 // Save one search to the user's history, then trim to the newest HISTORY_MAX.
+// `summarise` asks the model to condense resultText first (analyze, correct,
+// contextualize); otherwise resultText is already the one best result.
 // Never throws: history is a side feature and must not disturb the search.
-async function recordHistory({ method, src, tgt, input, resultText }) {
+async function recordHistory({ method, src, tgt, input, resultText, summarise }) {
   if (!historyEnabled() || !resultText || !resultText.trim()) return;
   const uid = auth.currentUser.uid;
   try {
-    let summary;
-    try {
-      summary = await summariseForHistory(method, src, tgt, input, resultText);
-    } catch (err) {
-      console.warn("History summary failed; storing a shortened result instead", err);
-      summary = resultText;
+    let summary = resultText;
+    if (summarise) {
+      try {
+        summary = await summariseForHistory(method, src, tgt, input, resultText);
+      } catch (err) {
+        console.warn("History summary failed; storing a shortened result instead", err);
+      }
     }
     summary = capWords(summary, HISTORY_MAX_WORDS).slice(0, 2000);
 
@@ -5576,7 +5600,7 @@ submitEl.addEventListener("click", async () => {
     } finally {
       submitEl.disabled = false;
     }
-    recordHistory({ ...histBase, resultText: singleResultText(".ctx-card") });
+    recordHistory({ ...histBase, resultText: singleResultText(".ctx-card"), summarise: true });
     return;
   }
 
@@ -5588,7 +5612,7 @@ submitEl.addEventListener("click", async () => {
     } finally {
       submitEl.disabled = false;
     }
-    recordHistory({ ...histBase, resultText: singleResultText(".summary-card") });
+    recordHistory({ ...histBase, resultText: singleResultText(".summary-card"), summarise: true });
     return;
   }
 
@@ -5700,13 +5724,11 @@ submitEl.addEventListener("click", async () => {
 
   submitEl.disabled = false;
 
-  // Log the search once every engine has answered (or failed / timed out).
+  // Log the search once every engine has answered (or failed / timed out),
+  // keeping only the best result rather than every engine's output.
   Promise.all(engineJobs).then(results => {
-    const resultText = results
-      .filter(r => r && r.text && r.text.trim())
-      .map(r => `${r.name}: ${r.text.trim()}`)
-      .join("\n");
-    recordHistory({ ...histBase, resultText });
+    const ok = results.filter(r => r && r.text && r.text.trim());
+    recordHistory({ ...histBase, resultText: bestEngineResult(ok), summarise: false });
   });
 });
 
