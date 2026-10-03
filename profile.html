@@ -148,6 +148,27 @@ body{
   margin:0 0 32px;
 }
 
+/* ── SEARCH HISTORY DOWNLOAD LINK ── */
+.history-row{
+  text-align:center;
+  margin:-20px 0 28px;
+}
+.history-link{
+  color:#0047FF;
+  font-size:16px;
+  font-weight:800;
+  text-decoration:underline;
+  text-underline-offset:3px;
+  cursor:pointer;
+}
+.history-link:hover{ color:#0033cc; }
+.history-msg{
+  display:block;
+  margin-top:6px;
+  font-size:13px;
+  color:#666;
+}
+
 /* ── FORM STYLES ── */
 .field-group{
   margin-bottom:24px;
@@ -560,6 +581,12 @@ body{
     <p class="page-title">User Profile</p>
     <p class="page-sub" id="pageSub">Set your username and language information</p>
 
+    <!-- SEARCH HISTORY: last 100 searches with short summaries, as a sheet -->
+    <div class="history-row">
+      <a href="#" class="history-link" id="historyLink">History</a>
+      <span class="history-msg" id="historyMsg"></span>
+    </div>
+
     <!-- READ-ONLY VIEW (shown after submission for non-admin users) -->
     <div id="readonlyView" style="display:none;"></div>
 
@@ -623,7 +650,7 @@ body{
       <h3>Delete Account</h3>
       <p class="danger-note">
         Permanently delete your account and all associated data — your profile,
-        username, and every flashcard stack you have created. This cannot be
+        username, search history, and every flashcard stack you have created. This cannot be
         undone.
       </p>
       <button class="delete-account-btn" id="deleteAccountBtn" type="button">Delete My Account</button>
@@ -720,6 +747,199 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   auth.signOut().then(() => { window.location.href = "index.html"; });
 });
 
+// ── Search history download ──
+// engines.html logs each search (max 100 per user, oldest dropped first) with
+// a short summary of its results. The "History" link exports them, oldest
+// first, as an .xlsx sheet. An admin viewing ?uid= gets that user's history.
+const pad2 = n => String(n).padStart(2, "0");
+
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = -1;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xFF];
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+// Minimal store-only (uncompressed) ZIP writer — same as engines.html.
+function buildZip(files) {
+  const enc = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+
+  const u16 = (arr, v) => arr.push(v & 0xFF, (v >>> 8) & 0xFF);
+  const u32 = (arr, v) =>
+    arr.push(v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF);
+
+  files.forEach(f => {
+    const nameBytes = enc.encode(f.name);
+    const data = typeof f.data === "string" ? enc.encode(f.data) : f.data;
+    const crc = crc32(data);
+
+    const local = [];
+    u32(local, 0x04034b50);
+    u16(local, 20);
+    u16(local, 0x0800);
+    u16(local, 0);
+    u16(local, 0); u16(local, 0);
+    u32(local, crc);
+    u32(local, data.length);
+    u32(local, data.length);
+    u16(local, nameBytes.length);
+    u16(local, 0);
+    nameBytes.forEach(b => local.push(b));
+    const localHeader = new Uint8Array(local);
+    chunks.push(localHeader, data);
+
+    const cd = [];
+    u32(cd, 0x02014b50);
+    u16(cd, 20);
+    u16(cd, 20);
+    u16(cd, 0x0800);
+    u16(cd, 0);
+    u16(cd, 0); u16(cd, 0);
+    u32(cd, crc);
+    u32(cd, data.length);
+    u32(cd, data.length);
+    u16(cd, nameBytes.length);
+    u16(cd, 0);
+    u16(cd, 0);
+    u16(cd, 0);
+    u16(cd, 0);
+    u32(cd, 0);
+    u32(cd, offset);
+    nameBytes.forEach(b => cd.push(b));
+    central.push(new Uint8Array(cd));
+
+    offset += localHeader.length + data.length;
+  });
+
+  const centralStart = offset;
+  let centralSize = 0;
+  central.forEach(c => { chunks.push(c); centralSize += c.length; offset += c.length; });
+
+  const end = [];
+  u32(end, 0x06054b50);
+  u16(end, 0); u16(end, 0);
+  u16(end, files.length);
+  u16(end, files.length);
+  u32(end, centralSize);
+  u32(end, centralStart);
+  u16(end, 0);
+  chunks.push(new Uint8Array(end));
+
+  let total = 0;
+  chunks.forEach(c => total += c.length);
+  const out = new Uint8Array(total);
+  let p = 0;
+  chunks.forEach(c => { out.set(c, p); p += c.length; });
+  return out;
+}
+
+function buildHistoryXlsx(rows) {
+  const cols = ["A", "B", "C", "D", "E", "F", "G", "H"];
+  const cell = (ref, value) =>
+    `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
+  const row = (r, values) =>
+    `<row r="${r}">${values.map((v, i) => cell(cols[i] + r, v)).join("")}</row>`;
+
+  let rowsXml = row(1, ["#", "Date", "Time", "Methodology", "From", "To", "Search", "Summary"]);
+  rows.forEach((v, i) => { rowsXml += row(i + 2, v); });
+
+  const widths = [5, 12, 10, 18, 18, 18, 40, 80];
+  const sheetXml =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols>` +
+    `<sheetData>${rowsXml}</sheetData></worksheet>`;
+
+  return buildZip([
+    { name: "[Content_Types].xml", data:
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+      `<Default Extension="xml" ContentType="application/xml"/>` +
+      `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+      `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+      `</Types>` },
+    { name: "_rels/.rels", data:
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+      `</Relationships>` },
+    { name: "xl/workbook.xml", data:
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ` +
+      `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+      `<sheets><sheet name="History" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name: "xl/_rels/workbook.xml.rels", data:
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
+      `</Relationships>` },
+    { name: "xl/worksheets/sheet1.xml", data: sheetXml }
+  ]);
+}
+
+async function downloadHistory() {
+  const msg = document.getElementById("historyMsg");
+  msg.textContent = "Preparing your history…";
+  try {
+    const snap = await db.collection("history").doc(viewingUid).collection("entries")
+      .orderBy("createdAt", "asc").get();
+    if (snap.empty) {
+      msg.textContent = "No searches saved yet — your searches on the Engines page will appear here.";
+      return;
+    }
+    const rows = snap.docs.map((d, i) => {
+      const e = d.data();
+      const at = e.createdAt && e.createdAt.toDate ? e.createdAt.toDate() : null;
+      const date = at ? `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}` : "";
+      const time = at ? `${pad2(at.getHours())}:${pad2(at.getMinutes())}:${pad2(at.getSeconds())}` : "";
+      return [String(i + 1), date, time, e.method || "", e.sourceLang || "", e.targetLang || "", e.input || "", e.summary || ""];
+    });
+    const blob = new Blob([buildHistoryXlsx(rows)], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "lingonect-history.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    msg.textContent = `${rows.length} search${rows.length === 1 ? "" : "es"} downloaded.`;
+  } catch (err) {
+    console.error("History download failed", err);
+    msg.textContent = "Your history could not be loaded. Please try again.";
+  }
+}
+
+document.getElementById("historyLink").addEventListener("click", e => {
+  e.preventDefault();
+  downloadHistory();
+});
+
 // ── Account deletion ──
 const isNativeApp = !!(window.Capacitor
   && typeof window.Capacitor.isNativePlatform === "function"
@@ -780,6 +1000,11 @@ async function deleteAllUserData(uid) {
   if (savedUsername) {
     await db.collection("usernames").doc(savedUsername.toLowerCase()).delete().catch(() => {});
   }
+  // Search history entries.
+  const historySnap = await db.collection("history").doc(uid).collection("entries").get();
+  for (const d of historySnap.docs) {
+    await d.ref.delete();
+  }
   // Profile document.
   await db.collection("profiles").doc(uid).delete().catch(() => {});
 }
@@ -794,7 +1019,7 @@ if (deleteBtn) {
 
     const ok = window.confirm(
       "Delete your account permanently?\n\n" +
-      "This removes your profile, username, and all your flashcard stacks. " +
+      "This removes your profile, username, search history and all your flashcard stacks. " +
       "This action cannot be undone."
     );
     if (!ok) return;
