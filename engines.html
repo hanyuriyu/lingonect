@@ -710,6 +710,14 @@ body{
 .tri-chip.idiosyncratic{ color:#8a5a00; background:rgba(230,160,0,.14); }
 .tri-chip.rejected{      color:#777; background:#eee; text-decoration:line-through; }
 .tri-caveat{ font-size:12px; line-height:1.5; color:#777; margin:10px 0 0; }
+a.tri-chip{ text-decoration:none; }
+.tri-chip.wiki-ok{ color:#0f9c08; background:rgba(22,198,12,.13); }
+.tri-chip.wiki-no{ color:#e3120b; background:rgba(227,18,11,.10); }
+.tri-sources{ font-size:12px; line-height:1.5; color:#666; margin:10px 0 0; }
+.tri-sources a, .tri-source-list a{ color:var(--cobalt); }
+.tri-source-list{ margin:6px 0 0; padding-left:20px; }
+.tri-source-list li{ margin:3px 0; overflow-wrap:anywhere; }
+.tri-host{ font-size:11px; color:#8a8a8a; }
 @media (max-width:600px){
   .tri-claims table, .tri-claims tbody, .tri-claims tr, .tri-claims td{ display:block; width:auto; }
   .tri-claims thead{ display:none; }
@@ -3501,6 +3509,9 @@ async function translateWithPerplexity(text, extra) {
   });
   if (!res.ok) throw await engineError("Perplexity", res);
   const data = await res.json();
+  // In a Triangulate answer round, keep the pages sonar searched so the card
+  // can link them (the inline [n] markers are still stripped below).
+  if (effectiveMethod() === "triangulate" && triPhase === "answer") triWebSources = perplexitySources(data);
   // Strip any markdown, citations, images that sonar may inject
   return data.choices[0].message.content.trim().replace(/!\[.*?\]\(.*?\)/g, "").replace(/\[\d+\]/g, "").trim();
 }
@@ -4879,6 +4890,107 @@ const WEB_GROUNDED_ENGINES = new Set(["perplexity"]);
 const TRI_MAX_CLAIMS = 20;       // claims kept from the cross-reference
 const TRI_MAX_ADJUDICATE = 12;   // claims sent to the critique round
 const TRI_CLASSIFIER_MODEL = "claude-haiku-4-5";
+// Wikipedia tagging: up to two articles, checked against the claims by a small
+// model. Tags only — a Wikipedia verdict never changes a claim's status, the
+// concordance score or the written answer.
+const TRI_WIKI_MODEL = "claude-haiku-4-5";
+const TRI_WIKI_CHARS = 12000;    // per article
+// The pages Perplexity searched for its answer in the current run.
+let triWebSources = [];
+
+// Perplexity's sources: search_results (title + url) where present, otherwise
+// the bare citations list. Only http(s) links, de-duplicated, at most ten.
+function perplexitySources(data) {
+  const raw = Array.isArray(data && data.search_results) && data.search_results.length
+    ? data.search_results.map(r => ({ title: r && r.title, url: r && r.url }))
+    : (Array.isArray(data && data.citations) ? data.citations.map(u => ({ title: "", url: u })) : []);
+  const seen = new Set();
+  return raw.filter(s => {
+    if (typeof s.url !== "string" || !/^https?:\/\//i.test(s.url) || seen.has(s.url)) return false;
+    seen.add(s.url);
+    return true;
+  }).map(s => ({ title: typeof s.title === "string" ? s.title.trim() : "", url: s.url })).slice(0, 10);
+}
+
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch (_) { return url; }
+}
+
+// Wikipedia edition for a picker language (falls back to English).
+function wikiLangCode(lang) {
+  const code = GOOGLE_LANG_MAP[lang];
+  if (!code) return "en";
+  if (code === "iw") return "he";
+  return code.split("-")[0];
+}
+
+async function wikiFetchJson(lang, params) {
+  const qs = new URLSearchParams({ format: "json", formatversion: "2", origin: "*", ...params });
+  const res = await fetch(`https://${lang}.wikipedia.org/w/api.php?${qs}`);
+  if (!res.ok) throw new Error(`Wikipedia HTTP ${res.status}`);
+  return res.json();
+}
+
+// The best-matching article for `query` on one Wikipedia edition, as plain
+// text, or null.
+async function wikiArticle(lang, query) {
+  if (!query) return null;
+  const found = await wikiFetchJson(lang, { action: "query", list: "search", srsearch: query, srlimit: "1", srprop: "" });
+  const hit = found.query && found.query.search && found.query.search[0];
+  if (!hit) return null;
+  const data = await wikiFetchJson(lang, { action: "query", prop: "extracts", explaintext: "1", redirects: "1", titles: hit.title });
+  const page = data.query && data.query.pages && data.query.pages[0];
+  if (!page || page.missing || !page.extract) return null;
+  return {
+    title: page.title,
+    url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}`,
+    text: page.extract.slice(0, TRI_WIKI_CHARS)
+  };
+}
+
+// Look the question up on Wikipedia — the source-language edition plus English
+// (or the top English article alone for an English question) — and tag each
+// claim the articles clearly confirm or contradict. Returns the articles used.
+async function triWikiTag(claims, wiki) {
+  const lang = wikiLangCode(sourceLang);
+  const lookups = [wikiArticle(lang, wiki.query_src || wiki.query_en)];
+  if (lang !== "en") lookups.push(wikiArticle("en", wiki.query_en));
+  const settled = await Promise.allSettled(lookups);
+  const articles = [];
+  settled.forEach(r => {
+    if (r.status === "rejected") console.warn("Wikipedia lookup failed", r.reason);
+    else if (r.value && !articles.some(a => a.url === r.value.url)) articles.push(r.value);
+  });
+  if (!articles.length) return [];
+
+  const system = `You are a strict fact-checker. You will receive numbered excerpts from Wikipedia articles (W1, W2, …) and a list of claims (C1, C2, …). For EACH claim decide, using ONLY the excerpts and never your own knowledge:
+- "confirmed": an excerpt clearly states it or directly implies it, including its specific details (names, numbers, dates).
+- "contradicted": an excerpt clearly states something incompatible with it.
+- "not_found": the excerpts do not settle it either way.
+The claims and the excerpts may be in different languages.
+Output ONLY a JSON object, with no markdown fences, like {"C1":{"v":"confirmed","w":1},"C2":{"v":"not_found"}}, where "w" is the number of the excerpt that settles the claim.`;
+  const user = articles.map((a, i) => `<excerpt n="W${i + 1}" title="${a.title}">\n${a.text}\n</excerpt>`).join("\n\n")
+    + `\n\nClaims:\n${claims.map(c => `${c.id}. ${c.text}`).join("\n")}`;
+  const res = await workerFetch(CLAUDE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: TRI_WIKI_MODEL,
+      max_tokens: 1500,
+      system,
+      messages: [{ role: "user", content: user }]
+    })
+  });
+  const data = await readClaudeJson("Wikipedia check", res);
+  const verdicts = parseTriJson(data.content[0].text);
+  claims.forEach(c => {
+    const v = verdicts[c.id];
+    if (!v || (v.v !== "confirmed" && v.v !== "contradicted")) return;
+    const a = articles[Number(v.w) - 1] || (articles.length === 1 ? articles[0] : null);
+    if (a) c.wiki = { verdict: v.v, title: a.title, url: a.url };
+  });
+  return articles;
+}
 
 function triangulateEnginePrompt(src, tgt) {
   if (triPhase === "critique") {
@@ -4972,8 +5084,10 @@ async function triExtractClaims(question, answers) {
 
 Keep at most the ${TRI_MAX_CLAIMS} most substantive claims, preferring those that bear directly on the question, and always keep any claim that some answer contradicts. Write every claim in ${tgt}, as one short sentence.
 
+Also give the best Wikipedia search terms for the question's topic: a short title-like query in ${src} ("query_src") and the same in English ("query_en").
+
 Output ONLY a JSON object, with no markdown fences, in exactly this shape:
-{"claims":[{"text":"…","assert":[1,3],"contradict":[2]}]}
+{"wiki":{"query_src":"…","query_en":"…"},"claims":[{"text":"…","assert":[1,3],"contradict":[2]}]}
 The numbers are the answer labels without the "M". Every claim must be asserted by at least one answer.`;
   const blocks = answers.map((a, i) => `<answer label="M${i + 1}">\n${a.raw.trim()}\n</answer>`).join("\n\n");
   const res = await workerFetch(CLAUDE_PROXY, {
@@ -4990,7 +5104,10 @@ The numbers are the answer labels without the "M". Every claim must be asserted 
   const obj = parseTriJson(data.content[0].text);
   const labels = arr => [...new Set((Array.isArray(arr) ? arr : [])
     .map(Number).filter(k => Number.isInteger(k) && k >= 1 && k <= n))];
-  return (Array.isArray(obj.claims) ? obj.claims : [])
+  const w = obj.wiki || {};
+  const term = t => (typeof t === "string" ? t.trim().slice(0, 120) : "");
+  const wiki = { query_src: term(w.query_src), query_en: term(w.query_en) };
+  const claims = (Array.isArray(obj.claims) ? obj.claims : [])
     .map(c => {
       const assert = labels(c.assert);
       const contradict = labels(c.contradict).filter(k => !assert.includes(k));
@@ -4999,6 +5116,7 @@ The numbers are the answer labels without the "M". Every claim must be asserted 
     .filter(c => c.text && c.assert.length)
     .slice(0, TRI_MAX_CLAIMS)
     .map((c, i) => ({ id: `C${i + 1}`, ...c }));
+  return { claims, wiki };
 }
 
 // Class a claim from its stances among the n answers.
@@ -5107,7 +5225,7 @@ Rules: use ONLY the claims given and add no new facts. If there are no CONSENSUS
 }
 
 // The concordance panel and the claim matrix shown under the answer.
-function triReportHtml(claims, answers, initialScore, finalScore) {
+function triReportHtml(claims, answers, initialScore, finalScore, wikiArticles, webSources) {
   const n = answers.length;
   const score = finalScore == null ? initialScore : finalScore;
   const band = triBand(score);
@@ -5123,7 +5241,7 @@ function triReportHtml(claims, answers, initialScore, finalScore) {
     if (c.votes) models += ` · Critique: ${c.votes.SUPPORT} support, ${c.votes.REFUTE} refute, ${c.votes.UNSURE} unsure`;
     return `<tr>
       <td><span class="tri-chip ${c.status}">${st.label}</span></td>
-      <td>${escapeXml(c.text)}${c.web ? ' <span class="tri-chip partial" title="Backed by a web-search-grounded model">web</span>' : ""}<span class="tri-models">${escapeXml(models)}</span></td>
+      <td>${escapeXml(c.text)}${c.web ? ' <span class="tri-chip partial" title="Backed by a web-search-grounded model">web</span>' : ""}${triWikiChip(c)}<span class="tri-models">${escapeXml(models)}</span></td>
       <td class="tri-num">${c.assert.length}/${n}</td>
     </tr>`;
   }).join("");
@@ -5143,11 +5261,34 @@ function triReportHtml(claims, answers, initialScore, finalScore) {
         <tbody>${rows}</tbody>
       </table>
     </details>
+    ${triWikiSummaryHtml(claims, wikiArticles)}
+    ${webSources.length ? `<details class="tri-claims">
+      <summary>Perplexity's web sources (${webSources.length})</summary>
+      <ol class="tri-source-list">${webSources.map(s => `<li>${triLink(s.url, s.title || hostOf(s.url))} <span class="tri-host">${escapeXml(hostOf(s.url))}</span></li>`).join("")}</ol>
+    </details>` : ""}
     <p class="ctx-sources">Answers from ${n} LLMs: ${escapeXml(answers.map(a => a.name).join(", "))}</p>
-    <p class="tri-caveat">Concordance measures how consistently the models agree, not whether they are right. The LLMs share architectures and much of their training data, so they are semi-independent sources that can be wrong together. Check low-concordance and contested claims against an authoritative source.${anyWeb ? " Claims marked “web” were backed by a model that searched the web (Perplexity), the one external check in this run." : ""}</p>`;
+    <p class="tri-caveat">Concordance measures how consistently the models agree, not whether they are right. The LLMs share architectures and much of their training data, so they are semi-independent sources that can be wrong together. Check low-concordance and contested claims against an authoritative source.${anyWeb ? " Claims marked “web” were backed by a model that searched the web (Perplexity)." : ""} Wikipedia tags are a reference check only: they do not change a claim's status or the score, and a missing tag means the article did not cover the claim, not that it is wrong.</p>`;
 }
 
-function triPlainText(question, summaryText, claims, answers, score) {
+// An external link; only http(s) URLs are ever passed in.
+function triLink(url, label) {
+  return `<a href="${escapeXml(url)}" target="_blank" rel="noopener noreferrer">${escapeXml(label)}</a>`;
+}
+
+function triWikiChip(c) {
+  if (!c.wiki) return "";
+  const ok = c.wiki.verdict === "confirmed";
+  return ` <a class="tri-chip ${ok ? "wiki-ok" : "wiki-no"}" href="${escapeXml(c.wiki.url)}" target="_blank" rel="noopener noreferrer" title="${ok ? "Confirmed" : "Contradicted"} by Wikipedia: ${escapeXml(c.wiki.title)}">Wikipedia ${ok ? "✓" : "✗"}</a>`;
+}
+
+function triWikiSummaryHtml(claims, articles) {
+  if (!articles.length) return `<p class="tri-sources">Wikipedia: no matching article was found for this question.</p>`;
+  const ok = claims.filter(c => c.wiki && c.wiki.verdict === "confirmed").length;
+  const no = claims.filter(c => c.wiki && c.wiki.verdict === "contradicted").length;
+  return `<p class="tri-sources">Wikipedia (${articles.map(a => triLink(a.url, a.title)).join(", ")}): ${ok} claim${ok === 1 ? "" : "s"} confirmed, ${no} contradicted, ${claims.length - ok - no} not covered.</p>`;
+}
+
+function triPlainText(question, summaryText, claims, answers, score, wikiArticles, webSources) {
   const n = answers.length;
   const lines = [
     `Question: ${question}`,
@@ -5159,8 +5300,17 @@ function triPlainText(question, summaryText, claims, answers, score) {
     "Claims:"
   ];
   claims.forEach(c => {
-    lines.push(`- [${TRI_STATUS[c.status].label}] ${c.text} (${c.assert.length}/${n} backed${c.web ? ", web" : ""})`);
+    const wiki = c.wiki ? `, Wikipedia ${c.wiki.verdict}` : "";
+    lines.push(`- [${TRI_STATUS[c.status].label}] ${c.text} (${c.assert.length}/${n} backed${c.web ? ", web" : ""}${wiki})`);
   });
+  if (wikiArticles.length) {
+    lines.push("", "Wikipedia articles checked:");
+    wikiArticles.forEach(a => lines.push(`- ${a.title}: ${a.url}`));
+  }
+  if (webSources.length) {
+    lines.push("", "Perplexity's web sources:");
+    webSources.forEach(s => lines.push(`- ${s.title || hostOf(s.url)}: ${s.url}`));
+  }
   lines.push("", "Concordance is cross-model consistency, not proof of truth: verify contested claims against an authoritative source.");
   return lines.join("\n");
 }
@@ -5209,6 +5359,7 @@ async function runTriangulate(question) {
   try {
     // 1. Elicit
     triPhase = "answer";
+    triWebSources = [];
     const answers = await triGather(llmEngines, question, progress("Asking every LLM your question…"));
     if (!alive()) return;
     if (answers.length < 2) {
@@ -5218,9 +5369,9 @@ async function runTriangulate(question) {
 
     // 2. Decompose & cross-reference
     statusEl.textContent = `Breaking ${n} answers into claims and cross-checking them…`;
-    let claims;
+    let claims, wikiQuery;
     try {
-      claims = await triExtractClaims(question, answers);
+      ({ claims, wiki: wikiQuery } = await triExtractClaims(question, answers));
     } catch (err) {
       console.error("Triangulate claim extraction failed", err);
       return fail("The answers could not be cross-checked. Please try again.");
@@ -5268,8 +5419,12 @@ async function runTriangulate(question) {
     }
     const finalScore = critics ? triConcordance(claims, n, critics, true) : null;
 
-    // 4. Synthesise
-    statusEl.textContent = "Writing the consensus answer…";
+    // 4. Synthesise — and, alongside it, tag the claims against Wikipedia. The
+    // Wikipedia check is optional: if it fails the answer still shows, untagged.
+    statusEl.textContent = "Writing the consensus answer and checking Wikipedia…";
+    const wikiJob = (wikiQuery.query_src || wikiQuery.query_en)
+      ? triWikiTag(claims, wikiQuery).catch(err => { console.warn("Wikipedia check failed", err); return []; })
+      : Promise.resolve([]);
     let summaryRaw;
     try {
       summaryRaw = await triSynthesise(question, claims, n);
@@ -5277,14 +5432,18 @@ async function runTriangulate(question) {
       console.error("Triangulate synthesis failed", err);
       return fail("The consensus answer could not be written. Please try again.");
     }
+    const wikiArticles = await wikiJob;
     if (!alive()) return;
+    const webSources = answers.some(a => WEB_GROUNDED_ENGINES.has(a.id)) ? triWebSources : [];
 
     statusEl.style.display = "none";
     bodyEl.innerHTML = formatSummaryHtml(summaryRaw);
-    const summaryText = bodyEl.textContent.trim();
-    bodyEl.insertAdjacentHTML("beforeend", triReportHtml(claims, answers, initialScore, finalScore));
+    // Line-preserving text for the download: the raw summary minus its markup.
+    const summaryText = summaryRaw.replace(/\[\[\/?[GBR]\]\]/g, "").replace(/^#{1,6}\s+/gm, "").trim();
+    bodyEl.insertAdjacentHTML("beforeend",
+      triReportHtml(claims, answers, initialScore, finalScore, wikiArticles, webSources));
     card.dataset.plain = triPlainText(question, summaryText, claims, answers,
-      finalScore == null ? initialScore : finalScore);
+      finalScore == null ? initialScore : finalScore, wikiArticles, webSources);
   } finally {
     triPhase = "answer";
   }
