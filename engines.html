@@ -624,6 +624,28 @@ body{
 .summary-body .hl-green{ color:#0f9c08; background:rgba(22,198,12,.13); }   /* strong agreement */
 .summary-body .hl-blue{  color:var(--cobalt); background:rgba(0,71,255,.10); } /* key point */
 .summary-body .hl-red{   color:#e3120b; background:rgba(227,18,11,.10); }    /* caution / debated */
+.summary-body .summary-copy-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  vertical-align:middle;
+  width:26px;
+  height:26px;
+  margin-left:6px;
+  padding:0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:#9a9a9a;
+  border-radius:6px;
+  transition:color .15s, background .15s;
+}
+.summary-body .summary-copy-btn:hover{ color:#0f9c08; background:rgba(22,198,12,.13); }
+.summary-body .summary-copy-btn svg{ width:15px; height:15px; }
+.summary-body .summary-copy-btn .check-icon{ display:none; }
+.summary-body .summary-copy-btn.copied{ color:#2e9e5b; }
+.summary-body .summary-copy-btn.copied .copy-icon{ display:none; }
+.summary-body .summary-copy-btn.copied .check-icon{ display:block; }
 
 /* ── Contextualize (single-word deep dive) ──
    One word in → a structured, well-laid-out set of notes: definition (in the
@@ -4575,6 +4597,39 @@ function formatSummaryHtml(raw) {
   return html;
 }
 
+// Put a copy button right after the green result sentence (the corrected /
+// recommended version most users want to grab). Prefers a paragraph that is
+// entirely green; falls back to the first green highlight in the summary.
+function addSummaryCopyButton(bodyEl) {
+  let target = null;
+  for (const p of bodyEl.querySelectorAll(".summary-p")) {
+    const g = p.querySelector(".hl-green");
+    if (g && g.textContent.trim() === p.textContent.trim()) { target = g; break; }
+  }
+  if (!target) target = bodyEl.querySelector(".hl-green");
+  if (!target || !target.textContent.trim()) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "summary-copy-btn";
+  btn.title = "Copy result";
+  btn.setAttribute("aria-label", "Copy result");
+  btn.innerHTML = `
+    <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>`;
+  btn.addEventListener("click", () => {
+    copyText(target.textContent.trim()).then(() => {
+      btn.classList.add("copied");
+      setTimeout(() => btn.classList.remove("copied"), 1400);
+    }).catch(err => console.error("Copy failed", err));
+  });
+  target.insertAdjacentElement("afterend", btn);
+}
+
 // The single card that holds the summarised Analyze / Correct result.
 function buildSummaryCard() {
   const card = document.createElement("div");
@@ -4676,6 +4731,7 @@ async function runSummarizedMethod(text, method) {
   statusEl.style.display = "none";
   bodyEl.innerHTML = formatSummaryHtml(summaryRaw);
   card.dataset.plain = bodyEl.textContent.trim();  // clean text for download
+  addSummaryCopyButton(bodyEl);
 }
 
 // ── Contextualize (single-word deep dive) ──
