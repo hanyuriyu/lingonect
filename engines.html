@@ -1872,6 +1872,8 @@ auth.onAuthStateChanged(async user => {
       && typeof window.Capacitor.isNativePlatform === "function"
       && window.Capacitor.isNativePlatform());
     if (isNativeApp) applyFreeMethodRestrictions();
+    // Everywhere (website included), free users never get Triangulate.
+    applyPlanMethodRestrictions(false);
     document.body.style.visibility = "visible";
     return;
   }
@@ -1888,6 +1890,8 @@ auth.onAuthStateChanged(async user => {
   } else {
     const profileDoc = await db.collection("profiles").doc(user.uid).get();
     userHasFullAccess = computeFullAccess(profileDoc.exists ? profileDoc.data() : null);
+    // Signed-in members on the free plan don't get Triangulate either.
+    if (!userHasFullAccess) applyPlanMethodRestrictions(true);
   }
 
   document.body.style.visibility = "visible";
@@ -2651,7 +2655,25 @@ function applyFreeMethodRestrictions() {
   renderMethodology();
 }
 
-// Transient "Sign in to unlock" bubble anchored above a locked methodology word.
+// Methodologies reserved for full-access members (admin, Pro, grandfathered)
+// on BOTH the website and the app. Triangulate fans out to every LLM twice, so
+// free users — anonymous, unverified or on the free plan — never get it.
+const FULL_ACCESS_METHODS = new Set(["triangulate"]);
+
+// Grey out the full-access-only methodologies. `signedIn` picks the tip shown
+// on tap: free-plan members are already signed in, so "Sign in" would mislead.
+function applyPlanMethodRestrictions(signedIn) {
+  methodWords.forEach(w => {
+    if (!FULL_ACCESS_METHODS.has(w.dataset.method)) return;
+    w.classList.add("locked-method");
+    w.dataset.lockReason = signedIn ? "plan" : "signin";
+  });
+  if (baseMethod && FULL_ACCESS_METHODS.has(baseMethod)) baseMethod = null;
+  renderMethodology();
+}
+
+// Transient bubble anchored above a locked methodology word: "Sign in to
+// unlock" (a link to login) or, for signed-in free-plan members, a plain note.
 let methodLockTipTimer = null;
 function showMethodLockTip(wordEl) {
   let tip = document.getElementById("methodLockTip");
@@ -2659,6 +2681,12 @@ function showMethodLockTip(wordEl) {
     tip = document.createElement("div");
     tip.id = "methodLockTip";
     tip.className = "method-lock-tip";
+    document.body.appendChild(tip);
+  }
+  tip.textContent = "";
+  if (wordEl.dataset.lockReason === "plan") {
+    tip.textContent = "Not available on the free plan";
+  } else {
     const link = document.createElement("a");
     link.href = "login.html";
     link.textContent = "Sign in to unlock";
@@ -2666,7 +2694,6 @@ function showMethodLockTip(wordEl) {
     link.style.textDecoration = "underline";
     link.style.pointerEvents = "auto";
     tip.appendChild(link);
-    document.body.appendChild(tip);
   }
   const r = wordEl.getBoundingClientRect();
   tip.style.left = (r.left + r.width / 2) + "px";
@@ -5160,6 +5187,12 @@ async function runTriangulate(question) {
   const alive = () => statusEl.isConnected;   // false once a new submit replaced this card
   const fail = msg => { statusEl.classList.add("error"); statusEl.textContent = msg; };
   const progress = label => (done, total) => { if (alive()) statusEl.textContent = `${label} (${done}/${total})`; };
+
+  // Full-access members only (the selector is locked for everyone else; this is
+  // the backstop in case the method was selected before auth resolved).
+  if (!userHasFullAccess) {
+    return fail("Triangulate is available to full members only.");
+  }
 
   statusEl.textContent = "Checking your question…";
   if (!(await triIsQuestion(question))) {
