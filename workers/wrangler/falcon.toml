@@ -1,0 +1,21 @@
+# Deploys to https://falcon.hanyuriyu.workers.dev
+name = "falcon"
+main = "../falcon-worker.js"
+compatibility_date = "2026-03-24"
+workers_dev = true
+preview_urls = false
+
+[[kv_namespaces]]
+binding = "QUOTA_KV"
+id = "f9f80346649545989106f2b6459bbb28"
+
+# Falcon-H1-Arabic-7B-Instruct runs on our own Hugging Face Inference Endpoint.
+# Paste the endpoint URL from the HF dashboard here. HF_TOKEN is a secret:
+#   npx wrangler secret put HF_TOKEN -c workers/wrangler/falcon.toml
+# FALCON_MODEL may stay empty — the worker reads the served id from /v1/models.
+[vars]
+FALCON_ENDPOINT_URL = ""
+FALCON_MODEL = ""
+
+[observability]
+enabled = true
