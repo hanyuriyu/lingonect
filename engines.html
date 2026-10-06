@@ -4116,6 +4116,29 @@ async function translateWithFanar(text, extra) {
 // the Space URL lives in the worker, the model id in the Space settings.
 const FALCON_PROXY = "https://falcon.hanyuriyu.workers.dev";
 
+// A 7B model does not infer the dialect from a label like "Arabic (Egypt)"
+// the way the large engines do — it falls back to the same generic Arabic for
+// every variant. Spell the variety out for it.
+const FALCON_ARABIC_VARIETIES = {
+  "Arabic (MSA)":     "Modern Standard Arabic (فصحى), formal written Arabic",
+  "Arabic (Egypt)":   "Egyptian Arabic (Masri, مصري) as Egyptians actually speak it",
+  "Arabic (Levant)":  "Levantine Arabic (Shami, شامي) as spoken in Syria, Lebanon, Jordan and Palestine",
+  "Arabic (Gulf)":    "Gulf Arabic (Khaleeji, خليجي) as spoken in the UAE, Saudi Arabia, Kuwait and Qatar",
+  "Arabic (Morocco)": "Moroccan Arabic (Darija, الدارجة) as Moroccans actually speak it",
+  "Arabic (Algeria)": "Algerian Arabic (Darja, الدارجة الجزائرية) as Algerians actually speak it",
+  "Arabic (Tunisia)": "Tunisian Arabic (Tounsi, تونسي) as Tunisians actually speak it",
+  "Arabic (Iraq)":    "Iraqi Arabic (Iraqi, عراقي) as Iraqis actually speak it",
+  "Arabic (Sudan)":   "Sudanese Arabic (سوداني) as Sudanese people actually speak it",
+  "Arabic (Yemen)":   "Yemeni Arabic (يمني) as Yemenis actually speak it"
+};
+
+function falconLanguageHint(tgt) {
+  const variety = FALCON_ARABIC_VARIETIES[tgt];
+  if (!variety) return "";
+  const notMsa = tgt === "Arabic (MSA)" ? "" : " Use the dialect's own everyday words and grammar, NOT Modern Standard Arabic.";
+  return `\n\nTARGET VARIETY: write the translation in ${variety}.${notMsa} Use Arabic script only — no letters from any other script.`;
+}
+
 async function translateWithFalcon(text, extra) {
   const res = await workerFetch(FALCON_PROXY, {
     method: "POST",
@@ -4124,10 +4147,13 @@ async function translateWithFalcon(text, extra) {
       messages: [
         {
           role: "system",
-          content: llmSystemPrompt(extra)
+          content: llmSystemPrompt(extra) + falconLanguageHint(targetLang)
         },
         { role: "user", content: `<text>${text}</text>` }
-      ]
+      ],
+      // Greedy decoding: sampling lets a small model drift into stray
+      // characters from other scripts.
+      temperature: 0
     })
   });
   if (!res.ok) throw await engineError("Falcon-H1", res);
