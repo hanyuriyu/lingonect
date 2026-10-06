@@ -20,7 +20,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 MODEL_ID = "tiiuae/Falcon-H1-Arabic-7B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-model = AutoModelForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16)
+model = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.bfloat16)
 # ZeroGPU: moving to "cuda" at import time is allowed; the GPU is only really
 # attached while a @spaces.GPU function runs.
 model.to("cuda")
@@ -51,17 +51,23 @@ def chat(messages_json: str, temperature: float = 0.3, max_tokens: int = 1024) -
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
-demo = gr.Interface(
-    fn=chat,
-    inputs=[
-        gr.Textbox(label="messages (JSON)", lines=6,
-                   value='[{"role": "user", "content": "Translate to Arabic: Good morning"}]'),
-        gr.Slider(0, 1, value=0.3, step=0.05, label="temperature"),
-        gr.Slider(16, 2048, value=1024, step=16, label="max_tokens"),
-    ],
-    outputs=gr.Textbox(label="reply"),
-    title="Falcon-H1-Arabic-7B-Instruct (Lingonect)",
-    api_name="chat",
-)
+# gr.Blocks with an explicit api_name on the event: the API route stays
+# /gradio_api/call/chat across Gradio 4, 5 and 6.
+with gr.Blocks(title="Falcon-H1-Arabic-7B-Instruct (Lingonect)") as demo:
+    gr.Markdown("## Falcon-H1-Arabic-7B-Instruct (Lingonect)")
+    messages_box = gr.Textbox(
+        label="messages (JSON)", lines=6,
+        value='[{"role": "user", "content": "Translate to Arabic: Good morning"}]',
+    )
+    temperature_box = gr.Slider(0, 1, value=0.3, step=0.05, label="temperature")
+    max_tokens_box = gr.Slider(16, 2048, value=1024, step=16, label="max_tokens")
+    run_btn = gr.Button("Submit", variant="primary")
+    reply_box = gr.Textbox(label="reply")
+    run_btn.click(
+        chat,
+        inputs=[messages_box, temperature_box, max_tokens_box],
+        outputs=reply_box,
+        api_name="chat",
+    )
 
 demo.queue(default_concurrency_limit=1).launch()
