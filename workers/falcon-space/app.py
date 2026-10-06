@@ -73,7 +73,7 @@ def chat(messages_json: str, temperature: float = 0.3, max_tokens: int = 1024) -
 
 # gr.Blocks with an explicit api_name on the event: the API route stays
 # /gradio_api/call/chat across Gradio 4, 5 and 6.
-with gr.Blocks(title="Falcon-H1-Arabic-7B-Instruct (Lingonect)") as demo:
+with gr.Blocks(title="Falcon-H1 (Lingonect)") as demo:
     gr.Markdown(f"## {MODEL_ID} (Lingonect)")
     if LOAD_ERROR:
         gr.Markdown("### ⚠️ The model failed to load. Copy this error and send it on:")
