@@ -1562,10 +1562,16 @@ a.tri-chip{ text-decoration:none; }
             <span class="lang-arrow">▾</span>
           </button>
           <div class="lang-dropdown" id="srcLangDropdown" role="listbox">
+            <button class="lang-option" data-lang="Arabic (Algeria)">Arabic (Algeria)</button>
             <button class="lang-option" data-lang="Arabic (Egypt)">Arabic (Egypt)</button>
             <button class="lang-option" data-lang="Arabic (Gulf)">Arabic (Gulf)</button>
+            <button class="lang-option" data-lang="Arabic (Iraq)">Arabic (Iraq)</button>
             <button class="lang-option" data-lang="Arabic (Levant)">Arabic (Levant)</button>
+            <button class="lang-option" data-lang="Arabic (Morocco)">Arabic (Morocco)</button>
             <button class="lang-option" data-lang="Arabic (MSA)">Arabic (MSA)</button>
+            <button class="lang-option" data-lang="Arabic (Sudan)">Arabic (Sudan)</button>
+            <button class="lang-option" data-lang="Arabic (Tunisia)">Arabic (Tunisia)</button>
+            <button class="lang-option" data-lang="Arabic (Yemen)">Arabic (Yemen)</button>
             <button class="lang-option" data-lang="Bengali">Bengali</button>
             <button class="lang-option" data-lang="Bulgarian">Bulgarian</button>
             <button class="lang-option" data-lang="Catalan">Catalan</button>
@@ -1637,10 +1643,16 @@ a.tri-chip{ text-decoration:none; }
             <span class="lang-arrow">▾</span>
           </button>
           <div class="lang-dropdown" id="langDropdown" role="listbox">
+            <button class="lang-option" data-lang="Arabic (Algeria)">Arabic (Algeria)</button>
             <button class="lang-option" data-lang="Arabic (Egypt)">Arabic (Egypt)</button>
             <button class="lang-option" data-lang="Arabic (Gulf)">Arabic (Gulf)</button>
+            <button class="lang-option" data-lang="Arabic (Iraq)">Arabic (Iraq)</button>
             <button class="lang-option" data-lang="Arabic (Levant)">Arabic (Levant)</button>
+            <button class="lang-option" data-lang="Arabic (Morocco)">Arabic (Morocco)</button>
             <button class="lang-option" data-lang="Arabic (MSA)">Arabic (MSA)</button>
+            <button class="lang-option" data-lang="Arabic (Sudan)">Arabic (Sudan)</button>
+            <button class="lang-option" data-lang="Arabic (Tunisia)">Arabic (Tunisia)</button>
+            <button class="lang-option" data-lang="Arabic (Yemen)">Arabic (Yemen)</button>
             <button class="lang-option" data-lang="Bengali">Bengali</button>
             <button class="lang-option" data-lang="Bulgarian">Bulgarian</button>
             <button class="lang-option" data-lang="Catalan">Catalan</button>
@@ -2450,7 +2462,7 @@ const LANG_VARIANT_GROUPS = [
   ["Spanish (EU)", "Spanish (LATAM)"],
   ["French (EU)", "French (Canada)"],
   ["Portuguese (Brazil)", "Portuguese (Portugal)"],
-  ["Arabic (MSA)", "Arabic (Egypt)", "Arabic (Levant)", "Arabic (Gulf)"]
+  ["Arabic (MSA)", "Arabic (Egypt)", "Arabic (Levant)", "Arabic (Gulf)", "Arabic (Morocco)", "Arabic (Algeria)", "Arabic (Tunisia)", "Arabic (Iraq)", "Arabic (Sudan)", "Arabic (Yemen)"]
 ];
 
 function sameLanguageFamily(a, b) {
@@ -2962,7 +2974,7 @@ function localizeClause(max) {
 // and the standard romanization for everything else.
 const NON_LATIN_LANGS = new Set([
   "Russian", "Ukrainian", "Bulgarian", "Serbian", "Greek", "Georgian",
-  "Arabic (MSA)", "Arabic (Egypt)", "Arabic (Levant)", "Arabic (Gulf)",
+  "Arabic (MSA)", "Arabic (Egypt)", "Arabic (Levant)", "Arabic (Gulf)", "Arabic (Morocco)", "Arabic (Algeria)", "Arabic (Tunisia)", "Arabic (Iraq)", "Arabic (Sudan)", "Arabic (Yemen)",
   "Hebrew", "Persian (Farsi)", "Hindi", "Urdu", "Bengali",
   "Tamil", "Telugu", "Marathi", "Gujarati", "Kannada", "Malayalam", "Punjabi", "Odia",
   "Japanese", "Chinese (Simplified)", "Chinese (Traditional)", "Korean", "Thai"
@@ -3050,6 +3062,36 @@ const ROMANIZATION_GUIDES = {
   "Arabic (Gulf)": {
     label: "ALA-LC style",
     method: "an ALA-LC-style phonemic romanization that reflects how Gulf Arabic is actually pronounced (e.g. y or j for ج, ch for ك where it affricates) rather than the MSA reading",
+    stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
+  },
+  "Arabic (Morocco)": {
+    label: "ALA-LC style",
+    method: "an ALA-LC-style phonemic romanization that reflects how Moroccan Arabic (Darija) is actually pronounced (e.g. g for ق in many words, and the consonant clusters left by its dropped short vowels) rather than the MSA reading",
+    stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
+  },
+  "Arabic (Algeria)": {
+    label: "ALA-LC style",
+    method: "an ALA-LC-style phonemic romanization that reflects how Algerian Arabic is actually pronounced (e.g. g for ق in many regions, and the consonant clusters left by its dropped short vowels) rather than the MSA reading",
+    stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
+  },
+  "Arabic (Tunisia)": {
+    label: "ALA-LC style",
+    method: "an ALA-LC-style phonemic romanization that reflects how Tunisian Arabic is actually pronounced (e.g. g for ق in rural speech, and the consonant clusters left by its dropped short vowels) rather than the MSA reading",
+    stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
+  },
+  "Arabic (Iraq)": {
+    label: "ALA-LC style",
+    method: "an ALA-LC-style phonemic romanization that reflects how Iraqi Arabic is actually pronounced (e.g. g for ق and ch for ك where they shift) rather than the MSA reading",
+    stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
+  },
+  "Arabic (Sudan)": {
+    label: "ALA-LC style",
+    method: "an ALA-LC-style phonemic romanization that reflects how Sudanese Arabic is actually pronounced (e.g. g for ق, j for ج) rather than the MSA reading",
+    stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
+  },
+  "Arabic (Yemen)": {
+    label: "ALA-LC style",
+    method: "an ALA-LC-style phonemic romanization that reflects how Yemeni Arabic is actually pronounced (e.g. g for ق in Sanaani) rather than the MSA reading",
     stress: "write every short vowel out in full — the script omits them — and mark the stressed syllable with an acute accent"
   },
   "Hebrew": {
@@ -3526,7 +3568,7 @@ const GOOGLE_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -3556,7 +3598,7 @@ const DEEPL_LANG_MAP = {
   "Greek":"EL","Romanian":"RO","Hungarian":"HU","Czech":"CS","Slovak":"SK",
   "Bulgarian":"BG","Croatian":"HR","Serbian":"SR","Lithuanian":"LT",
   "Latvian":"LV","Estonian":"ET","Slovenian":"SL","Catalan":"CA","Icelandic":"IS",
-  "Arabic (MSA)":"AR","Arabic (Egypt)":"AR","Arabic (Levant)":"AR","Arabic (Gulf)":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
+  "Arabic (MSA)":"AR","Arabic (Egypt)":"AR","Arabic (Levant)":"AR","Arabic (Gulf)":"AR","Arabic (Morocco)":"AR","Arabic (Algeria)":"AR","Arabic (Tunisia)":"AR","Arabic (Iraq)":"AR","Arabic (Sudan)":"AR","Arabic (Yemen)":"AR","Hebrew":"HE","Persian (Farsi)":"FA","Hindi":"HI","Urdu":"UR","Bengali":"BN",
   "Japanese":"JA","Chinese (Simplified)":"ZH-HANS","Chinese (Traditional)":"ZH-HANT","Korean":"KO",
   "Thai":"TH","Vietnamese":"VI","Indonesian":"ID","Malay":"MS","Tagalog (Filipino)":"TL"
 };
@@ -3665,7 +3707,7 @@ const TENCENT_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
@@ -3752,7 +3794,7 @@ const MICROSOFT_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh-Hans","Chinese (Traditional)":"zh-Hant","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"fil"
@@ -3790,7 +3832,7 @@ const AMAZON_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -3836,7 +3878,7 @@ const NLLB_LANG_MAP = {
   "Greek":"ell_Grek","Romanian":"ron_Latn","Hungarian":"hun_Latn","Czech":"ces_Latn","Slovak":"slk_Latn",
   "Bulgarian":"bul_Cyrl","Croatian":"hrv_Latn","Serbian":"srp_Cyrl","Lithuanian":"lit_Latn",
   "Latvian":"lvs_Latn","Estonian":"est_Latn","Slovenian":"slv_Latn","Catalan":"cat_Latn","Icelandic":"isl_Latn","Georgian":"kat_Geor",
-  "Arabic (MSA)":"arb_Arab","Arabic (Egypt)":"arz_Arab","Arabic (Levant)":"apc_Arab","Arabic (Gulf)":"ars_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
+  "Arabic (MSA)":"arb_Arab","Arabic (Egypt)":"arz_Arab","Arabic (Levant)":"apc_Arab","Arabic (Gulf)":"ars_Arab","Arabic (Morocco)":"ary_Arab","Arabic (Algeria)":"arb_Arab","Arabic (Tunisia)":"aeb_Arab","Arabic (Iraq)":"acm_Arab","Arabic (Sudan)":"arb_Arab","Arabic (Yemen)":"acq_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
   "Tamil":"tam_Taml","Telugu":"tel_Telu","Marathi":"mar_Deva","Gujarati":"guj_Gujr","Kannada":"kan_Knda","Malayalam":"mal_Mlym","Punjabi":"pan_Guru","Odia":"ory_Orya",
   "Japanese":"jpn_Jpan","Chinese (Simplified)":"zho_Hans","Chinese (Traditional)":"zho_Hant","Korean":"kor_Hang",
   "Thai":"tha_Thai","Vietnamese":"vie_Latn","Indonesian":"ind_Latn","Malay":"zsm_Latn","Tagalog (Filipino)":"tgl_Latn"
@@ -4078,7 +4120,7 @@ const BAIDU_LANG_MAP = {
   "Greek":"el","Romanian":"rom","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bul","Croatian":"hrv","Serbian":"srp","Lithuanian":"lit",
   "Latvian":"lav","Estonian":"est","Slovenian":"slo","Catalan":"cat","Icelandic":"ice","Georgian":"kat",
-  "Arabic (MSA)":"ara","Arabic (Egypt)":"ara","Arabic (Levant)":"ara","Arabic (Gulf)":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
+  "Arabic (MSA)":"ara","Arabic (Egypt)":"ara","Arabic (Levant)":"ara","Arabic (Gulf)":"ara","Arabic (Morocco)":"ara","Arabic (Algeria)":"ara","Arabic (Tunisia)":"ara","Arabic (Iraq)":"ara","Arabic (Sudan)":"ara","Arabic (Yemen)":"ara","Hebrew":"heb","Persian (Farsi)":"per","Hindi":"hi","Urdu":"urd","Bengali":"ben",
   "Japanese":"jp","Chinese (Simplified)":"zh","Chinese (Traditional)":"cht","Korean":"kor",
   "Thai":"th","Vietnamese":"vie","Indonesian":"id","Malay":"may","Tagalog (Filipino)":"tl"
 };
@@ -4124,7 +4166,7 @@ const YANDEX_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
 };
@@ -6617,7 +6659,7 @@ const SPEECH_LANG_MAP = {
   "Greek":"el-GR","Romanian":"ro-RO","Hungarian":"hu-HU","Czech":"cs-CZ","Slovak":"sk-SK",
   "Bulgarian":"bg-BG","Croatian":"hr-HR","Serbian":"sr-RS","Lithuanian":"lt-LT",
   "Latvian":"lv-LV","Estonian":"et-EE","Slovenian":"sl-SI","Catalan":"ca-ES","Icelandic":"is-IS","Georgian":"ka-GE",
-  "Arabic (MSA)":"ar-SA","Arabic (Egypt)":"ar-EG","Arabic (Levant)":"ar-LB","Arabic (Gulf)":"ar-AE","Hebrew":"he-IL","Persian (Farsi)":"fa-IR","Hindi":"hi-IN","Hinglish":"en-IN","Urdu":"ur-PK","Bengali":"bn-BD",
+  "Arabic (MSA)":"ar-SA","Arabic (Egypt)":"ar-EG","Arabic (Levant)":"ar-LB","Arabic (Gulf)":"ar-AE","Arabic (Morocco)":"ar-MA","Arabic (Algeria)":"ar-DZ","Arabic (Tunisia)":"ar-TN","Arabic (Iraq)":"ar-IQ","Arabic (Sudan)":"ar-SD","Arabic (Yemen)":"ar-YE","Hebrew":"he-IL","Persian (Farsi)":"fa-IR","Hindi":"hi-IN","Hinglish":"en-IN","Urdu":"ur-PK","Bengali":"bn-BD",
   "Tamil":"ta-IN","Telugu":"te-IN","Marathi":"mr-IN","Gujarati":"gu-IN","Kannada":"kn-IN","Malayalam":"ml-IN","Punjabi":"pa-IN","Odia":"or-IN",
   "Japanese":"ja-JP","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko-KR",
   "Thai":"th-TH","Vietnamese":"vi-VN","Indonesian":"id-ID","Malay":"ms-MY","Tagalog (Filipino)":"fil-PH"
