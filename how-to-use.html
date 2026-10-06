@@ -141,6 +141,17 @@ mark{
   border-radius:2px;
 }
 
+/* subtler step / source lists (Triangulation) */
+.sub-list{
+  font-size:14px;
+  line-height:1.7;
+  color:#444;
+  margin:0 0 16px;
+  padding-left:22px;
+}
+.sub-list li{ margin-bottom:6px; }
+.sub-list strong{ font-weight:600; color:#222; }
+
 /* ── WARNING CALLOUT ── */
 .callout{
   border:none;
@@ -375,13 +386,13 @@ mark{
 
   <h2>Triangulation</h2>
 
-  <p>Triangulation is for when you want an <strong>answer</strong>, not a translation, and do not want to trust a single AI for it. It accepts <strong>only a question</strong> — for example <em>“Why did the Roman Empire fall?”</em> or <em>“Is coffee bad for your heart?”</em>. Write the question in any language: that is your <strong>source language</strong>. The answer comes back in the <strong>target language</strong> you have selected. If your input is not a question, you will be asked to rephrase it.</p>
+  <p>Triangulation is for when you want an <strong>answer</strong>, not a translation, and do not want to trust a single AI for it. It accepts <strong>only a question</strong>, for example <em>“Why did the Roman Empire fall?”</em> or <em>“Is coffee bad for your heart?”</em>. Write the question in any language: that is your <strong>source language</strong>. The answer comes back in the <strong>target language</strong> you have selected. If your input is not a question, you will be asked to rephrase it.</p>
 
   <p>Instead of showing one answer per engine, triangulation works out <strong>what the LLMs agree on</strong>, in four steps:</p>
 
-  <ol>
+  <ol class="sub-list">
     <li><strong>Ask everyone.</strong> Every available LLM answers your question independently.</li>
-    <li><strong>Break it down and cross-check.</strong> Each answer is split into <strong>atomic claims</strong> — single, checkable statements — and the claims are compared across all the models. Each claim is marked as <strong>consensus</strong> (most models agree), <strong>partial agreement</strong> (some agree, none object), <strong>contested</strong> (models contradict each other) or <strong>single model</strong> (only one model says it).</li>
+    <li><strong>Break it down and cross-check.</strong> Each answer is split into <strong>atomic claims</strong> (single, checkable statements), and the claims are compared across all the models. Each claim is marked as <strong>consensus</strong> (most models agree), <strong>partial agreement</strong> (some agree, none object), <strong>contested</strong> (models contradict each other) or <strong>single model</strong> (only one model says it).</li>
     <li><strong>Let the models argue it out.</strong> The claims that are not consensus go back to every model, which critiques them: support, refute or unsure. A claim most models support is promoted to consensus; one most models refute is marked <strong>rejected</strong>; the rest stay open.</li>
     <li><strong>Write the answer.</strong> A single summary is written from the consensus claims. Disagreements are <strong>not thrown away</strong>: they are reported as hedged alternatives (“some sources hold…, others…”), followed by what is worth verifying.</li>
   </ol>
@@ -390,15 +401,15 @@ mark{
 
   <p>Two outside sources help you check the answer yourself:</p>
 
-  <ul>
+  <ul class="sub-list">
     <li><strong>Wikipedia.</strong> Triangulation looks your question up on Wikipedia, in your source language and in English, and checks every claim against the articles it finds. A claim the article confirms gets a green <strong>Wikipedia ✓</strong> tag; one it contradicts gets a red <strong>Wikipedia ✗</strong> tag. Each tag links to the article. The tags are <strong>for reference only</strong>: they never change a claim's status, the concordance score or the written answer. No tag simply means the article did not cover that claim, not that the claim is wrong.</li>
     <li><strong>Perplexity's web sources.</strong> Perplexity is the one LLM that searches the web while it answers. Claims it backed are marked <strong>“web”</strong>, and the pages it used are listed under the answer so you can open them. Remember that Perplexity is still an LLM: it counts as one opinion among the others, and its sources show where it looked, not that it read them correctly.</li>
   </ul>
 
-  <p>Every answer also gets an <mark>inter-model concordance score</mark> from 0 to 100%: how far the models agree at the level of individual claims. Each claim counts by the share of models that back it, and claims more models took a position on count more. <strong>75% or more</strong> means a robust cross-model consensus; <strong>50–75%</strong> means the core is agreed but the details vary; <strong>below 50%</strong> means the claims need checking.</p>
+  <p>Every answer also gets an <mark>inter-model concordance score</mark> from 0 to 100%: how far the models agree at the level of individual claims. Each claim counts by the share of models that back it, and claims more models took a position on count more. <strong>75% or more</strong> means a robust cross-model consensus; <strong>50 to 75%</strong> means the core is agreed but the details vary; <strong>below 50%</strong> means the claims need checking.</p>
 
   <div class="note">
-    <strong>High concordance is not proof.</strong> The LLMs share similar architectures and much of the same training data, so they are <strong>semi-independent</strong> sources, not fully independent ones, and can be wrong together. Read the concordance score as a measure of <strong>how consistently the models agree</strong>, not as a guarantee that the answer is true. For anything important, verify contested and low-concordance claims against an authoritative source. Triangulation is available to <strong>full members only</strong> — it is not part of the free plan. It is an <strong>LLM-only</strong> methodology; localization and formality do not apply. Because every LLM answers and then critiques, it <mark>uses roughly two requests per LLM plus a few for the analysis</mark>, so it counts more against your daily request limit and takes longer than a translation.
+    <strong>High concordance is not proof.</strong> The LLMs share similar architectures and much of the same training data, so they are <strong>semi-independent</strong> sources, not fully independent ones, and can be wrong together. Read the concordance score as a measure of <strong>how consistently the models agree</strong>, not as a guarantee that the answer is true. For anything important, verify contested and low-concordance claims against an authoritative source. Triangulation is available to <strong>full members only</strong>; it is not part of the free plan. It is an <strong>LLM-only</strong> methodology; localization and formality do not apply. Because every LLM answers and then critiques, it <mark>uses roughly two requests per LLM plus a few for the analysis</mark>, so it counts more against your daily request limit and takes longer than a translation.
   </div>
 
   <h2>Selecting a methodology</h2>
