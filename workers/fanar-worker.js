@@ -14,6 +14,8 @@
  *   FANAR_BASE_URL  (var, optional)    — API host, defaults to api.fanar.qa/v1
  *   FANAR_MODEL     (var, optional)    — model id, so a rename upstream is a
  *                                        dashboard edit, not a deploy
+ *   FANAR_FALLBACK_MODEL (var, optional) — model retried once when the main
+ *                                        one refuses (401/403/429) or errors
  *
  * The worker will be available at:
  *   https://fanar.hanyuriyu.workers.dev
@@ -314,19 +316,30 @@ export default {
       }
 
       const body = await request.json();
-      const res = await fetch(`${base}/chat/completions`, {
+      const call = (model) => fetch(`${base}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: body.model || __t(env.FANAR_MODEL) || "Fanar-C-2-27B",
+          model,
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
         }),
       });
+
+      const primary = body.model || __t(env.FANAR_MODEL) || "Fanar-C-2-27B";
+      let res = await call(primary);
+      // The 27B model intermittently refuses a key that works seconds later
+      // (401/403), rate-limits (429) or errors (5xx). Retry once on the smaller
+      // model rather than show the user a failure. A 400 is our request's
+      // fault, and the same request would fail on any model.
+      const fallback = __t(env.FANAR_FALLBACK_MODEL);
+      if ([401, 403, 429].includes(res.status) || res.status >= 500) {
+        if (fallback && fallback !== primary) res = await call(fallback);
+      }
       // Forwarded verbatim so the site's error classifier sees Fanar's wording.
       return new Response(await res.text(), {
         status: res.status,

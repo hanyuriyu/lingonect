@@ -15,6 +15,9 @@ id = "f9f80346649545989106f2b6459bbb28"
 # answered a one-line translation request with an unrelated article.
 [vars]
 FANAR_MODEL = "Fanar-C-2-27B"
+# Retried once when the main model refuses or errors; the 27B model does so
+# intermittently with a key that works moments later.
+FANAR_FALLBACK_MODEL = "Fanar-S-1-7B"
 
 [observability]
 enabled = true
