@@ -11,8 +11,10 @@ id = "f9f80346649545989106f2b6459bbb28"
 
 # Model id lives here so a rename upstream is a config edit, not a code change.
 # GET the deployed worker to see which ids the key can actually reach.
+# Pinned to the 27B chat model: the bare "Fanar" id routes requests and once
+# answered a one-line translation request with an unrelated article.
 [vars]
-FANAR_MODEL = "Fanar"
+FANAR_MODEL = "Fanar-C-2-27B"
 
 [observability]
 enabled = true
