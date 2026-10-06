@@ -1,5 +1,9 @@
 """
-Lingonect — Falcon-H1-Arabic on a Hugging Face ZeroGPU Space.
+Lingonect — Falcon-H1 on a Hugging Face ZeroGPU Space.
+
+Runs tiiuae/Falcon-H1-7B-Instruct (multilingual, Arabic among its 18 training
+languages). Falcon-H1-Arabic is not published on Hugging Face; if TII grants
+access, set MODEL_ID in the Space settings to switch.
 
 Upload this file and requirements.txt to a private Gradio Space with
 "ZeroGPU" hardware. The Cloudflare worker (workers/falcon-worker.js) calls the
@@ -11,21 +15,26 @@ API: chat(messages_json: str, temperature: float, max_tokens: int) -> str
   "content": "..."}]
 """
 import json
+import os
 
 import gradio as gr
 import spaces
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-MODEL_ID = "tiiuae/Falcon-H1-Arabic-7B-Instruct"
+# Both can be changed in the Space's Settings → "Variables and secrets"
+# without touching this file: MODEL_ID (variable) and HF_TOKEN (secret, needed
+# when the model is gated — accept its terms on the model page first).
+MODEL_ID = os.environ.get("MODEL_ID", "tiiuae/Falcon-H1-7B-Instruct").strip()
+HF_TOKEN = os.environ.get("HF_TOKEN") or None
 
 # If loading fails, keep the app up and show the error on the page (and in
 # API replies) instead of crashing the Space with a bare "Runtime error".
 LOAD_ERROR = None
 tokenizer = model = None
 try:
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.bfloat16)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=HF_TOKEN)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.bfloat16, token=HF_TOKEN)
     # ZeroGPU: moving to "cuda" at import time is allowed; the GPU is only
     # really attached while a @spaces.GPU function runs.
     model.to("cuda")
@@ -64,8 +73,8 @@ def chat(messages_json: str, temperature: float = 0.3, max_tokens: int = 1024) -
 
 # gr.Blocks with an explicit api_name on the event: the API route stays
 # /gradio_api/call/chat across Gradio 4, 5 and 6.
-with gr.Blocks(title="Falcon-H1-Arabic-7B-Instruct (Lingonect)") as demo:
-    gr.Markdown("## Falcon-H1-Arabic-7B-Instruct (Lingonect)")
+with gr.Blocks(title="Falcon-H1 (Lingonect)") as demo:
+    gr.Markdown(f"## {MODEL_ID} (Lingonect)")
     if LOAD_ERROR:
         gr.Markdown("### ⚠️ The model failed to load. Copy this error and send it on:")
         gr.Code(LOAD_ERROR, language=None)

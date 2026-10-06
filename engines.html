@@ -4111,10 +4111,9 @@ async function translateWithFanar(text, extra) {
   return data.choices[0].message.content.trim();
 }
 
-// ── Falcon-H1-Arabic (via Cloudflare Worker → our Hugging Face Inference
-// Endpoint) — TII's Arabic specialist. TII has no hosted API, so the 7B
-// Instruct model runs on a dedicated endpoint; the endpoint URL and model id
-// live in the worker.
+// ── Falcon-H1 (via Cloudflare Worker → our Hugging Face ZeroGPU Space) — TII's
+// multilingual hybrid model (Falcon-H1-7B-Instruct). TII has no hosted API;
+// the Space URL lives in the worker, the model id in the Space settings.
 const FALCON_PROXY = "https://falcon.hanyuriyu.workers.dev";
 
 async function translateWithFalcon(text, extra) {
@@ -4131,7 +4130,7 @@ async function translateWithFalcon(text, extra) {
       ]
     })
   });
-  if (!res.ok) throw await engineError("Falcon-H1-Arabic", res);
+  if (!res.ok) throw await engineError("Falcon-H1", res);
   const data = await res.json();
   return data.choices[0].message.content.trim();
 }
@@ -4546,7 +4545,7 @@ const engines = [
   },
   {
     id:         "falcon",
-    name:       "Falcon-H1-Arabic",
+    name:       "Falcon-H1",
     logoUrl:    "falcon-h1-arabic-1.png",
     badgeClass: "falcon",
     badgeText:  "FA",

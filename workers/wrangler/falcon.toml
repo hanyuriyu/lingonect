@@ -9,7 +9,7 @@ preview_urls = false
 binding = "QUOTA_KV"
 id = "f9f80346649545989106f2b6459bbb28"
 
-# Falcon-H1-Arabic-7B-Instruct runs on our own Hugging Face backend. HF_TOKEN
+# Falcon-H1-7B-Instruct runs on our own Hugging Face backend. HF_TOKEN
 # is a secret:  npx wrangler secret put HF_TOKEN -c workers/wrangler/falcon.toml
 #
 # ZeroGPU Space (HF PRO): set FALCON_SPACE_URL to the Space's direct URL, e.g.
