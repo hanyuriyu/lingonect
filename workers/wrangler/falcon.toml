@@ -9,11 +9,15 @@ preview_urls = false
 binding = "QUOTA_KV"
 id = "f9f80346649545989106f2b6459bbb28"
 
-# Falcon-H1-Arabic-7B-Instruct runs on our own Hugging Face Inference Endpoint.
-# Paste the endpoint URL from the HF dashboard here. HF_TOKEN is a secret:
-#   npx wrangler secret put HF_TOKEN -c workers/wrangler/falcon.toml
-# FALCON_MODEL may stay empty — the worker reads the served id from /v1/models.
+# Falcon-H1-Arabic-7B-Instruct runs on our own Hugging Face backend. HF_TOKEN
+# is a secret:  npx wrangler secret put HF_TOKEN -c workers/wrangler/falcon.toml
+#
+# ZeroGPU Space (HF PRO): set FALCON_SPACE_URL to the Space's direct URL, e.g.
+#   https://hanyuriyu-falcon-arabic.hf.space   (Space ⋮ menu → "Embed this Space")
+# Inference Endpoint instead: leave FALCON_SPACE_URL empty and set
+# FALCON_ENDPOINT_URL; FALCON_MODEL may stay empty (read from /v1/models).
 [vars]
+FALCON_SPACE_URL = ""
 FALCON_ENDPOINT_URL = ""
 FALCON_MODEL = ""
 

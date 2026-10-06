@@ -2,31 +2,36 @@
  * Cloudflare Worker: Falcon-H1-Arabic Translation Proxy (Technology Innovation
  * Institute's Arabic LLM, Abu Dhabi)
  *
- * TII offers no hosted API — the weights are only on Hugging Face. We run
- * tiiuae/Falcon-H1-Arabic-7B-Instruct on our own Hugging Face Inference
- * Endpoint (vLLM engine), which exposes an OpenAI-compatible API at
- *   https://<endpoint-id>.<region>.<cloud>.endpoints.huggingface.cloud/v1
+ * TII offers no hosted API — the weights are only on Hugging Face — so we run
+ * tiiuae/Falcon-H1-Arabic-7B-Instruct ourselves. Two backends are supported;
+ * the worker picks the Space when FALCON_SPACE_URL is set:
+ *
+ *   A. ZeroGPU Space (HF PRO, $9/month): a private Gradio Space running
+ *      workers/falcon-space/app.py. Requests use the HF token owner's daily
+ *      ZeroGPU quota (~25 GPU-minutes on PRO).
+ *        FALCON_SPACE_URL = https://<user>-<space>.hf.space
+ *   B. Inference Endpoint (pay per GPU-hour): vLLM engine, OpenAI-compatible.
+ *        FALCON_ENDPOINT_URL = https://<id>.<region>.<cloud>.endpoints.huggingface.cloud
  *
  * Deploy steps:
  *   1. npx wrangler secret put HF_TOKEN -c workers/wrangler/falcon.toml
- *   2. Set FALCON_ENDPOINT_URL in workers/wrangler/falcon.toml
+ *   2. Set FALCON_SPACE_URL (or FALCON_ENDPOINT_URL) in workers/wrangler/falcon.toml
  *   3. npx wrangler deploy -c workers/wrangler/falcon.toml
  *
  * Environment:
- *   HF_TOKEN             (secret, required) — HF access token with permission
- *                                            to call the endpoint
- *   FALCON_ENDPOINT_URL  (var, required)    — the endpoint URL from the HF
- *                                            dashboard (with or without /v1)
- *   FALCON_MODEL         (var, optional)    — served model id; when empty the
- *                                            worker asks the endpoint's /models
+ *   HF_TOKEN             (secret, required) — HF access token ("Read" is enough)
+ *   FALCON_SPACE_URL     (var)              — backend A
+ *   FALCON_ENDPOINT_URL  (var)              — backend B (with or without /v1)
+ *   FALCON_MODEL         (var, optional)    — backend B only: served model id;
+ *                                            when empty the worker asks /models
  *
  * The worker will be available at:
  *   https://falcon.hanyuriyu.workers.dev
  *
- * GET returns the endpoint's model list. POST proxies a chat completion.
- * With scale-to-zero, the first request after an idle spell wakes the GPU;
- * HF answers 503 for the minutes that takes, and we pass that on as a plain
- * "warming up" message rather than a generic failure.
+ * Either way the site gets an OpenAI-style chat-completion response back.
+ * GET checks the backend is reachable. A sleeping backend (scale-to-zero
+ * endpoint, or a Space that has gone to sleep) is reported as "warming up";
+ * a spent ZeroGPU quota as "quota_exhausted".
  */
 
 // ---------------------------------------------------------------------------
@@ -205,6 +210,92 @@ function __json(request, status, obj) {
   });
 }
 
+function __warmingUp(request) {
+  return __json(request, 503, {
+    error: {
+      message: "Falcon is warming up (the server sleeps when idle). Please try again in a minute or two.",
+      code: "warming_up",
+    },
+  });
+}
+
+// ── Backend A: ZeroGPU Space ────────────────────────────────────────────────
+// Gradio's HTTP API is two steps: POST /gradio_api/call/chat returns an
+// event_id, then GET /gradio_api/call/chat/<event_id> streams server-sent
+// events until "complete" (data: ["<reply>"]) or "error".
+async function __viaSpace(request, space, authHeaders) {
+  if (request.method === "GET") {
+    const infoRes = await fetch(`${space}/gradio_api/info`, { headers: authHeaders });
+    if (infoRes.status === 503) return __warmingUp(request);
+    return new Response(await infoRes.text(), {
+      status: infoRes.status,
+      headers: {
+        "Content-Type": infoRes.headers.get("Content-Type") || "application/json",
+        "Access-Control-Allow-Origin": corsOrigin(request),
+      },
+    });
+  }
+
+  const body = await request.json();
+  const callRes = await fetch(`${space}/gradio_api/call/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders },
+    body: JSON.stringify({
+      data: [
+        JSON.stringify(body.messages || []),
+        body.temperature ?? 0.3,
+        body.max_tokens ?? 1024,
+      ],
+    }),
+  });
+  // A sleeping or rebuilding Space answers 503 (or 404 while it boots).
+  if (callRes.status === 503 || callRes.status === 404) return __warmingUp(request);
+  if (!callRes.ok) {
+    return __json(request, callRes.status, {
+      error: { message: `Falcon Space error: ${(await callRes.text()).slice(0, 300)}` },
+    });
+  }
+  const { event_id } = await callRes.json();
+  if (!event_id) {
+    return __json(request, 502, { error: { message: "Falcon Space returned no event id." } });
+  }
+
+  const streamRes = await fetch(`${space}/gradio_api/call/chat/${event_id}`, { headers: authHeaders });
+  const sse = await streamRes.text();
+
+  // Walk the SSE blocks; the last "complete" or "error" one decides.
+  let reply = null, errorText = null;
+  for (const block of sse.split(/\n\n+/)) {
+    const ev = (block.match(/^event:\s*(.+)$/m) || [])[1];
+    const dataLine = (block.match(/^data:\s*(.*)$/m) || [])[1];
+    if (ev === "complete") {
+      try { reply = JSON.parse(dataLine)[0]; } catch (_) { reply = null; }
+    } else if (ev === "error") {
+      errorText = dataLine && dataLine !== "null" ? dataLine : "unknown error";
+    }
+  }
+
+  if (typeof reply === "string") {
+    // Shaped like an OpenAI chat completion so the site parses it unchanged.
+    return __json(request, 200, {
+      object: "chat.completion",
+      model: "tiiuae/Falcon-H1-Arabic-7B-Instruct",
+      choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
+    });
+  }
+
+  const msg = String(errorText || sse.slice(0, 300) || "empty response");
+  if (/quota/i.test(msg)) {
+    return __json(request, 429, {
+      error: {
+        message: "Falcon has used up today's free GPU time. Please try again tomorrow.",
+        code: "quota_exhausted",
+      },
+    });
+  }
+  return __json(request, 502, { error: { message: `Falcon Space error: ${msg}` } });
+}
+
 export default {
   async fetch(request, env) {
     // Handle CORS preflight
@@ -305,20 +396,24 @@ export default {
     // A missing secret would otherwise reach HF as "Bearer undefined" and come
     // back as a 401 — indistinguishable from a revoked token. Say so plainly.
     const apiKey = __t(env.HF_TOKEN);
+    const space = __t(env.FALCON_SPACE_URL).replace(/\/+$/, "");
     const endpoint = __t(env.FALCON_ENDPOINT_URL).replace(/\/+$/, "");
-    if (!apiKey || !endpoint) {
+    if (!apiKey || (!space && !endpoint)) {
       return __json(request, 503, {
         error: {
-          message: `Falcon is not configured on our side: ${!apiKey ? "HF_TOKEN" : "FALCON_ENDPOINT_URL"} is not set.`,
+          message: `Falcon is not configured on our side: ${!apiKey ? "HF_TOKEN" : "FALCON_SPACE_URL"} is not set.`,
           code: "not_configured",
         },
       });
     }
 
-    const base = endpoint.endsWith("/v1") ? endpoint : `${endpoint}/v1`;
     const authHeaders = { "Authorization": `Bearer ${apiKey}` };
 
     try {
+      if (space) return await __viaSpace(request, space, authHeaders);
+
+      const base = endpoint.endsWith("/v1") ? endpoint : `${endpoint}/v1`;
+
       // GET → model list, to confirm the endpoint is up and what it serves.
       if (request.method === "GET") {
         const listRes = await fetch(`${base}/models`, { headers: authHeaders });
@@ -339,12 +434,7 @@ export default {
           model = list && list.data && list.data[0] && list.data[0].id;
           if (model) __servedModel = model;
         } else if (listRes.status === 503) {
-          return __json(request, 503, {
-            error: {
-              message: "Falcon is warming up (the server sleeps when idle). Please try again in a minute or two.",
-              code: "warming_up",
-            },
-          });
+          return __warmingUp(request);
         }
       }
 
@@ -359,14 +449,7 @@ export default {
           max_tokens: body.max_tokens ?? 1024,
         }),
       });
-      if (res.status === 503) {
-        return __json(request, 503, {
-          error: {
-            message: "Falcon is warming up (the server sleeps when idle). Please try again in a minute or two.",
-            code: "warming_up",
-          },
-        });
-      }
+      if (res.status === 503) return __warmingUp(request);
       // Forwarded verbatim so the site's error classifier sees the upstream wording.
       return new Response(await res.text(), {
         status: res.status,
