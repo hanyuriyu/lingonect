@@ -1,16 +1,39 @@
 /**
- * Cloudflare Worker: Jais Translation Proxy (via Azure AI Foundry)
+ * Cloudflare Worker: Jais 2 Translation Proxy (Inception / MBZUAI, Abu Dhabi)
  *
- * Environment secrets required:
- *   Settings > Variables and Secrets > Add:
- *     JAIS_ENDPOINT  (e.g. https://<resource>.services.ai.azure.com)
- *     JAIS_API_KEY   (encrypt)
+ * Inception offers no public pay-as-you-go API (the old Azure jais-30b-chat
+ * listing was never usable for us), so we run inception42/Jais-2-8B-Chat
+ * ourselves, exactly like Falcon. Jais-2-70B-Chat is ~144 GB in bf16 and does
+ * not fit a ZeroGPU slot; it would need backend B on a multi-GPU endpoint.
+ * Two backends are supported; the worker picks the Space when JAIS_SPACE_URL
+ * is set:
  *
- * Deploy jais-30b-chat as a serverless API in Azure AI Foundry,
- * then set the endpoint URL and API key above.
+ *   A. ZeroGPU Space (HF PRO, $9/month): a private Gradio Space running
+ *      workers/jais-space/app.py. Requests use the HF token owner's daily
+ *      ZeroGPU quota (~25 GPU-minutes on PRO, shared with the Falcon Space).
+ *        JAIS_SPACE_URL = https://<user>-<space>.hf.space
+ *   B. Inference Endpoint (pay per GPU-hour): vLLM engine, OpenAI-compatible.
+ *        JAIS_ENDPOINT_URL = https://<id>.<region>.<cloud>.endpoints.huggingface.cloud
+ *
+ * Deploy steps:
+ *   1. npx wrangler secret put HF_TOKEN -c workers/wrangler/jais.toml
+ *   2. Set JAIS_SPACE_URL (or JAIS_ENDPOINT_URL) in workers/wrangler/jais.toml
+ *   3. npx wrangler deploy -c workers/wrangler/jais.toml
+ *
+ * Environment:
+ *   HF_TOKEN           (secret, required) — HF access token ("Read" is enough)
+ *   JAIS_SPACE_URL     (var)              — backend A
+ *   JAIS_ENDPOINT_URL  (var)              — backend B (with or without /v1)
+ *   JAIS_MODEL         (var, optional)    — backend B only: served model id;
+ *                                          when empty the worker asks /models
  *
  * The worker will be available at:
  *   https://jais.hanyuriyu.workers.dev
+ *
+ * Either way the site gets an OpenAI-style chat-completion response back.
+ * GET checks the backend is reachable. A sleeping backend (scale-to-zero
+ * endpoint, or a Space that has gone to sleep) is reported as "warming up";
+ * a spent ZeroGPU quota as "quota_exhausted".
  */
 
 // ---------------------------------------------------------------------------
@@ -175,13 +198,114 @@ function corsOrigin(request) {
 // reads, wrongly, like a revoked account.
 const __t = (v) => (v == null ? "" : String(v).trim());
 
+// Model id the endpoint serves, discovered once per isolate when JAIS_MODEL
+// isn't set (vLLM rejects any other name).
+let __servedModel = null;
+
+function __json(request, status, obj) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": corsOrigin(request),
+    },
+  });
+}
+
+function __warmingUp(request) {
+  return __json(request, 503, {
+    error: {
+      message: "Jais is warming up (the server sleeps when idle). Please try again in a minute or two.",
+      code: "warming_up",
+    },
+  });
+}
+
+// ── Backend A: ZeroGPU Space ────────────────────────────────────────────────
+// Gradio's HTTP API is two steps: POST /gradio_api/call/chat returns an
+// event_id, then GET /gradio_api/call/chat/<event_id> streams server-sent
+// events until "complete" (data: ["<reply>"]) or "error".
+async function __viaSpace(request, space, authHeaders) {
+  if (request.method === "GET") {
+    const infoRes = await fetch(`${space}/gradio_api/info`, { headers: authHeaders });
+    if (infoRes.status === 503) return __warmingUp(request);
+    return new Response(await infoRes.text(), {
+      status: infoRes.status,
+      headers: {
+        "Content-Type": infoRes.headers.get("Content-Type") || "application/json",
+        "Access-Control-Allow-Origin": corsOrigin(request),
+      },
+    });
+  }
+
+  const body = await request.json();
+  const callRes = await fetch(`${space}/gradio_api/call/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders },
+    body: JSON.stringify({
+      data: [
+        JSON.stringify(body.messages || []),
+        body.temperature ?? 0.3,
+        body.max_tokens ?? 1024,
+      ],
+    }),
+  });
+  // A sleeping or rebuilding Space answers 503 (or 404 while it boots).
+  if (callRes.status === 503 || callRes.status === 404) return __warmingUp(request);
+  if (!callRes.ok) {
+    return __json(request, callRes.status, {
+      error: { message: `Jais Space error: ${(await callRes.text()).slice(0, 300)}` },
+    });
+  }
+  const { event_id } = await callRes.json();
+  if (!event_id) {
+    return __json(request, 502, { error: { message: "Jais Space returned no event id." } });
+  }
+
+  const streamRes = await fetch(`${space}/gradio_api/call/chat/${event_id}`, { headers: authHeaders });
+  const sse = await streamRes.text();
+
+  // Walk the SSE blocks; the last "complete" or "error" one decides.
+  let reply = null, errorText = null;
+  for (const block of sse.split(/\n\n+/)) {
+    const ev = (block.match(/^event:\s*(.+)$/m) || [])[1];
+    const dataLine = (block.match(/^data:\s*(.*)$/m) || [])[1];
+    if (ev === "complete") {
+      try { reply = JSON.parse(dataLine)[0]; } catch (_) { reply = null; }
+    } else if (ev === "error") {
+      errorText = dataLine && dataLine !== "null" ? dataLine : "unknown error";
+    }
+  }
+
+  if (typeof reply === "string") {
+    // Shaped like an OpenAI chat completion so the site parses it unchanged.
+    return __json(request, 200, {
+      object: "chat.completion",
+      model: "inception42/Jais-2-8B-Chat",
+      choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
+    });
+  }
+
+  const msg = String(errorText || sse.slice(0, 300) || "empty response");
+  if (/quota/i.test(msg)) {
+    return __json(request, 429, {
+      error: {
+        message: "Jais has used up today's free GPU time. Please try again tomorrow.",
+        code: "quota_exhausted",
+      },
+    });
+  }
+  return __json(request, 502, { error: { message: `Jais Space error: ${msg}` } });
+}
+
 export default {
   async fetch(request, env) {
+    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": corsOrigin(request),
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
           "Access-Control-Max-Age": "86400",
         },
@@ -265,61 +389,78 @@ export default {
       }
     }
 
-    if (request.method !== "POST") {
+
+    if (request.method !== "POST" && request.method !== "GET") {
       return new Response("Method not allowed", { status: 405 });
     }
 
-    // A missing secret would otherwise go upstream as "Bearer undefined" and
-    // come back as a 401 — indistinguishable from a key the provider revoked.
-    // Report the real cause instead, so the engine-health check can name it.
-    const __missing = ["JAIS_API_KEY", "JAIS_ENDPOINT"].filter((n) => !__t(env[n]));
-    if (__missing.length) {
-      return new Response(
-        JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
-        {
-          status: 503,
+    // A missing secret would otherwise reach HF as "Bearer undefined" and come
+    // back as a 401 — indistinguishable from a revoked token. Say so plainly.
+    const apiKey = __t(env.HF_TOKEN);
+    const space = __t(env.JAIS_SPACE_URL).replace(/\/+$/, "");
+    const endpoint = __t(env.JAIS_ENDPOINT_URL).replace(/\/+$/, "");
+    if (!apiKey || (!space && !endpoint)) {
+      return __json(request, 503, {
+        error: {
+          message: `Jais is not configured on our side: ${!apiKey ? "HF_TOKEN" : "JAIS_SPACE_URL"} is not set.`,
+          code: "not_configured",
+        },
+      });
+    }
+
+    const authHeaders = { "Authorization": `Bearer ${apiKey}` };
+
+    try {
+      if (space) return await __viaSpace(request, space, authHeaders);
+
+      const base = endpoint.endsWith("/v1") ? endpoint : `${endpoint}/v1`;
+
+      // GET → model list, to confirm the endpoint is up and what it serves.
+      if (request.method === "GET") {
+        const listRes = await fetch(`${base}/models`, { headers: authHeaders });
+        return new Response(await listRes.text(), {
+          status: listRes.status,
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": listRes.headers.get("Content-Type") || "application/json",
             "Access-Control-Allow-Origin": corsOrigin(request),
           },
+        });
+      }
+
+      let model = __t(env.JAIS_MODEL) || __servedModel;
+      if (!model) {
+        const listRes = await fetch(`${base}/models`, { headers: authHeaders });
+        if (listRes.ok) {
+          const list = await listRes.json().catch(() => null);
+          model = list && list.data && list.data[0] && list.data[0].id;
+          if (model) __servedModel = model;
+        } else if (listRes.status === 503) {
+          return __warmingUp(request);
         }
-      );
-    }
-    try {
+      }
+
       const body = await request.json();
-      const endpoint = __t(env.JAIS_ENDPOINT).replace(/\/$/, "");
-      const res = await fetch(
-        `${endpoint}/models/chat/completions?api-version=2024-05-01-preview`,
-        {
-          method: "POST",
-          headers: {
-            "api-key": __t(env.JAIS_API_KEY),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "jais-30b-chat",
-            messages: body.messages,
-            max_tokens: body.max_tokens || 1024,
-            temperature: body.temperature || 0.3,
-          }),
-        }
-      );
-      const data = await res.json();
-      return new Response(JSON.stringify(data), {
+      const res = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({
+          model: model || "inception42/Jais-2-8B-Chat",
+          messages: body.messages,
+          temperature: body.temperature ?? 0.3,
+          max_tokens: body.max_tokens ?? 1024,
+        }),
+      });
+      if (res.status === 503) return __warmingUp(request);
+      // Forwarded verbatim so the site's error classifier sees the upstream wording.
+      return new Response(await res.text(), {
         status: res.status,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": res.headers.get("Content-Type") || "application/json",
           "Access-Control-Allow-Origin": corsOrigin(request),
         },
       });
     } catch (err) {
-      return new Response(JSON.stringify({ error: { message: err.message } }), {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": corsOrigin(request),
-        },
-      });
+      return __json(request, 500, { error: { message: err.message } });
     }
   },
 };

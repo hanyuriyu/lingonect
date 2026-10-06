@@ -9,5 +9,18 @@ preview_urls = false
 binding = "QUOTA_KV"
 id = "f9f80346649545989106f2b6459bbb28"
 
+# Jais-2-8B-Chat runs on our own Hugging Face backend, like Falcon. HF_TOKEN
+# is a secret:  npx wrangler secret put HF_TOKEN -c workers/wrangler/jais.toml
+# (the same token as the Falcon worker is fine).
+#
+# ZeroGPU Space (HF PRO): set JAIS_SPACE_URL to the Space's direct URL, e.g.
+#   https://hanyuriyu-jais-arabic.hf.space   (Space ⋮ menu → "Embed this Space")
+# Inference Endpoint instead: leave JAIS_SPACE_URL empty and set
+# JAIS_ENDPOINT_URL; JAIS_MODEL may stay empty (read from /v1/models).
+[vars]
+JAIS_SPACE_URL = "https://hanyuriyu-jais-arabic.hf.space"
+JAIS_ENDPOINT_URL = ""
+JAIS_MODEL = ""
+
 [observability]
 enabled = true

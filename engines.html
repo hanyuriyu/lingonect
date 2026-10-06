@@ -3848,11 +3848,31 @@ async function translateWithMicrosoft(text) {
   return data[0].translations[0].text.trim();
 }
 
-// ── Jais (via Cloudflare Worker → Hugging Face Inference Providers) ──
+// ── Jais 2 (via Cloudflare Worker → our Hugging Face ZeroGPU Space) — Inception
+// / MBZUAI's Arabic–English model (Jais-2-8B-Chat), hosted the same way as
+// Falcon-H1. The Space URL lives in the worker, the model id in the Space settings.
 const JAIS_PROXY = "https://jais.hanyuriyu.workers.dev";
 
-async function translateWithJais(text) {
-  return "API implementation in progress";
+async function translateWithJais(text, extra) {
+  const res = await workerFetch(JAIS_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: "system",
+          // An 8B model needs the Arabic variety spelled out, like Falcon-H1.
+          content: llmSystemPrompt(extra) + falconLanguageHint(targetLang)
+        },
+        { role: "user", content: `<text>${text}</text>` }
+      ],
+      // Greedy decoding keeps a small model from drifting into stray scripts.
+      temperature: 0
+    })
+  });
+  if (!res.ok) throw await engineError("Jais", res);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
 }
 
 // ── Amazon Translate (via Cloudflare Worker) ──
@@ -4162,7 +4182,7 @@ const FALCON_PROXY = "https://falcon.hanyuriyu.workers.dev";
 
 // A 7B model does not infer the dialect from a label like "Arabic (Egypt)"
 // the way the large engines do — it falls back to the same generic Arabic for
-// every variant. Spell the variety out for it.
+// every variant. Spell the variety out for it. Jais 2 (8B) uses this too.
 const FALCON_ARABIC_VARIETIES = {
   "Arabic (MSA)":     "Modern Standard Arabic (فصحى), formal written Arabic",
   "Arabic (Egypt)":   "Egyptian Arabic (Masri, مصري) as Egyptians actually speak it",
@@ -5783,7 +5803,7 @@ SYNTHESIS — you are not writing this entry from scratch. You will be given ${n
 - Write the merged entry as if it were the only one: no mention of the entries, the models, or any disagreement between them.`;
 }
 
-// Engines whose API isn't wired up yet (Jais, Cotoha, tsuzumi, Mirai, Rakuten)
+// Engines whose API isn't wired up yet (Cotoha, tsuzumi, Mirai, Rakuten)
 // answer with this placeholder instead of a result.
 function isPlaceholderResult(text) {
   return /^API implementation in progress/i.test(String(text || "").trim());
