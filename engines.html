@@ -3397,7 +3397,10 @@ const ENGINE_FAILURES = [
   { code: "deployment_stopped", when: /no deployments are ready|deployments are stopped|endpoint.{0,30}(stopped|not (running|started))|start (one|an endpoint)|scale.{0,20}zero/i,
     say: n => `${n}'s hosted endpoint is switched off on our side. Someone has to start it again — please report it.` },
   { code: "bad_credentials", when: /api[\s_-]?key|unauthorized|forbidden|invalid authentication|access denied|permission/i, status: [401, 403],
-    say: n => `${n} rejected our credentials. That is a problem on our side, not with your account.` },
+    // The provider's own wording is kept: "rejected our credentials" covers a
+    // bad key, a model the key may not use, and a quota worded as "forbidden",
+    // and only the wording tells those apart.
+    say: (n, msg) => `${n} rejected our credentials${quoted(msg)}. That is a problem on our side, not with your account.` },
   { code: "model_gone", when: /model.*(not found|does not exist|unavailable)|unknown model|no such model|deprecat/i, status: 404,
     say: n => `${n}'s model is unavailable — the provider may have retired it.` },
   { code: "provider_down", when: /internal (server )?error|service unavailable|bad gateway|upstream|overloaded|capacity|timed? ?out/i, status: s => s >= 500,
