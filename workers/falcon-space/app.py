@@ -19,16 +19,27 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_ID = "tiiuae/Falcon-H1-Arabic-7B-Instruct"
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-model = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.bfloat16)
-# ZeroGPU: moving to "cuda" at import time is allowed; the GPU is only really
-# attached while a @spaces.GPU function runs.
-model.to("cuda")
-model.eval()
+# If loading fails, keep the app up and show the error on the page (and in
+# API replies) instead of crashing the Space with a bare "Runtime error".
+LOAD_ERROR = None
+tokenizer = model = None
+try:
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.bfloat16)
+    # ZeroGPU: moving to "cuda" at import time is allowed; the GPU is only
+    # really attached while a @spaces.GPU function runs.
+    model.to("cuda")
+    model.eval()
+except Exception:
+    import traceback
+    LOAD_ERROR = traceback.format_exc()
+    print(LOAD_ERROR, flush=True)
 
 
 @spaces.GPU(duration=60)
 def chat(messages_json: str, temperature: float = 0.3, max_tokens: int = 1024) -> str:
+    if LOAD_ERROR:
+        raise gr.Error("Model failed to load:\n" + LOAD_ERROR[-1500:])
     messages = json.loads(messages_json)
     if not isinstance(messages, list) or not messages:
         raise gr.Error("messages must be a non-empty list")
@@ -55,6 +66,9 @@ def chat(messages_json: str, temperature: float = 0.3, max_tokens: int = 1024) -
 # /gradio_api/call/chat across Gradio 4, 5 and 6.
 with gr.Blocks(title="Falcon-H1-Arabic-7B-Instruct (Lingonect)") as demo:
     gr.Markdown("## Falcon-H1-Arabic-7B-Instruct (Lingonect)")
+    if LOAD_ERROR:
+        gr.Markdown("### ⚠️ The model failed to load. Copy this error and send it on:")
+        gr.Code(LOAD_ERROR, language=None)
     messages_box = gr.Textbox(
         label="messages (JSON)", lines=6,
         value='[{"role": "user", "content": "Translate to Arabic: Good morning"}]',
