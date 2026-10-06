@@ -93,4 +93,6 @@ with gr.Blocks(title="Falcon-H1 (Lingonect)") as demo:
         api_name="chat",
     )
 
-demo.queue(default_concurrency_limit=1).launch()
+# ssr_mode=False: Gradio 6 server-side rendering leaves the page unstyled
+# inside private Spaces; the API is unaffected either way.
+demo.queue(default_concurrency_limit=1).launch(ssr_mode=False)
