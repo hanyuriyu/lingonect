@@ -321,7 +321,7 @@ export default {
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: body.model || __t(env.FANAR_MODEL) || "Fanar",
+          model: body.model || __t(env.FANAR_MODEL) || "Fanar-C-2-27B",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
