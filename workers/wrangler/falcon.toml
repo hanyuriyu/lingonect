@@ -17,7 +17,7 @@ id = "f9f80346649545989106f2b6459bbb28"
 # Inference Endpoint instead: leave FALCON_SPACE_URL empty and set
 # FALCON_ENDPOINT_URL; FALCON_MODEL may stay empty (read from /v1/models).
 [vars]
-FALCON_SPACE_URL = ""
+FALCON_SPACE_URL = "https://hanyuriyu-falcon-arabic.hf.space"
 FALCON_ENDPOINT_URL = ""
 FALCON_MODEL = ""
 
