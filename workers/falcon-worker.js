@@ -1,9 +1,11 @@
 /**
- * Cloudflare Worker: Falcon-H1-Arabic Translation Proxy (Technology Innovation
- * Institute's Arabic LLM, Abu Dhabi)
+ * Cloudflare Worker: Falcon-H1 Translation Proxy (Technology Innovation
+ * Institute, Abu Dhabi)
  *
- * TII offers no hosted API — the weights are only on Hugging Face — so we run
- * tiiuae/Falcon-H1-Arabic-7B-Instruct ourselves. Two backends are supported;
+ * TII offers no hosted API, so we run tiiuae/Falcon-H1-7B-Instruct ourselves
+ * (multilingual, Arabic among its 18 training languages). Falcon-H1-Arabic is
+ * not published on Hugging Face; if TII grants access, only the Space's
+ * MODEL_ID setting changes. Two backends are supported;
  * the worker picks the Space when FALCON_SPACE_URL is set:
  *
  *   A. ZeroGPU Space (HF PRO, $9/month): a private Gradio Space running
@@ -279,7 +281,7 @@ async function __viaSpace(request, space, authHeaders) {
     // Shaped like an OpenAI chat completion so the site parses it unchanged.
     return __json(request, 200, {
       object: "chat.completion",
-      model: "tiiuae/Falcon-H1-Arabic-7B-Instruct",
+      model: "tiiuae/Falcon-H1-7B-Instruct",
       choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
     });
   }
@@ -443,7 +445,7 @@ export default {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
-          model: model || "tiiuae/Falcon-H1-Arabic-7B-Instruct",
+          model: model || "tiiuae/Falcon-H1-7B-Instruct",
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,
