@@ -1042,6 +1042,7 @@ a.tri-chip{ text-decoration:none; }
 .engine-logo-badge.sarvam     { background:#EA5B2A; }
 .engine-logo-badge.hyperclovex{ background:#03C75A; }
 .engine-logo-badge.papago     { background:#14B8A6; }
+.engine-logo-badge.fanar      { background:#0F766E; }
 .engine-logo-badge.baidu      { background:#2932E1; }
 .engine-logo-badge.yandex     { background:#FC3F1D; }
 .engine-logo-badge.alice      { background:#7C5CFC; }
@@ -1824,7 +1825,7 @@ const ENGINE_TIERS = {
   deepl: 1, perplexity: 1, mistral: 1, deepseek: 1,
   grok: 2, tencent: 2, alibaba: 2, qwen: 2, microsoft: 2,
   amazon: 3, nova: 3, meta: 3, llama: 3, baidu: 3,
-  hyperclovex: 0, papago: 0, yandex: 0, jais: 0, sarvam: 0,
+  hyperclovex: 0, papago: 0, fanar: 0, yandex: 0, jais: 0, sarvam: 0,
   alice: 2, doubao: 2, zai: 2
 };
 
@@ -4043,6 +4044,30 @@ async function translateWithPapago(text) {
   return data.message.result.translatedText.trim();
 }
 
+// ── Fanar (via Cloudflare Worker → api.fanar.qa) — Arabic specialist ──
+// The model id lives in the worker (FANAR_MODEL), so a rename upstream is a
+// config change, not a site deploy.
+const FANAR_PROXY = "https://fanar.hanyuriyu.workers.dev";
+
+async function translateWithFanar(text, extra) {
+  const res = await workerFetch(FANAR_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: "system",
+          content: llmSystemPrompt(extra)
+        },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw await engineError("Fanar", res);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
 // ── Baidu Translate (via Cloudflare Worker) ──
 const BAIDU_PROXY = "https://baidu.hanyuriyu.workers.dev";
 
@@ -4442,6 +4467,14 @@ const engines = [
     badgeClass: "papago",
     badgeText:  "PG",
     translate:  translateWithPapago
+  },
+  {
+    id:         "fanar",
+    name:       "Fanar",
+    logoUrl:    "Fanar.png.avif",
+    badgeClass: "fanar",
+    badgeText:  "FN",
+    translate:  translateWithFanar
   },
   {
     id:         "jais",
