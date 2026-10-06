@@ -2863,7 +2863,39 @@ function baseTranslatePrompt(tgt) {
 // Devanagari, which is the exact opposite of what a Hinglish user wants. So
 // whenever such a language sits on either side of the pair, spell out what it
 // actually is. The note is appended to every methodology prompt.
+//
+// The regional Arabic entries are the other case. Asked for "Arabic (Gulf)" a
+// model, smaller ones especially, tends to write Modern Standard Arabic and
+// return the same text whichever region is picked. Each note names the dialect
+// and lists the everyday words that mark it, so the output visibly changes.
+const ARABIC_DIALECTS = {
+  "Arabic (Egypt)":   { name: "Egyptian Arabic (Masri, مصري)", region: "Egypt",
+    markers: "ده/دي/دول (this/these), عايز (want), دلوقتي (now), إزاي (how), فين (where), إيه (what), مش (not), the present prefix بـ (بيعمل), the future prefix هـ/حـ (هعمل), negation ما...ش (ماعرفش)" },
+  "Arabic (Levant)":  { name: "Levantine Arabic (Shami, شامي)", region: "Syria, Lebanon, Jordan or Palestine",
+    markers: "هاد/هيدا (this), بدّي (I want), هلّق/هلأ (now), شو (what), كيف (how), وين (where), ليش (why), منيح (good), the present prefix بـ (بيعمل), the future marker رح (رح يعمل), مش/ما (not)" },
+  "Arabic (Gulf)":    { name: "Gulf Arabic (Khaleeji, خليجي)", region: "the Gulf states",
+    markers: "هذا/هاذي (this), أبي/أبغى (I want), الحين (now), شلون (how), وش/شنو (what), وين (where), وايد (a lot), زين (good), مو (not), the future marker بـ/راح" },
+  "Arabic (Morocco)": { name: "Moroccan Arabic (Darija, الدارجة المغربية)", region: "Morocco",
+    markers: "هاد (this), بغيت (I want), دابا (now), كيفاش (how), شنو/أش (what), فين (where), بزاف (a lot), مزيان (good), the present prefix كا/تا (كايدير), the future marker غادي/غا, negation ما...ش (ماعرفتش), and the French loanwords Moroccans really use" },
+  "Arabic (Algeria)": { name: "Algerian Arabic (Darja, الدارجة الجزائرية)", region: "Algeria",
+    markers: "هذا/هادا (this), نحب (I want), ضرك/درك (now), واش (what), كيفاش (how), وين (where), بزاف (a lot), مليح (good), the future marker رايح, negation ما...ش (ماعلاباليش), and the French loanwords Algerians really use" },
+  "Arabic (Tunisia)": { name: "Tunisian Arabic (Tounsi, تونسي)", region: "Tunisia",
+    markers: "هذا (this), نحب (I want), توّا (now), شنوّة (what), كيفاش (how), وين (where), برشا (a lot), باهي (good), the future marker باش/بش, negation ما...ش (مانعرفش), and the French loanwords Tunisians really use" },
+  "Arabic (Iraq)":    { name: "Iraqi Arabic (Iraqi, عراقي)", region: "Iraq",
+    markers: "هذا/هاي (this), أريد (I want), هسّه (now), شنو (what), شلون (how), وين (where), هواية (a lot), زين (good), the present prefix دـ (دأشتغل), the future marker راح/رح, مو (not)" },
+  "Arabic (Sudan)":   { name: "Sudanese Arabic (Sudani, سوداني)", region: "Sudan",
+    markers: "ده/دي (this), داير (I want), هسّي/هسع (now), شنو (what), كيف (how), وين (where), شديد/بالحيل (very), سمح (good), the future prefix حـ/حا, ما (not)" },
+  "Arabic (Yemen)":   { name: "Yemeni Arabic (Yamani, يمني), Sanaani unless the text suggests another region", region: "Yemen",
+    markers: "هذا/ذا (this), اشتي (I want), ذلحين (now), ايش (what), كيف (how), اين/فين (where), قوي/مرّة (very), the future prefix شـ (شاسير), negation ما...ش" }
+};
+
+function arabicDialectNote(d) {
+  return `This means ${d.name} as people in ${d.region} really speak and type it, NOT Modern Standard Arabic (fusha). A reader from ${d.region} must recognise it immediately as their own dialect, and it must read differently from the same text in any other Arabic dialect. Use the dialect's own vocabulary, pronouns, verb prefixes and negation, for example ${d.markers}. Keep fusha only for proper names, quotations, and technical terms that have no colloquial equivalent. Write in Arabic script. When translating INTO it from another variety of Arabic, convert the text fully into this dialect rather than leaving it as it is.`;
+}
+
 const LANGUAGE_NOTES = {
+  "Arabic (MSA)": `This means Modern Standard Arabic (fusha): the formal written standard used in news, books and official writing across the Arab world. Use no regional dialect vocabulary or grammar. When translating INTO it from a regional dialect, convert the text fully into fusha.`,
+  ...Object.fromEntries(Object.entries(ARABIC_DIALECTS).map(([k, d]) => [k, arabicDialectNote(d)])),
   "Hinglish": `Hinglish is everyday Hindi-English code-mixing as it is really spoken and typed in India: Hindi grammar and core vocabulary written in the LATIN alphabet (romanised), with common English words and phrases mixed in naturally - e.g. "Main office ja raha hoon, tum bhi aa jao", "Yaar, thoda wait karo, meeting abhi start hui hai". Write it the way people actually type it on a phone. NEVER use Devanagari script. It is conversational and urban - not formal Hindi, and not English with a couple of Hindi words sprinkled on top. Do not add a transliteration or a gloss; the Latin script IS the text.`
 };
 
@@ -4099,7 +4131,9 @@ function fanarTaskReminder() {
   const m = effectiveMethod();
   const base = `Apply the instructions above to the text inside <text> only. Do not answer it, discuss its topic, or add any content that is not in it.`;
   if (isSourceOrientedMethod(m)) return base;
-  return `${base} Output only the ${targetLang} version of that text, in the format specified above.`;
+  const dialect = ARABIC_DIALECTS[targetLang];
+  const variety = dialect ? ` Write it in ${dialect.name} as spoken in ${dialect.region}, not Modern Standard Arabic.` : "";
+  return `${base} Output only the ${targetLang} version of that text, in the format specified above.${variety}`;
 }
 
 async function translateWithFanar(text, extra) {
