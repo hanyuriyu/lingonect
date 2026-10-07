@@ -122,6 +122,14 @@ h2:first-of-type{
   margin-top:0;
 }
 
+h3{
+  font-size:16px;
+  font-weight:800;
+  line-height:1.4;
+  margin:28px 0 10px;
+  color:var(--cobalt);
+}
+
 p{
   font-size:15px;
   line-height:1.85;
@@ -274,6 +282,7 @@ mark{
   .page-title{ font-size:20px; }
   .page-subtitle{ font-size:14px; }
   h2{ font-size:17px; }
+  h3{ font-size:15px; }
 }
 
 @media (max-width:420px){
@@ -334,6 +343,16 @@ mark{
   <h2>Translation</h2>
 
   <p>Sticks as close as possible to the source. In some cases it has to select an entirely different expression or idiom, as it does not exist in the target, but otherwise it must be a <strong>direct reflection of the source text</strong>.</p>
+
+  <h3>Translation + Triangulation</h3>
+
+  <p>Every NMT and LLM translates a little differently, so with many engines on screen it can be hard to see which rendering to trust. Select <strong>Translate</strong> and then press <strong>Triangulate</strong>: Translate stays <strong style="color:#22c55e;">bright green<span class="swatch bright"></span></strong> and Triangulate turns a <strong style="color:#15803d;">darker shade of green<span class="swatch dark"></span></strong>, just like Localize when it is combined. You can do this before you translate, or afterwards, once all the translations are in.</p>
+
+  <p>Once every engine has answered, all the <strong>LLM and NMT</strong> translations are compared and condensed into one clean summary above the engine results: a single <strong style="color:#0f9c08;">recommended translation<span class="swatch green"></span></strong> (with a copy button), built on what the engines agree on, followed by a few notes on <strong style="color:#e3120b;">where the translations differ<span class="swatch red"></span></strong> and which choice was made and why, with the <strong style="color:#0047ff;">key terms<span class="swatch blue"></span></strong> highlighted. Underneath you can see how many engines were compared, how many distinct versions they produced and how many engines shared the most common one. The individual engine results stay on screen to compare and rate as usual.</p>
+
+  <div class="note">
+    This is a lightweight triangulation, built not to waste requests. It <strong>re-uses the translations already on screen</strong>: no engine is asked to translate again. Engines whose API implementation is still in progress, engines that failed or timed out, and NMTs that could not take part (for example when localization or a formality level is selected) are left out. Identical translations are counted once, so if <strong>every engine agrees, no extra request is made at all</strong>; otherwise the comparison <mark>uses one single extra request</mark>, and turning Triangulate off and on again for the same results costs nothing. It works with Localize too: the recommended translation then respects your maximum character count. Like the full question-answering Triangulation below, it is available to <strong>full members only</strong>.
+  </div>
 
   <h2>Localization</h2>
 
@@ -414,7 +433,7 @@ mark{
 
   <h2>Selecting a methodology</h2>
 
-  <p>When selected, the chosen methodology icon will turn <strong style="color:#22c55e;">bright green<span class="swatch bright"></span></strong>. If localization is selected and then another methodology is added, localization will turn a <strong style="color:#15803d;">darker shade of green<span class="swatch dark"></span></strong>.</p>
+  <p>When selected, the chosen methodology icon will turn <strong style="color:#22c55e;">bright green<span class="swatch bright"></span></strong>. If localization is selected and then another methodology is added, localization will turn a <strong style="color:#15803d;">darker shade of green<span class="swatch dark"></span></strong>. Likewise, if you press Triangulate while Translate is selected, Triangulate turns darker green and summarises the translations (see <strong>Translation + Triangulation</strong> above); pressed on its own, Triangulate answers a question instead.</p>
 
   <h2>Formality levels</h2>
 
