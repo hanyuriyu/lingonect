@@ -14,10 +14,13 @@ id = "f9f80346649545989106f2b6459bbb28"
 # worker to see which ids the key can actually reach.
 [vars]
 KIMI_MODEL = "kimi-k2.6"
-# kimi-k2.6 runs in thinking mode and accepts only temperature 1 — it rejects
-# the 0.3 the other translation proxies use. The worker retries once using
-# whatever value Moonshot names in the error, so this rarely needs touching.
-KIMI_TEMPERATURE = "1"
+# Instant mode: thinking-mode reasoning counts against max_tokens and left
+# long non-Latin translations with an empty answer. Set "enabled" to reason.
+KIMI_THINKING = "disabled"
+# kimi-k2.x pins temperature per mode: 0.6 instant, 1 thinking. The worker
+# retries once using whatever value Moonshot names in the error, so this
+# rarely needs touching — but keep it in step with KIMI_THINKING.
+KIMI_TEMPERATURE = "0.6"
 
 [observability]
 enabled = true

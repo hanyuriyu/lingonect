@@ -4068,7 +4068,10 @@ async function translateWithKimi(text, extra) {
   });
   if (!res.ok) throw await engineError("Kimi", res);
   const data = await res.json();
-  return data.choices[0].message.content.trim();
+  // An empty answer is a failure, never a blank translation.
+  const out = (data.choices?.[0]?.message?.content || "").trim();
+  if (!out) throw new Error("Kimi returned an empty answer — try again.");
+  return out;
 }
 
 // ── Sarvam AI (via Cloudflare Worker) — Indian-languages specialist ──
