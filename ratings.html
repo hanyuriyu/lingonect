@@ -241,6 +241,11 @@ body{
   font-style:italic;
 }
 
+/* Triangulation wins: total in its own column, per pair under the stars */
+.wins-val{ font-weight:800; color:#0f9c08; }
+.wins-of{ font-size:11px; color:#999; font-weight:400; white-space:nowrap; }
+.pair-wins{ display:block; font-size:10px; font-weight:700; color:#0f9c08; white-space:nowrap; margin-top:2px; }
+
 /* Custom pair header selectors */
 .custom-pair-header{
   display:flex;
@@ -330,7 +335,7 @@ body{
 <div class="page-wrap">
   <main class="stage">
     <p class="page-title">Engine Ratings by Language Pair</p>
-    <p class="page-sub">Average star ratings from all submitted evaluations</p>
+    <p class="page-sub">Average star ratings from all submitted evaluations<br><span style="font-size:12px;color:#999;">Wins: how often an engine came closest to the recommended translation in a Translate + Triangulate summary</span></p>
 
     <div id="loadingMsg" class="loading-msg">Loading ratings data…</div>
 
@@ -340,6 +345,7 @@ body{
           <tr>
             <th>Engine</th>
             <th>Overall</th>
+            <th title="Times this engine came closest to the recommended translation in Translate + Triangulate">Wins</th>
             <th>EN → ES</th>
             <th>EN → FR</th>
             <th>EN → DE</th>
@@ -510,6 +516,9 @@ populateDropdowns();
 // ratingsData[pairKey] = { engineId: { sum, count } }
 // pairKey = "source|target" e.g. "English|Spanish"
 let ratingsData = {};
+// winsData[pairKey] = { engineId: { wins, losses, compared } } — tallied from
+// the triangulationWins collection (one record per Translate + Triangulate run).
+let winsData = {};
 
 function pairKey(source, target) { return source + "|" + target; }
 
@@ -530,8 +539,56 @@ function migrateLang(lang) {
 // ZeroGPU Space). Jais ratings stamped earlier are ignored — see loadRatings.
 const JAIS_LIVE_MS = Date.parse("2026-10-07T07:00:00Z");
 
+// Tally the Translate + Triangulate rankings. Optional: if it can't be read,
+// the table still shows the star ratings, just without wins.
+async function loadWins() {
+  try {
+    const snapshot = await db.collection("triangulationWins").get();
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const target = migrateLang(d.targetLanguage);
+      const source = migrateLang(d.sourceLanguage);
+      if (!source || !target) return;
+      const key = pairKey(source, target);
+      if (!winsData[key]) winsData[key] = {};
+      const bump = (ids, field) => (Array.isArray(ids) ? [...new Set(ids)] : []).forEach(id => {
+        if (typeof id !== "string") return;
+        if (!winsData[key][id]) winsData[key][id] = { wins: 0, losses: 0, compared: 0 };
+        winsData[key][id][field] += 1;
+      });
+      bump(d.winners, "wins");
+      bump(d.losers, "losses");
+      bump(d.compared, "compared");
+    });
+  } catch (err) {
+    console.warn("Triangulation wins could not be loaded", err);
+  }
+}
+
+function getWins(engineId, source, target) {
+  const keys = source ? [pairKey(source, target)] : Object.keys(winsData);
+  const t = { wins: 0, losses: 0, compared: 0 };
+  keys.forEach(k => {
+    const d = winsData[k] && winsData[k][engineId];
+    if (d) { t.wins += d.wins; t.losses += d.losses; t.compared += d.compared; }
+  });
+  return t;
+}
+
+function renderWinsCell(t) {
+  if (!t.compared) return '<span class="rating-val na">N/A</span>';
+  const pct = Math.round((t.wins / t.compared) * 100);
+  return `<span class="wins-val">${t.wins}</span> <span class="wins-of" title="${t.losses} times furthest from the recommendation">of ${t.compared} · ${pct}%</span>`;
+}
+
+// A pair cell's wins line, shown under the stars once the engine has won there.
+function renderPairWins(engineId, source, target) {
+  const t = getWins(engineId, source, target);
+  return t.wins ? `<span class="pair-wins" title="Closest to the recommended translation ${t.wins} of ${t.compared} times">${t.wins} win${t.wins === 1 ? "" : "s"}</span>` : "";
+}
+
 async function loadRatings() {
-  const snapshot = await db.collection("ratings").get();
+  const [snapshot] = await Promise.all([db.collection("ratings").get(), loadWins()]);
 
   snapshot.forEach(doc => {
     const d = doc.data();
@@ -612,16 +669,19 @@ function renderTable() {
     const overall = getOverallAverage(engine.id);
     html += `<td>${renderOverallCell(overall)}</td>`;
 
+    // Triangulation wins, all pairs
+    html += `<td>${renderWinsCell(getWins(engine.id))}</td>`;
+
     // Preset pairs
     PRESET_PAIRS.forEach(pair => {
       const avg = getAverage(pair.source, pair.target, engine.id);
-      html += `<td>${renderCell(avg)}</td>`;
+      html += `<td>${renderCell(avg)}${renderPairWins(engine.id, pair.source, pair.target)}</td>`;
     });
 
     // Custom pair 1
     if (customSource1 && customTarget1) {
       const avg = getAverage(customSource1, customTarget1, engine.id);
-      html += `<td>${renderCell(avg)}</td>`;
+      html += `<td>${renderCell(avg)}${renderPairWins(engine.id, customSource1, customTarget1)}</td>`;
     } else {
       html += '<td><span class="rating-val na">—</span></td>';
     }
@@ -629,7 +689,7 @@ function renderTable() {
     // Custom pair 2
     if (customSource2 && customTarget2) {
       const avg = getAverage(customSource2, customTarget2, engine.id);
-      html += `<td>${renderCell(avg)}</td>`;
+      html += `<td>${renderCell(avg)}${renderPairWins(engine.id, customSource2, customTarget2)}</td>`;
     } else {
       html += '<td><span class="rating-val na">—</span></td>';
     }
