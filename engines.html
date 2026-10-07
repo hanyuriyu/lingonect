@@ -736,6 +736,47 @@ a.tri-chip{ text-decoration:none; }
   border-bottom:1px solid #e8e8e8;
 }
 
+/* Winners and losers: which engines came closest to / furthest from the
+   recommended translation. Shown in the summary and as a badge on each card. */
+.tt-rank{ margin:14px 0 4px; font-size:13px; line-height:1.6; }
+.tt-rank-row{ margin:4px 0; }
+.tt-rank-label{
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  color:#8a8a8a;
+  margin-right:6px;
+}
+.tt-chip{
+  display:inline-block;
+  font-size:12px;
+  font-weight:700;
+  padding:1px 8px;
+  margin:2px 4px 2px 0;
+  border-radius:10px;
+  white-space:nowrap;
+}
+.tt-chip.win{  color:#0f9c08; background:rgba(22,198,12,.13); }
+.tt-chip.lose{ color:#e3120b; background:rgba(227,18,11,.10); }
+.tt-chip.mid{  color:#555; background:#f0f0f0; }
+.tt-rank details{ margin-top:6px; }
+.tt-rank summary{ cursor:pointer; font-weight:700; color:#555; }
+.tt-rank-note{ font-size:11px; color:#a3a3a3; margin:6px 0 0; }
+.engine-name .tt-badge{
+  display:inline-block;
+  margin-left:8px;
+  padding:1px 7px;
+  border-radius:10px;
+  font-size:10px;
+  letter-spacing:.4px;
+  vertical-align:1px;
+}
+.engine-name .tt-badge.win{  color:#0f9c08; background:rgba(22,198,12,.13); }
+.engine-name .tt-badge.lose{ color:#e3120b; background:rgba(227,18,11,.10); }
+.result-card.tt-win{  box-shadow:inset 3px 0 0 #16c60c; padding-left:10px; }
+.result-card.tt-lose{ box-shadow:inset 3px 0 0 #e3120b; padding-left:10px; }
+
 /* ── Contextualize (single-word deep dive) ──
    One word in → a structured, well-laid-out set of notes: definition (in the
    target language), collocations/idioms, example sentences in the source
@@ -2771,7 +2812,7 @@ methodWords.forEach(w => {
       // asked again; turning it off removes the summary.
       triTranslateOn = !triTranslateOn;
       if (triTranslateOn) triangulateLastTranslation();
-      else document.getElementById("ttArea").innerHTML = "";
+      else ttClear();
     } else {
       // The base methodologies are mutually exclusive; clicking the active one
       // again clears it (translation is then assumed).
@@ -5730,7 +5771,7 @@ function ttVariants(results) {
     const key = normResultText(r.text);
     if (!key) return;
     if (!groups.has(key)) groups.set(key, { text: r.text.trim(), engines: [] });
-    groups.get(key).engines.push({ name: r.name, type: engineType(r.id) });
+    groups.get(key).engines.push({ id: r.id, name: r.name, type: engineType(r.id) });
   });
   return [...groups.values()].sort((a, b) => b.engines.length - a.engines.length);
 }
@@ -5766,10 +5807,97 @@ async function ttSummarise(run, variants) {
   return raw;
 }
 
+// Remove the summary card and the winner/loser badges on the engine cards.
+function ttClear() {
+  document.getElementById("ttArea").innerHTML = "";
+  document.querySelectorAll(".tt-badge").forEach(b => b.remove());
+  document.querySelectorAll(".result-card.tt-win, .result-card.tt-lose")
+    .forEach(c => c.classList.remove("tt-win", "tt-lose"));
+}
+
+// How close two translations are, 0–1: the Dice overlap of their character
+// bigrams after normalisation. Character-based, so it works the same
+// for spaced and unspaced scripts (Chinese, Japanese, Thai …), and it costs no
+// request — the ranking is worked out here, not by a model.
+function ttSimilarity(a, b) {
+  // Punctuation is ignored: a comma is not a translation choice, and in short
+  // unspaced text it would otherwise swing the score.
+  const clean = t => normResultText(t).replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ").trim();
+  a = clean(a); b = clean(b);
+  if (a === b) return 1;
+  const grams = t => {
+    const m = new Map();
+    const cs = [...t];
+    for (let i = 0; i < cs.length - 1; i++) {
+      const g = cs[i] + cs[i + 1];
+      m.set(g, (m.get(g) || 0) + 1);
+    }
+    return m;
+  };
+  const ga = grams(a), gb = grams(b);
+  let na = 0, nb = 0, both = 0;
+  ga.forEach(v => { na += v; });
+  gb.forEach((v, g) => { nb += v; both += Math.min(v, ga.get(g) || 0); });
+  return na + nb ? (2 * both) / (na + nb) : 0;
+}
+
+// Score every engine against the recommended translation and split them into
+// winners (closest, ties included) and losers (furthest). Losers are only
+// named when the spread is meaningful, so near-identical results don't brand
+// anyone a loser.
+function ttRankEngines(variants, recommended) {
+  const scored = variants.flatMap(v => {
+    const score = ttSimilarity(v.text, recommended);
+    return v.engines.map(e => ({ ...e, score }));
+  }).sort((x, y) => y.score - x.score);
+  const TIE = 0.02, SPREAD = 0.05;
+  const top = scored[0].score, bottom = scored[scored.length - 1].score;
+  const winners = scored.filter(e => e.score >= top - TIE);
+  const losers = top - bottom >= SPREAD
+    ? scored.filter(e => e.score <= bottom + TIE && !winners.includes(e))
+    : [];
+  return { scored, winners, losers };
+}
+
+// The winners/losers block under the summary, plus a badge on each engine card.
+function ttRankHtml(rank) {
+  const pct = x => `${Math.round(x * 100)}%`;
+  const chip = (e, cls) => `<span class="tt-chip ${cls}">${escapeXml(e.name)} · ${pct(e.score)}</span>`;
+  const winSet = new Set(rank.winners), loseSet = new Set(rank.losers);
+  const all = rank.scored.map(e => chip(e, winSet.has(e) ? "win" : loseSet.has(e) ? "lose" : "mid")).join("");
+  return `
+    <div class="tt-rank">
+      <div class="tt-rank-row"><span class="tt-rank-label">Closest to the recommendation</span>${rank.winners.map(e => chip(e, "win")).join("")}</div>
+      ${rank.losers.length ? `<div class="tt-rank-row"><span class="tt-rank-label">Furthest from it</span>${rank.losers.map(e => chip(e, "lose")).join("")}</div>` : ""}
+      <details>
+        <summary>See how every engine scored</summary>
+        <div class="tt-rank-row">${all}</div>
+      </details>
+      <p class="tt-rank-note">Score = how closely each engine's translation matches the recommended translation, character by character (ignoring punctuation and capitals). It shows agreement with the consensus, not a verdict on style: a free but valid rendering can still score low.</p>
+    </div>`;
+}
+
+function ttBadgeCards(rank) {
+  const mark = (e, cls, label) => {
+    const el = document.getElementById(`result-${e.id}`);
+    const card = el && el.closest(".result-card");
+    if (!card) return;
+    card.classList.add(cls === "win" ? "tt-win" : "tt-lose");
+    const name = card.querySelector(".engine-name");
+    if (!name) return;
+    const b = document.createElement("span");
+    b.className = `tt-badge ${cls}`;
+    b.textContent = `${label} · ${Math.round(e.score * 100)}%`;
+    name.appendChild(b);
+  };
+  rank.winners.forEach(e => mark(e, "win", "Closest"));
+  rank.losers.forEach(e => mark(e, "lose", "Furthest"));
+}
+
 // Render the summary card for one finished Translate run.
 async function runTranslateTriangulation(run) {
   const area = document.getElementById("ttArea");
-  area.innerHTML = "";
+  ttClear();
   const card = document.createElement("div");
   card.className = "tt-card";
   card.innerHTML = `
@@ -5821,6 +5949,16 @@ async function runTranslateTriangulation(run) {
     ? `${total === 2 ? "Both" : `All ${total}`} engines produced the same translation (${llms} LLM${llms === 1 ? "" : "s"}, ${total - llms} NMT${total - llms === 1 ? "" : "s"}): ${all.map(e => e.name).join(", ")}`
     : `Compared ${total} translations (${llms} LLM${llms === 1 ? "" : "s"}, ${total - llms} NMT${total - llms === 1 ? "" : "s"}) · ${variants.length} distinct versions · the most common one was produced by ${top} of ${total} engines. Engines: ${all.map(e => e.name).join(", ")}`;
   bodyEl.appendChild(stats);
+
+  // Winners and losers, measured against the recommended translation. When
+  // every engine produced the same version they all win, so there's nothing
+  // to rank.
+  const rec = bodyEl.querySelector(".hl-green");
+  if (variants.length > 1 && rec && rec.textContent.trim()) {
+    const rank = ttRankEngines(variants, rec.textContent.trim());
+    stats.insertAdjacentHTML("beforebegin", ttRankHtml(rank));
+    ttBadgeCards(rank);
+  }
 }
 
 // ── Contextualize (single-word deep dive) ──
