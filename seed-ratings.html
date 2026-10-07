@@ -1095,7 +1095,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
 
   // For API-based engines (not DeepL/Google/Tencent/Microsoft which are non-LLM),
   // we send a rating prompt. For non-LLM engines, fall back to Claude.
-  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "papago", "baidu", "yandex"];
+  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "papago", "baidu", "yandex", "falcon", "jais"];
   const actualRater = NON_LLM.includes(raterEngine) ? "claude" : raterEngine;
 
   let rawScore;
@@ -1140,7 +1140,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
     rawScore = data.translated.trim();
   } else {
     // Generic OpenAI-compatible proxy (Mistral, DeepSeek, Grok, Perplexity,
-    // Alibaba, Alice, Doubao, Z.ai, Llama, Sarvam, Kimi, Fanar, Falcon, Jais). Every proxy requires a
+    // Alibaba, Alice, Doubao, Z.ai, Llama, Sarvam, Kimi, Fanar). Every proxy requires a
     // valid Firebase ID token (Authorization: Bearer <idToken>), so they are
     // all called through workerFetch, which attaches the token.
     const proxyMap = {
@@ -1157,9 +1157,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-105b" },
       // Model ids for these live in their workers (model: undefined is dropped).
       kimi:       { proxy: KIMI_PROXY },
-      fanar:      { proxy: FANAR_PROXY },
-      falcon:     { proxy: FALCON_PROXY },
-      jais:       { proxy: JAIS_PROXY }
+      fanar:      { proxy: FANAR_PROXY }
     };
     const cfg = proxyMap[actualRater];
     if (!cfg) throw new Error(`No proxy config for rater "${actualRater}"`);
@@ -1242,8 +1240,10 @@ function populateDropdowns() {
 
 // ── UI: Build rater radio buttons ──
 // NMT engines can't follow rating prompts, so they're excluded from the rater list.
+// Falcon-H1 and Jais are small models: they translate for results but don't rate.
 const NMT_ENGINE_IDS = new Set([
-  "deepl", "google", "tencent", "alibaba", "microsoft", "amazon", "meta", "baidu", "yandex"
+  "deepl", "google", "tencent", "alibaba", "microsoft", "amazon", "meta", "baidu", "yandex",
+  "falcon", "jais"
 ]);
 
 function buildRaterOptions() {
