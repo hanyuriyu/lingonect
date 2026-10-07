@@ -30,9 +30,13 @@
  *   KIMI_BASE_URL     (var, optional)    — API host, for the .cn region
  *   KIMI_MODEL        (var, optional)    — model id, so a rename upstream is a
  *                                          dashboard edit, not a deploy
- *   KIMI_TEMPERATURE  (var, optional)    — defaults to 1, which thinking-mode
- *                                          models require. Instant-mode models
- *                                          prefer 0.6.
+ *   KIMI_THINKING     (var, optional)    — "disabled" (default) runs the model
+ *                                          in instant mode; "enabled" lets it
+ *                                          reason first. See below for why
+ *                                          translation wants it off.
+ *   KIMI_TEMPERATURE  (var, optional)    — defaults to 0.6 in instant mode and
+ *                                          1 in thinking mode, which is what
+ *                                          kimi-k2.x accepts in each.
  *
  * The worker will be available at:
  *   https://kimi.hanyuriyu.workers.dev
@@ -340,17 +344,31 @@ export default {
 
       const body = await request.json();
 
+      // Thinking mode is off by default. kimi-k2.6 reasons before it answers,
+      // and those hidden reasoning tokens count against max_tokens. On short
+      // Latin-script text that fits, but on Arabic, Chinese and the like —
+      // where the prompt also asks for a transliteration — the reasoning ran
+      // past the cap, so Moonshot answered 200 with an EMPTY message and
+      // finish_reason "length". The site showed a blank row, and the health
+      // sweep ("Good morning.") never tripped it. Translation does not need
+      // the reasoning; instant mode answers directly.
+      const thinking = (__t(env.KIMI_THINKING) || "disabled").toLowerCase() === "enabled" ? "enabled" : "disabled";
+      const defaultTemp = thinking === "enabled" ? 1 : 0.6;
+
       const payload = {
         // kimi-k2-0905-preview, kimi-k2-thinking, kimi-k2.5 and the whole
         // moonshot-v1 series are retired and answer 404 now. Keep this on a
         // current id; GET this worker to see what the key can actually reach.
         model: body.model || __t(env.KIMI_MODEL) || "kimi-k2.6",
         messages: body.messages,
-        // Thinking-mode models pin temperature: kimi-k2.6 accepts only 1 and
+        thinking: { type: thinking },
+        // kimi-k2.x pins temperature per mode (1 thinking, 0.6 instant) and
         // rejects the 0.3 the rest of our proxies use for translation. Default
-        // to what the current model wants; the retry below covers the rest.
-        temperature: body.temperature ?? Number(__t(env.KIMI_TEMPERATURE) || "1"),
-        max_tokens: body.max_tokens ?? 1024,
+        // to what the current mode wants; the retry below covers the rest.
+        temperature: body.temperature ?? Number(__t(env.KIMI_TEMPERATURE) || String(defaultTemp)),
+        // Roomy enough that a reasoning model still has budget left for the
+        // answer if thinking is switched back on or the param is ignored.
+        max_tokens: body.max_tokens ?? (thinking === "enabled" ? 8192 : 2048),
       };
 
       const call = (p) => fetch(`${base}/chat/completions`, {
@@ -367,6 +385,16 @@ export default {
       // "insufficient balance") is far more useful to the site's error
       // classifier than a re-wrapped message would be.
       let responseBody = await res.text();
+      let sent = payload;
+
+      // A model that does not know the thinking switch rejects it by name.
+      // Drop it, give the reasoning room, and try once more.
+      if (!res.ok && /thinking/i.test(responseBody)) {
+        sent = Object.assign({}, payload, { max_tokens: body.max_tokens ?? 8192, temperature: body.temperature ?? 1 });
+        delete sent.thinking;
+        res = await call(sent);
+        responseBody = await res.text();
+      }
 
       // Moonshot names the value it will accept — "only 1 is allowed for this
       // model" — so a temperature rejection is self-correcting rather than
@@ -374,12 +402,38 @@ export default {
       // mind. Retried once, only for this error.
       if (!res.ok && /temperature/i.test(responseBody)) {
         const allowed = responseBody.match(/only\s+([\d.]+)\s+is allowed/i);
-        const retry = Object.assign({}, payload, {
-          temperature: allowed ? Number(allowed[1]) : 1,
+        const retry = Object.assign({}, sent, {
+          temperature: allowed ? Number(allowed[1]) : (sent.temperature === 1 ? 0.6 : 1),
         });
-        if (retry.temperature !== payload.temperature && !Number.isNaN(retry.temperature)) {
+        if (retry.temperature !== sent.temperature && !Number.isNaN(retry.temperature)) {
           res = await call(retry);
           responseBody = await res.text();
+        }
+      }
+
+      // A 200 with no answer is a failure, not a translation. Say why, so the
+      // site shows an error instead of a silent blank row.
+      if (res.ok) {
+        let choice = null;
+        try { choice = (JSON.parse(responseBody).choices || [])[0] || null; } catch (_) {}
+        const content = choice && choice.message && choice.message.content;
+        if (choice && !(typeof content === "string" && content.trim())) {
+          const truncated = choice.finish_reason === "length";
+          return new Response(
+            JSON.stringify({ error: {
+              message: truncated
+                ? "Kimi ran out of output tokens before answering (finish_reason: length)."
+                : "Kimi returned an empty answer (finish_reason: " + (choice.finish_reason || "none") + ").",
+              code: "empty_response",
+            } }),
+            {
+              status: 502,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": corsOrigin(request),
+              },
+            }
+          );
         }
       }
 
