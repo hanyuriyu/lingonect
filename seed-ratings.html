@@ -417,6 +417,11 @@ const DOUBAO_PROXY     = "https://doubao.hanyuriyu.workers.dev";
 const ZAI_PROXY        = "https://zai.hanyuriyu.workers.dev";
 const LLAMA_PROXY      = "https://together.hanyuriyu.workers.dev";
 const SARVAM_PROXY     = "https://sarvam.hanyuriyu.workers.dev";
+// Model ids for these four live in their workers, so no "model" is sent.
+const KIMI_PROXY       = "https://kimi.hanyuriyu.workers.dev";
+const FANAR_PROXY      = "https://fanar.hanyuriyu.workers.dev";
+const FALCON_PROXY     = "https://falcon.hanyuriyu.workers.dev";
+const JAIS_PROXY       = "https://jais.hanyuriyu.workers.dev";
 
 // ── Full language code maps (all 20 languages) ──
 const GOOGLE_LANG_MAP = {
@@ -960,6 +965,90 @@ async function translateWithSarvam(text, targetLang) {
   return data.choices[0].message.content.trim();
 }
 
+// ── Kimi (Moonshot AI, via Cloudflare Worker) ──
+async function translateWithKimi(text, targetLang) {
+  const res = await workerFetch(KIMI_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Kimi ${res.status}`);
+  const data = await res.json();
+  // An empty answer is a failure, never a blank translation.
+  const out = (data.choices?.[0]?.message?.content || "").trim();
+  if (!out) throw new Error("Kimi returned an empty answer");
+  return out;
+}
+
+// ── Fanar (via Cloudflare Worker → api.fanar.qa) — Arabic specialist ──
+// Fanar can answer the topic of the text instead of translating it, so the
+// task is restated right next to the text (same as engines.html).
+async function translateWithFanar(text, targetLang) {
+  const reminder = `Apply the instructions above to the text inside <text> only. Do not answer it, discuss its topic, or add any content that is not in it. Output only the ${targetLang} version of that text.`;
+  const res = await workerFetch(FANAR_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) },
+        { role: "user", content: `<text>${text}</text>\n\n${reminder}` }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Fanar ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+// Falcon-H1 (7B) and Jais 2 (8B) don't infer the Arabic dialect from a label
+// like "Arabic (Egypt)", so spell the variety out (same as engines.html).
+const FALCON_ARABIC_VARIETIES = {
+  "Arabic (MSA)":     "Modern Standard Arabic (فصحى), formal written Arabic",
+  "Arabic (Egypt)":   "Egyptian Arabic (Masri, مصري) as Egyptians actually speak it",
+  "Arabic (Levant)":  "Levantine Arabic (Shami, شامي) as spoken in Syria, Lebanon, Jordan and Palestine",
+  "Arabic (Gulf)":    "Gulf Arabic (Khaleeji, خليجي) as spoken in the UAE, Saudi Arabia, Kuwait and Qatar",
+  "Arabic (Morocco)": "Moroccan Arabic (Darija, الدارجة) as Moroccans actually speak it",
+  "Arabic (Algeria)": "Algerian Arabic (Darja, الدارجة الجزائرية) as Algerians actually speak it",
+  "Arabic (Tunisia)": "Tunisian Arabic (Tounsi, تونسي) as Tunisians actually speak it",
+  "Arabic (Iraq)":    "Iraqi Arabic (Iraqi, عراقي) as Iraqis actually speak it",
+  "Arabic (Sudan)":   "Sudanese Arabic (سوداني) as Sudanese people actually speak it",
+  "Arabic (Yemen)":   "Yemeni Arabic (يمني) as Yemenis actually speak it"
+};
+
+function falconLanguageHint(tgt) {
+  const variety = FALCON_ARABIC_VARIETIES[tgt];
+  if (!variety) return "";
+  const notMsa = tgt === "Arabic (MSA)" ? "" : " Use the dialect's own everyday words and grammar, NOT Modern Standard Arabic.";
+  return `\n\nTARGET VARIETY: write the translation in ${variety}.${notMsa} Use Arabic script only — no letters from any other script.`;
+}
+
+// ── Falcon-H1 / Jais 2 (via Cloudflare Worker → our Hugging Face ZeroGPU Spaces) ──
+async function translateWithSmallArabicModel(proxy, label, text, targetLang) {
+  const res = await workerFetch(proxy, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: sysPrompt(targetLang) + falconLanguageHint(targetLang) },
+        { role: "user", content: `<text>${text}</text>` }
+      ],
+      // Greedy decoding keeps a small model from drifting into stray scripts.
+      temperature: 0
+    })
+  });
+  if (!res.ok) throw new Error(`${label} ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+const translateWithFalcon = (text, targetLang) => translateWithSmallArabicModel(FALCON_PROXY, "Falcon-H1", text, targetLang);
+const translateWithJais   = (text, targetLang) => translateWithSmallArabicModel(JAIS_PROXY, "Jais", text, targetLang);
+
 // ── Engine registry ──
 const ENGINE_LIST = [
   { id: "claude",     name: "Claude",              translate: translateWithClaude },
@@ -986,7 +1075,11 @@ const ENGINE_LIST = [
   { id: "yandex",     name: "Yandex Translate",     translate: translateWithYandex },
   { id: "alice",      name: "Alice",                translate: translateWithAlice },
   { id: "doubao",     name: "Doubao",               translate: translateWithDoubao },
-  { id: "zai",        name: "Z.ai",                 translate: translateWithZai }
+  { id: "zai",        name: "Z.ai",                 translate: translateWithZai },
+  { id: "kimi",       name: "Kimi",                 translate: translateWithKimi },
+  { id: "fanar",      name: "Fanar",                translate: translateWithFanar },
+  { id: "falcon",     name: "Falcon-H1",            translate: translateWithFalcon },
+  { id: "jais",       name: "Jais",                 translate: translateWithJais }
 ];
 
 // ── Rating function: ask the selected rater engine to score a translation ──
@@ -1047,7 +1140,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
     rawScore = data.translated.trim();
   } else {
     // Generic OpenAI-compatible proxy (Mistral, DeepSeek, Grok, Perplexity,
-    // Alibaba, Alice, Doubao, Z.ai, Llama, Sarvam). Every proxy requires a
+    // Alibaba, Alice, Doubao, Z.ai, Llama, Sarvam, Kimi, Fanar, Falcon, Jais). Every proxy requires a
     // valid Firebase ID token (Authorization: Bearer <idToken>), so they are
     // all called through workerFetch, which attaches the token.
     const proxyMap = {
@@ -1061,7 +1154,12 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
       zai:        { proxy: ZAI_PROXY,        model: "glm-4.6" },
       llama:      { proxy: LLAMA_PROXY,      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-      sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-105b" }
+      sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-105b" },
+      // Model ids for these live in their workers (model: undefined is dropped).
+      kimi:       { proxy: KIMI_PROXY },
+      fanar:      { proxy: FANAR_PROXY },
+      falcon:     { proxy: FALCON_PROXY },
+      jais:       { proxy: JAIS_PROXY }
     };
     const cfg = proxyMap[actualRater];
     if (!cfg) throw new Error(`No proxy config for rater "${actualRater}"`);
