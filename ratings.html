@@ -526,6 +526,10 @@ function migrateLang(lang) {
   return LEGACY_LANG_MIGRATION[lang] || lang;
 }
 
+// When Jais started returning real translations (Jais-2-8B-Chat on our
+// ZeroGPU Space). Jais ratings stamped earlier are ignored — see loadRatings.
+const JAIS_LIVE_MS = Date.parse("2026-10-07T07:00:00Z");
+
 async function loadRatings() {
   const snapshot = await db.collection("ratings").get();
 
@@ -541,10 +545,14 @@ async function loadRatings() {
     if (!ratingsData[key]) ratingsData[key] = {};
 
     const ratings = d.ratings || {};
+    const ratedAtMs = d.timestamp && d.timestamp.toMillis ? d.timestamp.toMillis() : 0;
     for (const [engineId, value] of Object.entries(ratings)) {
-      // Jais / Cotoha / Tsuzumi API keys are not yet available — keep their
+      // Cotoha / Tsuzumi API keys are not yet available — keep their
       // columns N/A regardless of any legacy seeded ratings still in Firestore.
-      if (engineId === "jais" || engineId === "cotoha" || engineId === "tsuzumi") continue;
+      if (engineId === "cotoha" || engineId === "tsuzumi") continue;
+      // Jais only went live on JAIS_LIVE_MS; anything older is a seeded rating
+      // of the placeholder reply, so only count ratings made since then.
+      if (engineId === "jais" && ratedAtMs < JAIS_LIVE_MS) continue;
       if (!ratingsData[key][engineId]) {
         ratingsData[key][engineId] = { sum: 0, count: 0 };
       }
