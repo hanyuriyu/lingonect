@@ -5894,6 +5894,27 @@ function ttBadgeCards(rank) {
   rank.losers.forEach(e => mark(e, "lose", "Furthest"));
 }
 
+// Keep a record of every ranking for the "Wins" counter on the Ratings page:
+// one small document per Translate run, holding the language pair and the
+// engine ids that won, lost and took part. Recorded once per run (toggling
+// Triangulate off and on again doesn't count twice), only when there was a
+// real ranking, and only for signed-in, verified users. Never throws.
+const TT_WINS_COLLECTION = "triangulationWins";
+const ttRecordedRuns = new Set();
+function ttRecordWins(run, rank) {
+  const u = auth.currentUser;
+  if (!u || u.isAnonymous || !u.emailVerified || ttRecordedRuns.has(run.runId)) return;
+  ttRecordedRuns.add(run.runId);
+  db.collection(TT_WINS_COLLECTION).add({
+    sourceLanguage: run.src,
+    targetLanguage: run.tgt,
+    winners:  rank.winners.map(e => e.id),
+    losers:   rank.losers.map(e => e.id),
+    compared: rank.scored.map(e => e.id),
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(err => console.warn("Triangulation wins not saved", err));
+}
+
 // Render the summary card for one finished Translate run.
 async function runTranslateTriangulation(run) {
   const area = document.getElementById("ttArea");
@@ -5958,6 +5979,7 @@ async function runTranslateTriangulation(run) {
     const rank = ttRankEngines(variants, rec.textContent.trim());
     stats.insertAdjacentHTML("beforebegin", ttRankHtml(rank));
     ttBadgeCards(rank);
+    ttRecordWins(run, rank);
   }
 }
 

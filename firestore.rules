@@ -94,6 +94,34 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---- triangulation wins (Translate + Triangulate rankings) ----
+    // engines.html records which engines came closest to (winners) and
+    // furthest from (losers) the recommended translation, once per run; the
+    // Ratings page tallies them into a "Wins" counter. Anonymous: engine ids
+    // and the language pair only. Records are immutable from the client.
+    match /triangulationWins/{winId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['sourceLanguage', 'targetLanguage', 'winners', 'losers', 'compared', 'timestamp'])
+        && request.resource.data.timestamp == request.time
+        && request.resource.data.sourceLanguage is string
+        && request.resource.data.sourceLanguage.size() <= 80
+        && request.resource.data.targetLanguage is string
+        && request.resource.data.targetLanguage.size() <= 80
+        && request.resource.data.winners is list
+        && request.resource.data.winners.size() >= 1
+        && request.resource.data.winners.size() <= 60
+        && request.resource.data.losers is list
+        && request.resource.data.losers.size() <= 60
+        && request.resource.data.compared is list
+        && request.resource.data.compared.size() >= 2
+        && request.resource.data.compared.size() <= 60;
+
+      allow update, delete: if isAdmin();
+    }
+
     // ---- chat messages (1:1 rooms keyed "<uidA>_<uidB>", alphabetical) ----
     // Only the two participants encoded in the room id may read or post, and a
     // message's `from` must be the sender. Participants may delete (the client
