@@ -165,6 +165,11 @@ html,body{
   transition:color .2s;
 }
 .auth-link:hover{ color:var(--cobalt); }
+/* Engines is members-only on the website (signed-in members land there straight
+   from Login), so the link only shows in the native apps, where Engines is open
+   without an account. app-native.js tags <html> with .native-app. */
+.auth-link.app-only{ display:none; }
+html.native-app .auth-link.app-only{ display:inline; }
 
 /* === BRAND HEADING + TAGLINE (crawlable, keyword-rich page content) === */
 .brand-heading{
@@ -340,7 +345,7 @@ html,body{
     <h1 class="brand-heading">Lingonect<sup class="tm">®</sup></h1>
     <p class="brand-tagline">Compare AI translation engines side by side, build AI-powered language flashcards, and connect with truly multilingual humans.</p>
     <nav class="auth-nav" aria-label="Menu">
-      <a href="engines.html" class="auth-link">Engines</a>
+      <a href="engines.html" class="auth-link app-only">Engines</a>
       <a href="about.html" class="auth-link">About</a>
       <a href="login.html" class="auth-link">Login</a>
       <a href="register.html" class="auth-link">Register</a>
