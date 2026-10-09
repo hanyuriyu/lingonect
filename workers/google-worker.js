@@ -167,6 +167,8 @@ const CORS_ALLOWED_ORIGINS = [
   "http://localhost",
   "https://localhost",
 ];
+// Origins of the native apps — the only place anonymous users are allowed.
+const APP_ORIGINS = ["capacitor://localhost", "https://localhost"];
 function corsOrigin(request) {
   const o = request.headers.get("Origin");
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
@@ -207,6 +209,18 @@ export default {
             "Access-Control-Allow-Origin": corsOrigin(request),
           },
         }
+      );
+    }
+
+    // Anonymous (no-account) access exists only for the native apps (Apple
+    // 5.1.1(v)); on the website Engines is members-only. Browsers can't forge
+    // Origin, so an anonymous token from any web page is refused here. The
+    // apps load from capacitor://localhost (iOS) and https://localhost (Android).
+    if (__authPayload.firebase && __authPayload.firebase.sign_in_provider === "anonymous"
+        && !APP_ORIGINS.includes(request.headers.get("Origin"))) {
+      return new Response(
+        JSON.stringify({ error: "Please sign in to use the translation engines.", code: "login_required" }),
+        { status: 403, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
       );
     }
 
