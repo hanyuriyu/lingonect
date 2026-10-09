@@ -1946,10 +1946,26 @@ function computeFullAccess(data) {
 const db = firebase.firestore();
 
 auth.onAuthStateChanged(async user => {
-  // No session yet → sign in anonymously so anyone can use the free engines
-  // (Google Translate, OpenAI, Mistral) WITHOUT an account. Apple 5.1.1(v):
-  // core translation must not sit behind a login. Login stays optional and
-  // only unlocks the remaining engines and account features.
+  const isNativeApp = !!(window.Capacitor
+    && typeof window.Capacitor.isNativePlatform === "function"
+    && window.Capacitor.isNativePlatform());
+
+  // Website: Engines is members-only. Anyone without a verified account
+  // (no session, a leftover anonymous session, or an unverified email) goes
+  // to login. The open free tier below exists only for the native apps.
+  // Same test as login.html's redirect, so the two pages can't bounce a user
+  // back and forth (Google/Apple accounts arrive verified by the provider).
+  const isMember = !!(user && !user.isAnonymous && (user.emailVerified
+    || user.providerData.some(p => p.providerId === "google.com" || p.providerId === "apple.com")));
+  if (!isNativeApp && !isMember) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  // App: no session yet → sign in anonymously so anyone can use the free
+  // engines (Google Translate, OpenAI, Mistral) WITHOUT an account. Apple
+  // 5.1.1(v): core translation must not sit behind a login. Login stays
+  // optional and only unlocks the remaining engines and account features.
   if (!user) {
     try {
       await auth.signInAnonymously();
@@ -1959,7 +1975,7 @@ auth.onAuthStateChanged(async user => {
     return; // onAuthStateChanged fires again with the anonymous user
   }
 
-  // Anonymous or not-yet-verified → free tier: the three open engines only.
+  // App only: anonymous or not-yet-verified → free tier, three open engines.
   // Show only About + Engines in the menu; the account-only pages (Ratings,
   // Chat, Flashcards, Profile) are hidden and a Login link is shown instead.
   if (user.isAnonymous || !user.emailVerified) {
@@ -1967,12 +1983,9 @@ auth.onAuthStateChanged(async user => {
     document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = "none"; });
     document.getElementById("loginNavLink").style.display = "";
     document.getElementById("logoutBtn").style.display = "none";
-    // On the app, free users get only Translate / Transcreate / Localize.
-    const isNativeApp = !!(window.Capacitor
-      && typeof window.Capacitor.isNativePlatform === "function"
-      && window.Capacitor.isNativePlatform());
-    if (isNativeApp) applyFreeMethodRestrictions();
-    // Everywhere (website included), free users never get Triangulate.
+    // (Only reachable in the app.) Free users get only Translate /
+    // Transcreate / Localize, and never Triangulate.
+    applyFreeMethodRestrictions();
     applyPlanMethodRestrictions(false);
     document.body.style.visibility = "visible";
     return;
