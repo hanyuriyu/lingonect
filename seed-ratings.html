@@ -356,11 +356,11 @@ const ALL_LANGUAGES = [
   "Arabic (Algeria)","Arabic (Egypt)","Arabic (Gulf)","Arabic (Iraq)","Arabic (Levant)",
   "Arabic (Morocco)","Arabic (MSA)","Arabic (Sudan)","Arabic (Tunisia)","Arabic (Yemen)",
   "Bengali","Bulgarian","Catalan","Chinese (Simplified)","Chinese (Traditional)",
-  "Croatian","Czech","Danish","Dutch","English (UK)","English (US)","Estonian",
+  "Croatian","Czech","Danish","Dari","Dutch","English (UK)","English (US)","Estonian",
   "Finnish","French (Canada)","French (EU)","Georgian","German","Greek","Gujarati",
   "Hebrew","Hindi","Hungarian","Icelandic","Indonesian","Italian","Japanese",
   "Kannada","Korean","Latvian","Lithuanian","Malay","Malayalam","Marathi",
-  "Norwegian","Odia","Persian (Farsi)","Polish","Portuguese (Brazil)","Portuguese (Portugal)",
+  "Norwegian","Odia","Pashto","Persian (Farsi)","Polish","Portuguese (Brazil)","Portuguese (Portugal)",
   "Punjabi","Romanian","Russian","Serbian","Slovak","Slovenian","Spanish (EU)",
   "Spanish (LATAM)","Swedish","Tagalog (Filipino)","Tamil","Telugu","Thai",
   "Turkish","Ukrainian","Urdu","Vietnamese"
@@ -431,7 +431,7 @@ const GOOGLE_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"iw","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Dari":"fa-AF","Pashto":"ps","Bengali":"bn",
   "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh-CN","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -465,7 +465,7 @@ const MICROSOFT_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr-Cyrl","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Dari":"prs","Pashto":"ps","Bengali":"bn",
   "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh-Hans","Chinese (Traditional)":"zh-Hant","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"fil"
@@ -477,7 +477,7 @@ const AMAZON_LANG_MAP = {
   "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
   "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
   "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Dari":"fa-AF","Pashto":"ps","Bengali":"bn",
   "Tamil":"ta","Telugu":"te","Marathi":"mr","Gujarati":"gu","Kannada":"kn","Malayalam":"ml","Punjabi":"pa","Odia":"or",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
   "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
@@ -489,7 +489,7 @@ const NLLB_LANG_MAP = {
   "Greek":"ell_Grek","Romanian":"ron_Latn","Hungarian":"hun_Latn","Czech":"ces_Latn","Slovak":"slk_Latn",
   "Bulgarian":"bul_Cyrl","Croatian":"hrv_Latn","Serbian":"srp_Cyrl","Lithuanian":"lit_Latn",
   "Latvian":"lvs_Latn","Estonian":"est_Latn","Slovenian":"slv_Latn","Catalan":"cat_Latn","Icelandic":"isl_Latn","Georgian":"kat_Geor",
-  "Arabic (MSA)":"arb_Arab","Arabic (Egypt)":"arz_Arab","Arabic (Levant)":"apc_Arab","Arabic (Gulf)":"ars_Arab","Arabic (Morocco)":"ary_Arab","Arabic (Algeria)":"arb_Arab","Arabic (Tunisia)":"aeb_Arab","Arabic (Iraq)":"acm_Arab","Arabic (Sudan)":"arb_Arab","Arabic (Yemen)":"acq_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Bengali":"ben_Beng",
+  "Arabic (MSA)":"arb_Arab","Arabic (Egypt)":"arz_Arab","Arabic (Levant)":"apc_Arab","Arabic (Gulf)":"ars_Arab","Arabic (Morocco)":"ary_Arab","Arabic (Algeria)":"arb_Arab","Arabic (Tunisia)":"aeb_Arab","Arabic (Iraq)":"acm_Arab","Arabic (Sudan)":"arb_Arab","Arabic (Yemen)":"acq_Arab","Hebrew":"heb_Hebr","Persian (Farsi)":"pes_Arab","Hindi":"hin_Deva","Urdu":"urd_Arab","Dari":"prs_Arab","Pashto":"pbt_Arab","Bengali":"ben_Beng",
   "Tamil":"tam_Taml","Telugu":"tel_Telu","Marathi":"mar_Deva","Gujarati":"guj_Gujr","Kannada":"kan_Knda","Malayalam":"mal_Mlym","Punjabi":"pan_Guru","Odia":"ory_Orya",
   "Japanese":"jpn_Jpan","Chinese (Simplified)":"zho_Hans","Chinese (Traditional)":"zho_Hant","Korean":"kor_Hang",
   "Thai":"tha_Thai","Vietnamese":"vie_Latn","Indonesian":"ind_Latn","Malay":"zsm_Latn","Tagalog (Filipino)":"tgl_Latn"
