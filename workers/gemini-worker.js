@@ -5,6 +5,10 @@
  *   Settings > Variables and Secrets > Add:
  *     GEMINI_API_KEY (encrypt)
  *
+ * Optional variable:
+ *   GEMINI_PRO_THINKING_BUDGET — reasoning-token cap for gemini-2.5-pro
+ *                                (default 128, Pro's minimum)
+ *
  * The worker will be available at:
  *   https://geminitranslate.hanyuriyu.workers.dev
  */
@@ -297,21 +301,42 @@ export default {
       // constraint). Fall back to a plain translation instruction.
       const promptInstruction = instruction
         || `Translate into ${targetLang}. Output ONLY translated text.`;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${__t(env.GEMINI_API_KEY)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `${promptInstruction}\n\n<text>${text}</text>`
-              }]
+      // gemini-2.5-pro always reasons before it answers and cannot switch that
+      // off. Left unbounded, the reasoning alone often ran past the site's 30s
+      // timeout. Translation does not need it, so cap it at Pro's minimum
+      // (128 tokens). GEMINI_PRO_THINKING_BUDGET overrides it from the
+      // dashboard. Other models are left as they are.
+      const isPro = /^gemini-2\.5-pro/.test(modelId);
+      const thinkingBudget = Number(__t(env.GEMINI_PRO_THINKING_BUDGET) || "128");
+      const callGemini = (withThinkingCap) => {
+        const payload = {
+          contents: [{
+            parts: [{
+              text: `${promptInstruction}\n\n<text>${text}</text>`
             }]
-          })
-        }
-      );
-      const raw = await response.text();
+          }]
+        };
+        if (withThinkingCap) payload.generationConfig = { thinkingConfig: { thinkingBudget } };
+        // thinkingConfig is a v1beta field; plain calls stay on v1.
+        const apiVersion = withThinkingCap ? "v1beta" : "v1";
+        return fetch(
+          `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelId}:generateContent?key=${__t(env.GEMINI_API_KEY)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }
+        );
+      };
+      const capThinking = isPro && Number.isFinite(thinkingBudget);
+      let response = await callGemini(capThinking);
+      let raw = await response.text();
+      // If Google ever rejects the thinking cap, fall back to the plain call
+      // rather than failing the translation.
+      if (capThinking && response.status === 400 && /thinking/i.test(raw)) {
+        response = await callGemini(false);
+        raw = await response.text();
+      }
       let data;
       try { data = JSON.parse(raw); } catch { data = null; }
       if (!response.ok) {

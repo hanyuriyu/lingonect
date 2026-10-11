@@ -13,7 +13,11 @@ id = "f9f80346649545989106f2b6459bbb28"
 # Override in the dashboard (Settings > Variables) if needed. GET the deployed
 # worker to see which ids the key can actually reach.
 [vars]
-KIMI_MODEL = "kimi-k2.6"
+# Turbo build: same Kimi K2 quality, much faster replies, so it stays inside
+# the site's 30s timeout. If Moonshot ever retires this id, the worker falls
+# back to KIMI_FALLBACK_MODEL on its own.
+KIMI_MODEL = "kimi-k2-turbo-preview"
+KIMI_FALLBACK_MODEL = "kimi-k2.6"
 # Instant mode: thinking-mode reasoning counts against max_tokens and left
 # long non-Latin translations with an empty answer. Set "enabled" to reason.
 KIMI_THINKING = "disabled"
