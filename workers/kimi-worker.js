@@ -30,6 +30,8 @@
  *   KIMI_BASE_URL     (var, optional)    — API host, for the .cn region
  *   KIMI_MODEL        (var, optional)    — model id, so a rename upstream is a
  *                                          dashboard edit, not a deploy
+ *   KIMI_FALLBACK_MODEL (var, optional)  — used when KIMI_MODEL is retired
+ *                                          upstream; defaults to kimi-k2.6
  *   KIMI_THINKING     (var, optional)    — "disabled" (default) runs the model
  *                                          in instant mode; "enabled" lets it
  *                                          reason first. See below for why
@@ -386,6 +388,17 @@ export default {
       // classifier than a re-wrapped message would be.
       let responseBody = await res.text();
       let sent = payload;
+
+      // KIMI_MODEL points at Moonshot's faster turbo build. Model ids get
+      // retired without notice, so if the configured one is gone, fall back
+      // to KIMI_FALLBACK_MODEL (kimi-k2.6) instead of failing every request.
+      const fallbackModel = __t(env.KIMI_FALLBACK_MODEL) || "kimi-k2.6";
+      if (!res.ok && !body.model && sent.model !== fallbackModel &&
+          (res.status === 404 || /model[^"]*not\s*(found|exist)|no such model|invalid model|permission/i.test(responseBody))) {
+        sent = Object.assign({}, payload, { model: fallbackModel });
+        res = await call(sent);
+        responseBody = await res.text();
+      }
 
       // A model that does not know the thinking switch rejects it by name.
       // Drop it, give the reasoning room, and try once more.
