@@ -265,10 +265,22 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    let body;
+    try {
+      body = await request.json();
+    } catch (_) {
+      body = {};
+    }
+    // "mt" = Alibaba Cloud Machine Translation (the NMT behind "Alibaba
+    // Translate"); anything else = a Qwen chat call via DashScope.
+    const __isMT = body.mode === "mt";
+
     // A missing secret would otherwise go upstream as "Bearer undefined" and
     // come back as a 401 — indistinguishable from a key the provider revoked.
     // Report the real cause instead, so the engine-health check can name it.
-    const __missing = ["DASHSCOPE_API_KEY"].filter((n) => !__t(env[n]));
+    const __missing = (__isMT
+      ? ["ALIBABA_ACCESS_KEY_ID", "ALIBABA_ACCESS_KEY_SECRET"]
+      : ["DASHSCOPE_API_KEY"]).filter((n) => !__t(env[n]));
     if (__missing.length) {
       return new Response(
         JSON.stringify({ error: { message: "This engine is not configured on our side (missing " + __missing.join(", ") + ").", code: "not_configured" } }),
@@ -282,11 +294,19 @@ export default {
       );
     }
     try {
-      const body = await request.json();
-      // The same DashScope proxy serves two Lingonect engines:
-      //   • "Alibaba Translate" — a fast, plain NMT-style call (qwen-flash).
-      //   • "Qwen" — the reasoning LLM (qwen-max with enable_thinking).
-      // So forward the caller's model and the optional thinking flag.
+      if (__isMT) {
+        const { status, data } = await translateGeneral(env, body);
+        return new Response(JSON.stringify(data), {
+          status,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": corsOrigin(request),
+          },
+        });
+      }
+
+      // DashScope serves the "Qwen" engine: the reasoning LLM (qwen-max with
+      // enable_thinking). Forward the caller's model and the thinking flag.
       const payload = {
         model: body.model || "qwen-plus",
         messages: body.messages,
@@ -336,3 +356,72 @@ export default {
     }
   },
 };
+
+// ---------------------------------------------------------------------------
+// Alibaba Cloud Machine Translation (TranslateGeneral, RPC API 2018-10-12)
+//
+// Needs an AccessKey pair, ideally of a RAM user that only has
+// AliyunMTFullAccess:
+//   npx wrangler secret put ALIBABA_ACCESS_KEY_ID
+//   npx wrangler secret put ALIBABA_ACCESS_KEY_SECRET
+// Optional: ALIBABA_MT_ENDPOINT (default mt.aliyuncs.com).
+//
+// Returns { translated } on success, or { error: { message, code } } with a
+// non-2xx status so the site's error matcher can explain it.
+// ---------------------------------------------------------------------------
+function __pctEncode(v) {
+  return encodeURIComponent(v).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
+async function translateGeneral(env, body) {
+  const params = {
+    Format: "JSON",
+    Version: "2018-10-12",
+    AccessKeyId: __t(env.ALIBABA_ACCESS_KEY_ID),
+    SignatureMethod: "HMAC-SHA1",
+    SignatureVersion: "1.0",
+    SignatureNonce: crypto.randomUUID(),
+    Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    Action: "TranslateGeneral",
+    FormatType: "text",
+    Scene: "general",
+    SourceLanguage: body.source || "auto",
+    TargetLanguage: body.target,
+    SourceText: body.text || "",
+  };
+  const canonical = Object.keys(params).sort()
+    .map((k) => __pctEncode(k) + "=" + __pctEncode(params[k]))
+    .join("&");
+  const stringToSign = "POST&" + __pctEncode("/") + "&" + __pctEncode(canonical);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(__t(env.ALIBABA_ACCESS_KEY_SECRET) + "&"),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(stringToSign)));
+  const signature = btoa(String.fromCharCode(...sig));
+
+  const host = __t(env.ALIBABA_MT_ENDPOINT) || "mt.aliyuncs.com";
+  const res = await fetch("https://" + host + "/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: canonical + "&Signature=" + __pctEncode(signature),
+  });
+  const data = await res.json().catch(() => ({}));
+
+  // Gateway errors (bad key, no permission, service not activated) come back
+  // as HTTP 4xx; translation errors as HTTP 200 with a non-"200" Code.
+  const ok = res.ok && String(data.Code) === "200" && data.Data && typeof data.Data.Translated === "string";
+  if (ok) return { status: 200, data: { translated: data.Data.Translated } };
+  return {
+    status: res.ok ? 400 : res.status,
+    data: {
+      error: {
+        message: `${data.Code || "Error"}: ${data.Message || "no message"} (RequestId ${data.RequestId || "?"})`,
+        code: data.Code,
+      },
+    },
+  };
+}
