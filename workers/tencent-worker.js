@@ -4,6 +4,8 @@
  * Environment secrets required:
  *   npx wrangler secret put TENCENT_SECRET_ID
  *   npx wrangler secret put TENCENT_SECRET_KEY
+ * Optional:
+ *   npx wrangler secret put TENCENT_REGION   (default ap-singapore)
  *
  * The worker will be available at:
  *   https://tencenttranslate.hanyuriyu.workers.dev
@@ -293,7 +295,9 @@ export default {
       const host = "tmt.tencentcloudapi.com";
       const action = "TextTranslate";
       const version = "2018-03-21";
-      const region = "ap-singapore";
+      // Overridable without a code change (wrangler secret put TENCENT_REGION),
+      // since which regions serve TMT depends on the account's site/entity.
+      const region = __t(env.TENCENT_REGION) || "ap-singapore";
 
       const payload = JSON.stringify({
         SourceText: text,
