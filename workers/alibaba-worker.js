@@ -364,7 +364,8 @@ export default {
 // AliyunMTFullAccess:
 //   npx wrangler secret put ALIBABA_ACCESS_KEY_ID
 //   npx wrangler secret put ALIBABA_ACCESS_KEY_SECRET
-// Optional: ALIBABA_MT_ENDPOINT (default mt.aliyuncs.com).
+// Optional: ALIBABA_MT_ENDPOINT pins the endpoint (otherwise each known one
+// is tried until one recognises the key).
 //
 // Returns { translated } on success, or { error: { message, code } } with a
 // non-2xx status so the site's error matcher can explain it.
@@ -373,7 +374,11 @@ function __pctEncode(v) {
   return encodeURIComponent(v).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 }
 
-async function translateGeneral(env, body) {
+let __mtHost = null;
+
+// Build a signed form body. Each call gets a fresh nonce and timestamp, so a
+// retry at another endpoint is never rejected as a replay.
+async function __signedMtBody(env, body) {
   const params = {
     Format: "JSON",
     Version: "2018-10-12",
@@ -401,15 +406,36 @@ async function translateGeneral(env, body) {
     ["sign"]
   );
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(stringToSign)));
-  const signature = btoa(String.fromCharCode(...sig));
+  return canonical + "&Signature=" + __pctEncode(btoa(String.fromCharCode(...sig)));
+}
 
-  const host = __t(env.ALIBABA_MT_ENDPOINT) || "mt.aliyuncs.com";
-  const res = await fetch("https://" + host + "/", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: canonical + "&Signature=" + __pctEncode(signature),
-  });
-  const data = await res.json().catch(() => ({}));
+async function translateGeneral(env, body) {
+  // An AccessKey only exists at the endpoints of its own site (China vs
+  // international), and the wrong one answers "InvalidAccessKeyId.NotFound".
+  // Unless ALIBABA_MT_ENDPOINT pins one, try each and remember the one that
+  // knows the key for the rest of this isolate's life.
+  const pinned = __t(env.ALIBABA_MT_ENDPOINT);
+  const hosts = pinned ? [pinned]
+    : [...new Set([__mtHost, "mt.aliyuncs.com", "mt.ap-southeast-1.aliyuncs.com", "mt.cn-hangzhou.aliyuncs.com"].filter(Boolean))];
+  let res = null, data = {}, lastErr = null;
+  for (const host of hosts) {
+    try {
+      res = await fetch("https://" + host + "/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: await __signedMtBody(env, body),
+      });
+    } catch (e) {
+      lastErr = e; // e.g. a host that does not exist
+      continue;
+    }
+    data = await res.json().catch(() => ({}));
+    if (data.Code !== "InvalidAccessKeyId.NotFound") {
+      __mtHost = host;
+      break;
+    }
+  }
+  if (!res) throw lastErr || new Error("No Machine Translation endpoint reachable");
 
   // Gateway errors (bad key, no permission, service not activated) come back
   // as HTTP 4xx; translation errors as HTTP 200 with a non-"200" Code.

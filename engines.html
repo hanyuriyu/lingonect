@@ -3542,7 +3542,7 @@ const ENGINE_FAILURES = [
   // of changing the model id fixes it. It has to be said in those words.
   { code: "deployment_stopped", when: /no deployments are ready|deployments are stopped|endpoint.{0,30}(stopped|not (running|started))|start (one|an endpoint)|scale.{0,20}zero/i,
     say: n => `${n}'s hosted endpoint is switched off on our side. Someone has to start it again — please report it.` },
-  { code: "bad_credentials", when: /api[\s_-]?key|unauthorized|forbidden|invalid authentication|access denied|permission/i, status: [401, 403],
+  { code: "bad_credentials", when: /api[\s_-]?key|access[\s_-]?key|unauthorized|forbidden|invalid authentication|access denied|permission/i, status: [401, 403],
     say: n => `${n} rejected our credentials. That is a problem on our side, not with your account.` },
   { code: "model_gone", when: /model.*(not found|does not exist|unavailable)|unknown model|no such model|deprecat/i, status: 404,
     say: n => `${n}'s model is unavailable — the provider may have retired it.` },
