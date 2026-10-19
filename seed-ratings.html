@@ -694,21 +694,18 @@ async function translateWithTencent(text, targetLang) {
 }
 
 async function translateWithAlibaba(text, targetLang) {
-  // Fast NMT-style Alibaba engine: smallest/quickest Qwen model.
+  // Alibaba Cloud Machine Translation (NMT) via the worker's "mt" mode.
+  // Its codes match Tencent's list here, lower-cased (zh-TW -> zh-tw).
+  const target = TENCENT_LANG_MAP[targetLang] && TENCENT_LANG_MAP[targetLang].toLowerCase();
+  if (!target) throw new Error(`Alibaba does not support ${targetLang}.`);
   const res = await workerFetch(ALIBABA_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "qwen-flash",
-      messages: [
-        { role: "system", content: sysPrompt(targetLang) },
-        { role: "user", content: `<text>${text}</text>` }
-      ]
-    })
+    body: JSON.stringify({ mode: "mt", text, source: "auto", target })
   });
   if (!res.ok) throw new Error(`Alibaba ${res.status}`);
   const data = await res.json();
-  return data.choices[0].message.content.trim();
+  return data.translated.trim();
 }
 
 async function translateWithQwen(text, targetLang) {
@@ -1095,7 +1092,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
 
   // For API-based engines (not DeepL/Google/Tencent/Microsoft which are non-LLM),
   // we send a rating prompt. For non-LLM engines, fall back to Claude.
-  const NON_LLM = ["deepl", "google", "tencent", "microsoft", "amazon", "meta", "papago", "baidu", "yandex", "falcon", "jais"];
+  const NON_LLM = ["deepl", "google", "tencent", "alibaba", "microsoft", "amazon", "meta", "papago", "baidu", "yandex", "falcon", "jais"];
   const actualRater = NON_LLM.includes(raterEngine) ? "claude" : raterEngine;
 
   let rawScore;
@@ -1148,7 +1145,6 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
       grok:       { proxy: GROK_PROXY,       model: "grok-3" },
       perplexity: { proxy: PERPLEXITY_PROXY, model: "sonar" },
-      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-flash" },
       qwen:       { proxy: ALIBABA_PROXY,    model: "qwen-max" },
       alice:      { proxy: ALICE_PROXY,      model: "aliceai-llm/latest" },
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
