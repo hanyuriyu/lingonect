@@ -10,8 +10,24 @@ cd "$(dirname "$0")"
 
 read -rsp "Alibaba AccessKey ID (LTA…): " key_id; echo
 read -rsp "Alibaba AccessKey Secret: " key_secret; echo
+# Strip spaces/newlines that sneak in with a paste.
+key_id="$(printf '%s' "$key_id" | tr -d '[:space:]')"
+key_secret="$(printf '%s' "$key_secret" | tr -d '[:space:]')"
 if [ -z "$key_id" ] || [ -z "$key_secret" ]; then
   echo "Both values are required — nothing was changed."
+  exit 1
+fi
+
+# The input is hidden, so show a masked preview: a value pasted twice shows up
+# here as an unusual length (an ID is normally 24 characters, a Secret 30).
+echo "ID:     ${key_id:0:4}…${key_id: -3}  (${#key_id} characters)"
+echo "Secret: ${key_secret:0:3}…${key_secret: -3}  (${#key_secret} characters)"
+if [ "${key_id:0:4}" != "LTAI" ]; then
+  echo "Warning: an Alibaba AccessKey ID normally starts with LTAI."
+fi
+read -rp "Store these two values? [y/N] " ok
+if [ "$ok" != "y" ] && [ "$ok" != "Y" ]; then
+  echo "Nothing was changed."
   exit 1
 fi
 
