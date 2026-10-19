@@ -3920,9 +3920,18 @@ async function translateWithTencent(text) {
     // (and log the RequestId for a support ticket) instead of hiding it.
     const err = data.Response.Error;
     console.warn(`Tencent refused ${srcCode} → ${langCode}:`, err, "RequestId:", data.Response.RequestId);
-    throw await engineError("Tencent Translate", res, {
+    const e = await engineError("Tencent Translate", res, {
       error: { message: `${err.Code || "Error"}: ${err.Message || ""} (${srcCode} → ${langCode})` }
     });
+    // Since 2026-10-18 Tencent refuses every pair this way, on both the intl
+    // and China-site hosts, and TextTranslate is gone from its API Explorer —
+    // a block on Tencent's side. Say so plainly; we keep calling, so the card
+    // recovers by itself once Tencent serves text translation again.
+    if (err.Code === "UnsupportedOperation.UnsupportedLanguage") {
+      e.message = "Tencent Translate is temporarily unavailable — Tencent is currently refusing all text translations. The other engines are not affected.";
+      e.code = "provider_unavailable";
+    }
+    throw e;
   }
   return data.Response.TargetText.trim();
 }
