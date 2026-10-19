@@ -699,7 +699,7 @@ async function translateWithAlibaba(text, targetLang) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "qwen-turbo",
+      model: "qwen-flash",
       messages: [
         { role: "system", content: sysPrompt(targetLang) },
         { role: "user", content: `<text>${text}</text>` }
@@ -1148,7 +1148,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       deepseek:   { proxy: DEEPSEEK_PROXY,   model: "deepseek-chat" },
       grok:       { proxy: GROK_PROXY,       model: "grok-3" },
       perplexity: { proxy: PERPLEXITY_PROXY, model: "sonar" },
-      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-turbo" },
+      alibaba:    { proxy: ALIBABA_PROXY,    model: "qwen-flash" },
       qwen:       { proxy: ALIBABA_PROXY,    model: "qwen-max" },
       alice:      { proxy: ALICE_PROXY,      model: "aliceai-llm/latest" },
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },

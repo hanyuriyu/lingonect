@@ -284,7 +284,7 @@ export default {
     try {
       const body = await request.json();
       // The same DashScope proxy serves two Lingonect engines:
-      //   • "Alibaba Translate" — a fast, plain NMT-style call (qwen-turbo).
+      //   • "Alibaba Translate" — a fast, plain NMT-style call (qwen-flash).
       //   • "Qwen" — the reasoning LLM (qwen-max with enable_thinking).
       // So forward the caller's model and the optional thinking flag.
       const payload = {
