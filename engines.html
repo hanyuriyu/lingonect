@@ -3531,7 +3531,7 @@ const ENGINE_FAILURES = [
   // "rejected our credentials" sends us rotating a key that was never the problem.
   { code: "account_suspended", when: /(account|cloud|subscription|billing account|organization).{0,40}(suspend|blocked|deactivat|disabled|frozen|not active|inactive|closed)|(suspend|blocked|deactivat|disabled|frozen).{0,40}(account|cloud|billing)|payment method|add a payment|card (declined|expired)/i,
     say: n => `${n}'s account on our side is suspended — usually lapsed billing, not a broken key. Please report it.` },
-  { code: "no_credit", when: /insufficient|balance|billing|payment|out of credit|quota (exceeded|exhausted)|exceeded your current quota|free amount|arrears/i, status: 402,
+  { code: "no_credit", when: /insufficient|balance|billing|payment|out of credit|quota (exceeded|exhausted)|exceeded your current quota|free amount|free tier|arrear|good standing/i, status: 402,
     say: n => `${n} has run out of API credit on our side. This is not your request limit — please report it.` },
   { code: "rate_limited", when: /rate.?limit|too many requests|access limit|qps/i, status: 429,
     say: n => `${n} is rate-limiting us right now. Wait a few seconds and translate again.` },
@@ -3879,32 +3879,49 @@ async function translateWithGrok(text, extra) {
 // ── Tencent Translate (via Cloudflare Worker) ──
 const TENCENT_PROXY = "https://tencent.hanyuriyu.workers.dev";
 
+// Tencent TMT only covers these 18 languages, and not every pair between them.
 const TENCENT_LANG_MAP = {
   "English (US)":"en","English (UK)":"en","Spanish (EU)":"es","Spanish (LATAM)":"es","French (EU)":"fr","French (Canada)":"fr","German":"de","Italian":"it",
-  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Swedish":"sv","Norwegian":"no","Danish":"da","Finnish":"fi",
-  "Dutch":"nl","Polish":"pl","Russian":"ru","Ukrainian":"uk","Turkish":"tr",
-  "Greek":"el","Romanian":"ro","Hungarian":"hu","Czech":"cs","Slovak":"sk",
-  "Bulgarian":"bg","Croatian":"hr","Serbian":"sr","Lithuanian":"lt",
-  "Latvian":"lv","Estonian":"et","Slovenian":"sl","Catalan":"ca","Icelandic":"is","Georgian":"ka",
-  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hebrew":"he","Persian (Farsi)":"fa","Hindi":"hi","Urdu":"ur","Bengali":"bn",
+  "Portuguese (Brazil)":"pt","Portuguese (Portugal)":"pt","Russian":"ru","Turkish":"tr",
+  "Arabic (MSA)":"ar","Arabic (Egypt)":"ar","Arabic (Levant)":"ar","Arabic (Gulf)":"ar","Arabic (Morocco)":"ar","Arabic (Algeria)":"ar","Arabic (Tunisia)":"ar","Arabic (Iraq)":"ar","Arabic (Sudan)":"ar","Arabic (Yemen)":"ar","Hindi":"hi",
   "Japanese":"ja","Chinese (Simplified)":"zh","Chinese (Traditional)":"zh-TW","Korean":"ko",
-  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms","Tagalog (Filipino)":"tl"
+  "Thai":"th","Vietnamese":"vi","Indonesian":"id","Malay":"ms"
+};
+
+// Source → targets Tencent accepts. Any other pair comes back (with HTTP 200)
+// as "Unsupported translation direction", so check before spending a call.
+const TENCENT_EUROPEAN = ["fr", "es", "it", "de", "tr", "ru", "pt"];
+const TENCENT_ALL = ["zh", "zh-TW", "en", "ja", "ko", ...TENCENT_EUROPEAN, "vi", "id", "th", "ms", "ar", "hi"];
+const TENCENT_DIRECTIONS = {
+  zh: TENCENT_ALL, "zh-TW": TENCENT_ALL, en: TENCENT_ALL,
+  ja: ["zh", "zh-TW", "en", "ko"],
+  ko: ["zh", "zh-TW", "en", "ja"],
+  ...Object.fromEntries(TENCENT_EUROPEAN.map(c => [c, ["zh", "zh-TW", "en", ...TENCENT_EUROPEAN]])),
+  ...Object.fromEntries(["vi", "id", "th", "ms", "ar", "hi"].map(c => [c, ["zh", "zh-TW", "en"]]))
 };
 
 async function translateWithTencent(text) {
   assertLangSupported(TENCENT_LANG_MAP);
+  const srcCode = TENCENT_LANG_MAP[sourceLang];
   const langCode = TENCENT_LANG_MAP[targetLang];
+  if (srcCode === langCode || !(TENCENT_DIRECTIONS[srcCode] || []).includes(langCode)) {
+    throw new UnsupportedLanguageError();
+  }
   const res = await workerFetch(TENCENT_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, source: "auto", target: langCode })
+    body: JSON.stringify({ text, source: srcCode, target: langCode })
   });
   if (!res.ok) throw await engineError("Tencent Translate", res);
   const data = await res.json();
   if (data.Response && data.Response.Error) {
     const err = data.Response.Error;
-    if (err.Code === "UnsupportedLanguage" || /不支持的语种/.test(err.Message || "")) {
-      throw new Error("Language not supported");
+    // Tencent reports these as e.g. "UnsupportedOperation.UnsupportedLanguage"
+    // or "...UnsupportedSourceLanguage", with the message "Unsupported
+    // translation direction" — a language mismatch, not a failure.
+    if (/Unsupported(Source)?Language/i.test(err.Code || "") ||
+        /unsupported (translation direction|language)|不支持的语种|不支持该语种/i.test(err.Message || "")) {
+      throw new UnsupportedLanguageError();
     }
     throw await engineError("Tencent Translate", res, data);
   }
