@@ -3915,15 +3915,14 @@ async function translateWithTencent(text) {
   if (!res.ok) throw await engineError("Tencent Translate", res);
   const data = await res.json();
   if (data.Response && data.Response.Error) {
+    // The pair already passed TENCENT_DIRECTIONS, so a refusal here is not
+    // "language not supported" on our side: show Tencent's own code and text
+    // (and log the RequestId for a support ticket) instead of hiding it.
     const err = data.Response.Error;
-    // Tencent reports these as e.g. "UnsupportedOperation.UnsupportedLanguage"
-    // or "...UnsupportedSourceLanguage", with the message "Unsupported
-    // translation direction" — a language mismatch, not a failure.
-    if (/Unsupported(Source)?Language/i.test(err.Code || "") ||
-        /unsupported (translation direction|language)|不支持的语种|不支持该语种/i.test(err.Message || "")) {
-      throw new UnsupportedLanguageError();
-    }
-    throw await engineError("Tencent Translate", res, data);
+    console.warn(`Tencent refused ${srcCode} → ${langCode}:`, err, "RequestId:", data.Response.RequestId);
+    throw await engineError("Tencent Translate", res, {
+      error: { message: `${err.Code || "Error"}: ${err.Message || ""} (${srcCode} → ${langCode})` }
+    });
   }
   return data.Response.TargetText.trim();
 }
