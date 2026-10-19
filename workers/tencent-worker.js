@@ -6,6 +6,8 @@
  *   npx wrangler secret put TENCENT_SECRET_KEY
  * Optional:
  *   npx wrangler secret put TENCENT_REGION   (default ap-singapore)
+ *   npx wrangler secret put TENCENT_HOST     (default: try tmt.intl.tencentcloudapi.com,
+ *                                             then tmt.tencentcloudapi.com)
  *
  * The worker will be available at:
  *   https://tencenttranslate.hanyuriyu.workers.dev
@@ -292,7 +294,6 @@ export default {
 
       // Build Tencent Cloud API v3 request
       const service = "tmt";
-      const host = "tmt.tencentcloudapi.com";
       const action = "TextTranslate";
       const version = "2018-03-21";
       // Overridable without a code change (wrangler secret put TENCENT_REGION),
@@ -306,56 +307,80 @@ export default {
         ProjectId: 0,
       });
 
-      const timestamp = Math.floor(Date.now() / 1000);
-      const dateStr = new Date(timestamp * 1000).toISOString().slice(0, 10);
+      // Signed per host: the host is part of the signature.
+      const callTmt = async (host) => {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const dateStr = new Date(timestamp * 1000).toISOString().slice(0, 10);
 
-      // TC3-HMAC-SHA256 signing
-      const hashedPayload = await sha256Hex(payload);
+        // TC3-HMAC-SHA256 signing
+        const hashedPayload = await sha256Hex(payload);
 
-      const canonicalRequest = [
-        "POST",
-        "/",
-        "",
-        `content-type:application/json\nhost:${host}\n`,
-        "content-type;host",
-        hashedPayload,
-      ].join("\n");
+        const canonicalRequest = [
+          "POST",
+          "/",
+          "",
+          `content-type:application/json\nhost:${host}\n`,
+          "content-type;host",
+          hashedPayload,
+        ].join("\n");
 
-      const credentialScope = `${dateStr}/${service}/tc3_request`;
-      const stringToSign = [
-        "TC3-HMAC-SHA256",
-        timestamp,
-        credentialScope,
-        await sha256Hex(canonicalRequest),
-      ].join("\n");
+        const credentialScope = `${dateStr}/${service}/tc3_request`;
+        const stringToSign = [
+          "TC3-HMAC-SHA256",
+          timestamp,
+          credentialScope,
+          await sha256Hex(canonicalRequest),
+        ].join("\n");
 
-      const secretDate = await hmacSha256(
-        new TextEncoder().encode("TC3" + __t(env.TENCENT_SECRET_KEY)),
-        dateStr
-      );
-      const secretService = await hmacSha256(secretDate, service);
-      const secretSigning = await hmacSha256(secretService, "tc3_request");
-      const signature = await hmacSha256Hex(secretSigning, stringToSign);
+        const secretDate = await hmacSha256(
+          new TextEncoder().encode("TC3" + __t(env.TENCENT_SECRET_KEY)),
+          dateStr
+        );
+        const secretService = await hmacSha256(secretDate, service);
+        const secretSigning = await hmacSha256(secretService, "tc3_request");
+        const signature = await hmacSha256Hex(secretSigning, stringToSign);
 
-      const authorization =
-        `TC3-HMAC-SHA256 Credential=${__t(env.TENCENT_SECRET_ID)}/${credentialScope}, ` +
-        `SignedHeaders=content-type;host, Signature=${signature}`;
+        const authorization =
+          `TC3-HMAC-SHA256 Credential=${__t(env.TENCENT_SECRET_ID)}/${credentialScope}, ` +
+          `SignedHeaders=content-type;host, Signature=${signature}`;
 
-      const res = await fetch(`https://${host}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Host: host,
-          "X-TC-Action": action,
-          "X-TC-Version": version,
-          "X-TC-Region": region,
-          "X-TC-Timestamp": String(timestamp),
-          Authorization: authorization,
-        },
-        body: payload,
-      });
+        const res = await fetch(`https://${host}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Host: host,
+            "X-TC-Action": action,
+            "X-TC-Version": version,
+            "X-TC-Region": region,
+            "X-TC-Timestamp": String(timestamp),
+            Authorization: authorization,
+          },
+          body: payload,
+        });
 
-      const data = await res.json();
+        const data = await res.json();
+        return { res, data };
+      };
+
+      // International-site accounts are served at tmt.intl.tencentcloudapi.com;
+      // the China-site host can refuse them with UnsupportedOperation.* (seen as
+      // "Unsupported translation direction" for every pair). Try the
+      // international host first and fall back, unless TENCENT_HOST pins one.
+      const pinnedHost = __t(env.TENCENT_HOST);
+      const hosts = pinnedHost ? [pinnedHost]
+        : ["tmt.intl.tencentcloudapi.com", "tmt.tencentcloudapi.com"];
+      let res, data, lastErr;
+      for (const host of hosts) {
+        try {
+          ({ res, data } = await callTmt(host));
+        } catch (e) {
+          lastErr = e;
+          continue;
+        }
+        const code = data && data.Response && data.Response.Error && data.Response.Error.Code;
+        if (!code || !/^(UnsupportedOperation|AuthFailure)/.test(code)) break;
+      }
+      if (!res) throw lastErr || new Error("No Tencent TMT endpoint reachable");
 
       return new Response(JSON.stringify(data), {
         status: res.status,
