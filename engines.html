@@ -4202,10 +4202,11 @@ async function translateWithMeta(text) {
   }
 }
 
-// ── Meta Llama 3.3 (via Cloudflare Worker → Together AI) ──
+// ── Meta Muse Glimmer (via Cloudflare Worker → Together AI) ──
 // A hosted, always-on LLM alternative to the NLLB-200 NMT above. Uses Together
-// AI's OpenAI-compatible endpoint with Llama 3.3 70B Instruct Turbo — the
-// Llama model Together serves serverless (Llama 4 requires a dedicated endpoint).
+// AI's OpenAI-compatible endpoint with Muse Glimmer 30B, which Together
+// recommended when it retired Llama 3.3 70B Instruct Turbo from serverless.
+// The engine keeps its "llama" id so stored ratings and settings carry over.
 const LLAMA_PROXY = "https://together.hanyuriyu.workers.dev";
 
 async function translateWithLlama(text, extra) {
@@ -4213,7 +4214,7 @@ async function translateWithLlama(text, extra) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      model: "meta-models/Muse-Glimmer-30B",
       messages: [
         {
           role: "system",
@@ -4223,7 +4224,7 @@ async function translateWithLlama(text, extra) {
       ]
     })
   });
-  if (!res.ok) throw await engineError("Meta Llama", res);
+  if (!res.ok) throw await engineError("Meta Muse Glimmer", res);
   const data = await res.json();
   return data.choices[0].message.content.trim();
 }
@@ -4743,7 +4744,7 @@ const engines = [
   },
   {
     id:         "llama",
-    name:       "Meta Llama 3.3",
+    name:       "Meta Muse Glimmer",
     logoUrl:    "LLaMA-Meta-Logo-Vector.png",
     badgeClass: "llama",
     badgeText:  "LM",
