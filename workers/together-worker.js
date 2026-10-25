@@ -2,9 +2,9 @@
  * Cloudflare Worker: Together AI (Meta Llama) Translation Proxy
  *
  * Proxies to Together AI's OpenAI-compatible Chat Completions endpoint so the
- * site can use Meta's Llama models as a hosted LLM engine. Defaults to
- * Llama 3.3 70B Instruct Turbo — the Llama model Together serves serverless
- * (Llama 4 variants require a paid dedicated endpoint).
+ * site can use Meta's models as a hosted LLM engine. Defaults to Muse Glimmer
+ * 30B, Together's recommended replacement after it retired Llama 3.3 70B
+ * Instruct Turbo from serverless (October 2026).
  *
  * It also carries a compatibility shim for Kimi, which used to be served from
  * here: native app builds bundle a frozen copy of the site, so shipped ones go
@@ -30,6 +30,15 @@
 // for this project. The token is an RS256 JWT signed by Google; we verify the
 // signature against Google's public keys and validate the standard claims.
 // ---------------------------------------------------------------------------
+// Together retired Llama 3.3 70B Instruct Turbo from serverless; calls for it
+// now fail with "Unable to access non-serverless model". Native app builds
+// bundle a frozen page that still asks for it, so rewrite retired ids to the
+// live model rather than failing those translations until a new build ships.
+const DEFAULT_MODEL = "meta-models/Muse-Glimmer-30B";
+const RETIRED_MODELS = new Set([
+  "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+]);
+
 const FIREBASE_PROJECT_ID = "lingonect-4db51";
 const FIREBASE_JWKS_URL =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
@@ -375,7 +384,7 @@ export default {
           "Authorization": `Bearer ${__t(env.TOGETHER_API_KEY)}`,
         },
         body: JSON.stringify({
-          model: body.model || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          model: !body.model || RETIRED_MODELS.has(body.model) ? DEFAULT_MODEL : body.model,
           messages: body.messages,
           temperature: body.temperature ?? 0.3,
           max_tokens: body.max_tokens ?? 1024,

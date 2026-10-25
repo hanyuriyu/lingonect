@@ -926,20 +926,20 @@ async function translateWithZai(text, targetLang) {
   return data.choices[0].message.content.trim();
 }
 
-// ── Meta Llama 3.3 (via Cloudflare Worker → Together AI) ──
+// ── Meta Muse Glimmer (via Cloudflare Worker → Together AI) ──
 async function translateWithLlama(text, targetLang) {
   const res = await workerFetch(LLAMA_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      model: "meta-models/Muse-Glimmer-30B",
       messages: [
         { role: "system", content: sysPrompt(targetLang) },
         { role: "user", content: `<text>${text}</text>` }
       ]
     })
   });
-  if (!res.ok) throw new Error(`Meta Llama ${res.status}`);
+  if (!res.ok) throw new Error(`Meta Muse Glimmer ${res.status}`);
   const data = await res.json();
   return data.choices[0].message.content.trim();
 }
@@ -1064,7 +1064,7 @@ const ENGINE_LIST = [
   { id: "amazon",     name: "Amazon Translate",     translate: translateWithAmazon },
   { id: "nova",       name: "Amazon Nova",          translate: translateWithNova },
   { id: "meta",       name: "Meta (NLLB-200)",      translate: translateWithMeta },
-  { id: "llama",      name: "Meta Llama 3.3",       translate: translateWithLlama },
+  { id: "llama",      name: "Meta Muse Glimmer",    translate: translateWithLlama },
   { id: "sarvam",     name: "Sarvam",               translate: translateWithSarvam },
   { id: "hyperclovex",name: "HyperCLOVA X",         translate: translateWithHyperCloveX },
   { id: "papago",     name: "Naver Papago",         translate: translateWithPapago },
@@ -1149,7 +1149,7 @@ async function rateTranslation(sourceText, targetLang, translatedText, raterEngi
       alice:      { proxy: ALICE_PROXY,      model: "aliceai-llm/latest" },
       doubao:     { proxy: DOUBAO_PROXY,     model: "ep-20260617224552-qpsmq" },
       zai:        { proxy: ZAI_PROXY,        model: "glm-4.6" },
-      llama:      { proxy: LLAMA_PROXY,      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+      llama:      { proxy: LLAMA_PROXY,      model: "meta-models/Muse-Glimmer-30B" },
       sarvam:     { proxy: SARVAM_PROXY,     model: "sarvam-105b" },
       // Model ids for these live in their workers (model: undefined is dropped).
       kimi:       { proxy: KIMI_PROXY },
