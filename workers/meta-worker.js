@@ -140,7 +140,11 @@ async function __resolveUserStatus(uid, authHeader) {
     const res = await fetch(FIRESTORE_PROFILE_BASE + uid, {
       headers: { Authorization: authHeader },
     });
-    if (!res.ok) return "legacy";
+    // No profile document (404) or it could not be read. This used to mean
+    // "legacy" (1000/day), so a brand-new account that never got a profile
+    // skipped the 500-request free cap. Decide from the account's own
+    // creation time in Firebase Auth instead.
+    if (!res.ok) return await __statusFromAccountAge(authHeader);
     const doc = await res.json();
     const f = (doc && doc.fields) || {};
     const plan = f.plan && f.plan.stringValue;
@@ -173,6 +177,123 @@ function corsOrigin(request) {
   return CORS_ALLOWED_ORIGINS.includes(o) ? o : "https://www.lingonect.com";
 }
 
+// ── Cost guard ─────────────────────────────────────────────────
+// A valid login is not enough on its own: without limits, any logged-in
+// caller could use this worker as an open API — any model, any prompt size,
+// any answer length — on our bill. Each request is held to what Lingonect's
+// own pages send (engines.html, flashcards.html, seed-ratings.html), sized
+// from their largest real call (Contextualize, Triangulate, flashcard
+// batches) with headroom:
+//   • models      allowed model ids; any other is swapped for defaultModel
+//                 (an empty list drops the caller's model, so the worker's
+//                 own config decides). Old app builds asking for a retired
+//                 model still get an answer.
+//   • maxOutputTokens  caps max_tokens / max_completion_tokens
+//   • defaultOutputTokens  set when the caller sends none
+//   • maxBodyChars     a larger request body is refused (413)
+//   • keys        top-level fields passed on; anything else is dropped
+const __LIMITS = { maxBodyChars: 20000 };
+
+function __modelAllowed(model, list) {
+  return list.some((m) => (m instanceof RegExp ? m.test(model) : m === model));
+}
+
+// Returns { request, info } with a sanitised request, or { error } to refuse.
+async function __applyCostGuard(request) {
+  if (request.method !== "POST") return { request, info: {} };
+  const L = typeof __LIMITS === "function" ? __LIMITS(request) : __LIMITS;
+  const raw = await request.text();
+  const info = { bodyChars: raw.length };
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  const rebuild = (text) => new Request(request.url, { method: "POST", headers, body: text });
+  if (raw.length > L.maxBodyChars) {
+    return { error: "This request is too large (" + raw.length + " characters; the limit is " + L.maxBodyChars + ").", info };
+  }
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch (_) {
+    return { request: rebuild(raw), info }; // the worker reports malformed JSON itself
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { request: rebuild(raw), info };
+
+  if (L.keys) {
+    for (const k of Object.keys(body)) {
+      if (!L.keys.includes(k)) {
+        delete body[k];
+        (info.droppedKeys = info.droppedKeys || []).push(k);
+      }
+    }
+  }
+  if (L.models && body.model != null && !__modelAllowed(String(body.model), L.models)) {
+    info.requestedModel = String(body.model);
+    if (L.defaultModel === undefined) delete body.model;
+    else body.model = L.defaultModel;
+  }
+  if (L.maxOutputTokens) {
+    for (const k of ["max_tokens", "max_completion_tokens"]) {
+      if (body[k] == null) continue;
+      const n = Math.floor(Number(body[k]));
+      body[k] = Number.isFinite(n) && n > 0 ? Math.min(n, L.maxOutputTokens) : (L.defaultOutputTokens || L.maxOutputTokens);
+    }
+    if (L.defaultOutputTokens && body.max_tokens == null && body.max_completion_tokens == null) {
+      body.max_tokens = L.defaultOutputTokens;
+    }
+  }
+  if (L.fix) L.fix(body);
+  info.model = body.model;
+  info.maxTokens = body.max_tokens ?? body.max_completion_tokens;
+  return { request: rebuild(JSON.stringify(body)), info };
+}
+
+// One log line per request, readable in Cloudflare > Workers > Logs: who
+// called (uid / email), from where (IP, country, page origin) and how big a
+// request it was. This is how to tell which account is spending the credits.
+function __logRequest(request, auth, info, outcome) {
+  try {
+    console.log(JSON.stringify({
+      lingonect: "request",
+      worker: new URL(request.url).hostname.split(".")[0],
+      path: new URL(request.url).pathname,
+      outcome,
+      uid: auth.sub,
+      email: auth.email || null,
+      anonymous: !!(auth.firebase && auth.firebase.sign_in_provider === "anonymous"),
+      ip: request.headers.get("CF-Connecting-IP"),
+      country: request.headers.get("CF-IPCountry"),
+      origin: request.headers.get("Origin"),
+      ...info,
+    }));
+  } catch (_) {}
+}
+
+// Public web API key (the same one embedded in the site's HTML). Used only to
+// ask Firebase Auth when the caller's own account was created.
+const FIREBASE_WEB_API_KEY = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
+
+// "free" for an account created on/after the cutoff, else "legacy". Fails safe
+// to "legacy", like __resolveUserStatus.
+async function __statusFromAccountAge(authHeader) {
+  try {
+    const res = await fetch(
+      "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + FIREBASE_WEB_API_KEY,
+      {
+        method: "POST",
+        // The key may be restricted to the site's referrer.
+        headers: { "Content-Type": "application/json", "Referer": "https://www.lingonect.com/" },
+        body: JSON.stringify({ idToken: authHeader.slice(7).trim() }),
+      }
+    );
+    if (!res.ok) return "legacy";
+    const data = await res.json();
+    const createdMs = Number(data && data.users && data.users[0] && data.users[0].createdAt);
+    return createdMs && createdMs >= NEW_LIMITS_CUTOFF_MS ? "free" : "legacy";
+  } catch (_) {
+    return "legacy";
+  }
+}
+
 export default {
   async fetch(request, env) {
     const CORS = {
@@ -200,6 +321,22 @@ export default {
       );
     }
 
+    // ── Cost guard + usage log ──────────────────────────────
+    // Before the quota block, so an oversized request is refused without
+    // costing the caller a request from their allowance.
+    {
+      const __guard = await __applyCostGuard(request);
+      if (__guard.error) {
+        __logRequest(request, __authPayload, __guard.info, "refused_too_large");
+        return new Response(
+          JSON.stringify({ error: { message: __guard.error, code: "request_too_large" } }),
+          { status: 413, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+        );
+      }
+      request = __guard.request;
+      __logRequest(request, __authPayload, __guard.info, "accepted");
+    }
+
     // ── Per-user request limits ─────────────────────────────
     // Admin is always exempt. Everything below fails open: any KV/Firestore
     // hiccup lets the request through rather than blocking a paying or
@@ -212,6 +349,24 @@ export default {
     if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
       try {
         const __uid = __authPayload.sub;
+        // Per-IP ceiling across all accounts. Accounts are free to create, so
+        // the per-account limits below cannot stop one machine cycling through
+        // many of them; this can. Generous on purpose — a school or office
+        // shares one IP — and tunable as IP_DAILY_MAX in the dashboard.
+        const __ip = request.headers.get("CF-Connecting-IP");
+        if (__ip) {
+          const __ipMax = parseInt(env.IP_DAILY_MAX, 10) || 5000;
+          const __ipKey = "ip:" + __ip + ":" + new Date().toISOString().slice(0, 10);
+          const __ipUsed = parseInt((await env.QUOTA_KV.get(__ipKey)) || "0", 10) || 0;
+          if (__ipUsed >= __ipMax) {
+            __logRequest(request, __authPayload, {}, "refused_ip_limit");
+            return new Response(
+              JSON.stringify({ error: "Too many requests from this network today. Please try again tomorrow.", code: "ip_limit_reached" }),
+              { status: 429, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+            );
+          }
+          await env.QUOTA_KV.put(__ipKey, String(__ipUsed + 1), { expirationTtl: 172800 });
+        }
         // Resolve the user's status, cached in KV so Firestore is hit at most
         // once every 10 minutes per user.
         let __status = await env.QUOTA_KV.get("st:" + __uid);

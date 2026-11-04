@@ -1674,7 +1674,10 @@ Return ONLY a valid JSON array of strings, in the same order as the input. The a
 Words/phrases:
 ${numbered}`;
 
-  const res = await fetch(workerUrl, {
+  // workerFetch, not fetch: the workers refuse any request without the
+  // user's Firebase ID token, so a bare fetch here always came back 401 and
+  // left example2 / example3 empty.
+  const res = await workerFetch(workerUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

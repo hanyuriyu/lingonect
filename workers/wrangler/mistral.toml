@@ -24,3 +24,6 @@ enabled = true
 [vars]
 ANON_DAILY_PER_USER = "50"
 ANON_DAILY_TOTAL = "5000"
+# Anonymous ids are free to mint (a reinstall gives a new one), so they are
+# also capped per IP address, across all three free engines.
+ANON_DAILY_PER_IP = "300"
