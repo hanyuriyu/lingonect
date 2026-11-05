@@ -68,3 +68,43 @@ touch worker **secrets** (`TOGETHER_API_KEY`, `KIMI_API_KEY`, …), which stay a
 Cloudflare holds them. It does overwrite `[vars]`, so a value edited in the
 dashboard — `KIMI_MODEL`, say — goes back to what the `.toml` says: change it
 there as well, or the next deploy reverts it.
+
+## Cost guard, usage log and per-IP limits
+
+A valid login is not enough on its own: before this, any logged-in caller
+could pick the model, the prompt size and the answer length, and so use a
+worker as an open AI API on our bill. Every worker now runs
+`__applyCostGuard` before the quota block:
+
+- **Model allow-list** (`__LIMITS.models`). Any other model id is swapped for
+  the worker's default model rather than refused, so old app builds still get
+  an answer. When `engines.html` switches a model, add the new id to that
+  worker's `__LIMITS` too, or it will quietly be replaced by the default.
+- **Output cap** (`maxOutputTokens`), sized from the largest real call:
+  Claude 12000 (Contextualize, romanized), OpenAI and DeepSeek 8192
+  (flashcard batches), Kimi 8192, the other LLMs 4096. Gemini has a
+  `maxOutputTokens` of 8192 in its own payload.
+- **Input cap** (`maxBodyChars`): Claude 400k characters (Contextualize and
+  Triangulate merges carry every engine's answer), OpenAI 200k, other LLMs
+  100k, plain translation APIs 20k, OpenAI TTS 6k. Larger → `413`.
+- **Field allow-list** (`keys`) on the workers that forward the body whole
+  (Claude, OpenAI, Perplexity): e.g. tools / web search, `n` are dropped.
+  Perplexity's `search_context_size: "high"` is lowered to `"medium"`.
+
+Every request writes one JSON log line (`"lingonect": "request"`) with uid,
+email, IP, country, origin, model and size. Read them in Cloudflare →
+Workers & Pages → (worker) → Logs, and filter on `email` or `uid` to see who
+is spending.
+
+Quota changes:
+
+- A user with no Firestore profile used to count as "legacy" (1000/day). Now
+  the worker asks Firebase Auth when the account was created: on/after the
+  cutoff → "free" (500 lifetime), before → "legacy".
+- Per-IP ceiling across all accounts: `IP_DAILY_MAX` (default 5000/day).
+- Anonymous users (free engines in the apps) are also capped per IP:
+  `ANON_DAILY_PER_IP` (default 300/day).
+
+The anonymous-origin check can still be faked by a script (it only stops
+browsers); the per-IP and the shared `ANON_DAILY_TOTAL` ceilings bound it.
+Firebase App Check would be the full fix.
