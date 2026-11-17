@@ -517,47 +517,97 @@ export default {
     try {
       const body = await request.json();
 
-      const upstreamBody = JSON.stringify({
-        model: body.model || "mistral-small-latest",
+      // mistral-large-latest now points to Mistral Large 4, which always
+      // reasons before it answers and cannot switch that off. On a short
+      // translation the reasoning used up the whole answer budget (blank
+      // results), made every call slow, and is billed as output. So the
+      // "large" requests the site sends (and the app builds already on
+      // phones) go to MISTRAL_MODEL instead (default mistral-medium-latest),
+      // with reasoning switched off. Change MISTRAL_MODEL in wrangler/mistral.toml
+      // or the dashboard to pick another model without a code change.
+      const model = body.model === "mistral-large-latest" || !body.model
+        ? (__t(env.MISTRAL_MODEL) || "mistral-medium-latest")
+        : body.model;
+      const payload = {
+        model,
         messages: body.messages,
         temperature: body.temperature ?? 0.3,
         max_tokens: body.max_tokens ?? 1024,
-      });
+        reasoning_effort: "none",
+      };
 
       // Mistral's API has been returning intermittent 401/429/5xx responses
       // even with a valid key. These are transient, so retry a couple of times
       // with a short backoff before surfacing the error to the user.
       const TRANSIENT = new Set([401, 429, 500, 502, 503, 504]);
-      let res;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        res = await fetch("https://api.mistral.ai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${__t(env.MISTRAL_API_KEY)}`,
-          },
-          body: upstreamBody,
-        });
-        if (!TRANSIENT.has(res.status)) break;   // success or a non-retryable error
-        if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+      const send = async (p) => {
+        let r;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          r = await fetch("https://api.mistral.ai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${__t(env.MISTRAL_API_KEY)}`,
+            },
+            body: JSON.stringify(p),
+          });
+          if (!TRANSIENT.has(r.status)) break;   // success or a non-retryable error
+          if (attempt < 2) await new Promise(res => setTimeout(res, 400 * (attempt + 1)));
+        }
+        return { res: r, text: await r.text() };
+      };
+
+      let sent = payload;
+      let { res, text } = await send(sent);
+      // A model that does not know reasoning_effort (or not "none") rejects
+      // it by name: retry once without it rather than fail the translation.
+      if (res.status === 400 && /reasoning/i.test(text)) {
+        sent = Object.assign({}, sent);
+        delete sent.reasoning_effort;
+        ({ res, text } = await send(sent));
+      }
+      // A configured model that does not exist (typo, retired): fall back to
+      // mistral-small-latest so Mistral keeps working.
+      if (!res.ok && sent.model !== "mistral-small-latest" &&
+          (res.status === 404 || /invalid model|unknown model|no such model|model[^"]*(not\s*found|does not exist|invalid)/i.test(text))) {
+        sent = Object.assign({}, sent, { model: "mistral-small-latest" });
+        ({ res, text } = await send(sent));
+        if (res.status === 400 && /reasoning/i.test(text)) {
+          delete sent.reasoning_effort;
+          ({ res, text } = await send(sent));
+        }
       }
 
-      const data = await res.json();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (_) {
+        data = { error: { message: text.slice(0, 500) || "Empty response from Mistral" } };
+      }
 
-      // Newer Mistral models can return message.content as a list of chunks
+      // Reasoning models return message.content as a list of chunks
       // ([{type:"thinking",…}, {type:"text", text:"…"}]) instead of a string.
       // Every page (and the app builds already on phones) calls
-      // content.replace()/.trim() on it, which then fails with "undefined is
-      // not a function". Flatten it here to the plain answer text, dropping
-      // any reasoning chunks, so every client keeps getting a string.
+      // content.replace()/.trim() on it, which fails on a list. Flatten it to
+      // the plain answer text, dropping the reasoning chunks.
       for (const choice of (data && Array.isArray(data.choices) ? data.choices : [])) {
         const msg = choice && choice.message;
         if (msg && Array.isArray(msg.content)) {
           const textOf = (c) => (typeof c === "string" ? c : c && typeof c.text === "string" ? c.text : "");
-          const answer = msg.content.filter((c) => typeof c === "string" || (c && c.type === "text"));
-          msg.content = (answer.length ? answer : msg.content.filter((c) => !(c && c.type === "thinking")))
+          msg.content = msg.content
+            .filter((c) => typeof c === "string" || (c && c.type === "text"))
             .map(textOf).join("").trim();
         }
+      }
+
+      // An answer with no text (e.g. a reasoning model that spent the whole
+      // budget thinking) used to show as a blank card. Report it instead.
+      const first = data && Array.isArray(data.choices) && data.choices[0];
+      if (res.ok && first && first.message && !String(first.message.content || "").trim()) {
+        return new Response(
+          JSON.stringify({ error: { message: "Mistral returned no text (model " + sent.model + ", finish_reason " + (first.finish_reason || "unknown") + ")." } }),
+          { status: 502, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+        );
       }
 
       return new Response(JSON.stringify(data), {
