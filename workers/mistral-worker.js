@@ -544,6 +544,22 @@ export default {
 
       const data = await res.json();
 
+      // Newer Mistral models can return message.content as a list of chunks
+      // ([{type:"thinking",…}, {type:"text", text:"…"}]) instead of a string.
+      // Every page (and the app builds already on phones) calls
+      // content.replace()/.trim() on it, which then fails with "undefined is
+      // not a function". Flatten it here to the plain answer text, dropping
+      // any reasoning chunks, so every client keeps getting a string.
+      for (const choice of (data && Array.isArray(data.choices) ? data.choices : [])) {
+        const msg = choice && choice.message;
+        if (msg && Array.isArray(msg.content)) {
+          const textOf = (c) => (typeof c === "string" ? c : c && typeof c.text === "string" ? c.text : "");
+          const answer = msg.content.filter((c) => typeof c === "string" || (c && c.type === "text"));
+          msg.content = (answer.length ? answer : msg.content.filter((c) => !(c && c.type === "thinking")))
+            .map(textOf).join("").trim();
+        }
+      }
+
       return new Response(JSON.stringify(data), {
         status: res.status,
         headers: {
