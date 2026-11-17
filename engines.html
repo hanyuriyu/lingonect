@@ -355,6 +355,37 @@ body{
   text-overflow:ellipsis;
 }
 .input-tool-status.error{ color:#c62828; }
+.input-thumb{
+  position:absolute;
+  left:8px;
+  bottom:6px;
+  height:30px;
+}
+.input-thumb[hidden]{ display:none; }
+.input-thumb img{
+  display:block;
+  height:30px;
+  max-width:60px;
+  object-fit:cover;
+  border-radius:4px;
+  border:1px solid #ddd;
+}
+.input-thumb-del{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  width:16px;
+  height:16px;
+  padding:0;
+  border:none;
+  border-radius:50%;
+  background:#555;
+  color:#fff;
+  font-size:12px;
+  line-height:16px;
+  cursor:pointer;
+}
+.input-thumb:not([hidden]) ~ .input-tool-status{ left:78px; max-width:calc(100% - 230px); }
 
 .text-input:focus{
   box-shadow:0 0 0 3px rgba(0,71,255,.15);
@@ -1717,6 +1748,12 @@ a.tri-chip{ text-decoration:none; }
         </div>
         <input type="file" id="inputImageFile" accept="image/*" hidden>
         <input type="file" id="inputCameraFile" accept="image/*" capture="environment" hidden>
+        <!-- Small preview of the photo the text came from. Held only in memory
+             and removed when the box is cleared or another image is read. -->
+        <div class="input-thumb" id="inputThumb" hidden>
+          <img id="inputThumbImg" alt="Image the text was read from">
+          <button class="input-thumb-del" id="inputThumbDel" type="button" title="Remove image" aria-label="Remove image">×</button>
+        </div>
         <div class="input-tool-status" id="inputToolStatus" role="status" aria-live="polite"></div>
       </div>
 
@@ -2486,6 +2523,22 @@ const inputCameraBtn  = document.getElementById("inputCameraBtn");
 const inputImageFile  = document.getElementById("inputImageFile");
 const inputCameraFile = document.getElementById("inputCameraFile");
 const inputToolStatus = document.getElementById("inputToolStatus");
+const inputThumb      = document.getElementById("inputThumb");
+const inputThumbImg   = document.getElementById("inputThumbImg");
+
+// The preview lives only in this <img>: nothing is uploaded to storage or
+// saved. Removing it drops the image data from the page entirely.
+function showInputThumb(dataUrl) {
+  inputThumbImg.src = dataUrl;
+  inputThumb.hidden = false;
+}
+function removeInputThumb() {
+  inputThumbImg.removeAttribute("src");
+  inputThumb.hidden = true;
+}
+document.getElementById("inputThumbDel").addEventListener("click", removeInputThumb);
+// Emptying the box by hand removes the image too.
+inputEl.addEventListener("input", () => { if (!inputEl.value.trim()) removeInputThumb(); });
 let inputStatusTimer = null;
 
 function setInputStatus(msg, isError, holdMs) {
@@ -2509,6 +2562,7 @@ function flashToolDone(btn) {
 
 inputClearBtn.addEventListener("click", () => {
   setInputText("");
+  removeInputThumb();
   setInputStatus("");
   inputEl.focus();
 });
@@ -2603,6 +2657,7 @@ async function onInputImagePicked(e) {
   const tools = [inputImageBtn, inputCameraBtn];
   tools.forEach(b => { b.disabled = true; });
   inputImageBtn.classList.add("busy");
+  removeInputThumb();
   setInputStatus("Reading text from image…");
   try {
     const b64 = await imageFileToJpegBase64(file);
@@ -2612,6 +2667,7 @@ async function onInputImagePicked(e) {
       return;
     }
     setInputText(text);
+    showInputThumb("data:image/jpeg;base64," + b64);
     const n = countWords(text);
     if (n > 80) setInputStatus(`${n} words found; trim to 80 to submit`, true, 6000);
     else setInputStatus("Text extracted", false, 2000);
