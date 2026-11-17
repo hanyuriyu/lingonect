@@ -278,8 +278,16 @@ body{
   align-items:flex-start;
 }
 
-.text-input{
+.text-box{
   flex:1;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+
+.text-input{
+  width:100%;
   font-family:"Special Elite","Courier New",monospace;
   font-size:15px;
   padding:12px 14px;
@@ -292,7 +300,92 @@ body{
   background:#fff;
   box-sizing:border-box;
   line-height:1.5;
+  padding-bottom:38px;   /* room for the tool icons in the bottom corner */
 }
+
+/* Clear / copy / image tools, tucked into the text box's bottom-right corner. */
+.input-tools{
+  position:absolute;
+  right:16px;
+  bottom:6px;
+  display:flex;
+  gap:2px;
+}
+.input-tool{
+  width:30px;
+  height:30px;
+  padding:5px;
+  border:none;
+  border-radius:5px;
+  background:transparent;
+  color:#888;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.input-tool:hover{ color:var(--cobalt); background:rgba(0,71,255,.08); }
+.input-tool:disabled{ opacity:.4; cursor:default; background:transparent; color:#888; }
+.input-tool svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.input-tool.done{ color:#1a8f3c; }
+/* The camera button only appears on touch devices, where it opens the camera
+   directly. On a desktop it would just open the same file picker. */
+.input-tool#inputCameraBtn{ display:none; }
+@media (pointer:coarse){ .input-tool#inputCameraBtn{ display:flex; } }
+.input-tool.busy svg{ animation:inputToolPulse 1s ease-in-out infinite; }
+@keyframes inputToolPulse{ 50%{ opacity:.3; } }
+.input-tool-status{
+  position:absolute;
+  left:14px;
+  bottom:12px;
+  font-size:12px;
+  color:#888;
+  pointer-events:none;
+  max-width:calc(100% - 160px);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.input-tool-status.error{ color:#c62828; }
+.input-thumb{
+  position:absolute;
+  left:8px;
+  bottom:6px;
+  height:30px;
+}
+.input-thumb[hidden]{ display:none; }
+.input-thumb img{
+  display:block;
+  height:30px;
+  max-width:60px;
+  object-fit:cover;
+  border-radius:4px;
+  border:1px solid #ddd;
+}
+.input-thumb-del{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  width:16px;
+  height:16px;
+  padding:0;
+  border:none;
+  border-radius:50%;
+  background:#555;
+  color:#fff;
+  font-size:12px;
+  line-height:16px;
+  cursor:pointer;
+}
+.input-thumb:not([hidden]) ~ .input-tool-status{ left:78px; max-width:calc(100% - 230px); }
 
 .text-input:focus{
   box-shadow:0 0 0 3px rgba(0,71,255,.15);
@@ -1456,6 +1549,11 @@ a.tri-chip{ text-decoration:none; }
     gap:12px;
   }
 
+  .text-box{
+    flex:none;
+    width:100%;
+  }
+
   .text-input{
     flex:none;
     width:100%;
@@ -1624,13 +1722,40 @@ a.tri-chip{ text-decoration:none; }
 
     <!-- INPUT -->
     <div class="input-wrap">
-      <textarea
-        class="text-input"
-        id="inputText"
-        placeholder="Enter text in any language…"
-        rows="3"
-        spellcheck="false"
-      ></textarea>
+      <div class="text-box">
+        <textarea
+          class="text-input"
+          id="inputText"
+          placeholder="Enter text in any language…"
+          rows="3"
+          spellcheck="false"
+        ></textarea>
+        <!-- Quick tools in the box's corner: read text from a photo, copy the
+             text, clear the box. -->
+        <div class="input-tools">
+          <button class="input-tool" id="inputCameraBtn" type="button" title="Take a photo of text" aria-label="Take a photo of text">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          </button>
+          <button class="input-tool" id="inputImageBtn" type="button" title="Get text from an image" aria-label="Get text from an image">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>
+          </button>
+          <button class="input-tool" id="inputCopyBtn" type="button" title="Copy text" aria-label="Copy text">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+          </button>
+          <button class="input-tool" id="inputClearBtn" type="button" title="Clear text" aria-label="Clear text">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <input type="file" id="inputImageFile" accept="image/*" hidden>
+        <input type="file" id="inputCameraFile" accept="image/*" capture="environment" hidden>
+        <!-- Small preview of the photo the text came from. Held only in memory
+             and removed when the box is cleared or another image is read. -->
+        <div class="input-thumb" id="inputThumb" hidden>
+          <img id="inputThumbImg" alt="Image the text was read from">
+          <button class="input-thumb-del" id="inputThumbDel" type="button" title="Remove image" aria-label="Remove image">×</button>
+        </div>
+        <div class="input-tool-status" id="inputToolStatus" role="status" aria-live="polite"></div>
+      </div>
 
       <div class="input-actions">
         <!-- The two pickers and the button that exchanges them. The rows keep
@@ -2386,6 +2511,175 @@ inputEl.addEventListener("input", () => {
   countEl.classList.toggle("over", n > 80);
   submitEl.disabled = n === 0 || n > 80;
 });
+
+// ── Input tools: clear, copy, text from an image ──
+// Clear and copy save highlighting the box by hand. The image tools read the
+// text out of a photo or screenshot (handy for a script you can't type) and
+// put ONLY that text in the box; the image itself isn't kept or shown.
+const inputClearBtn   = document.getElementById("inputClearBtn");
+const inputCopyBtn    = document.getElementById("inputCopyBtn");
+const inputImageBtn   = document.getElementById("inputImageBtn");
+const inputCameraBtn  = document.getElementById("inputCameraBtn");
+const inputImageFile  = document.getElementById("inputImageFile");
+const inputCameraFile = document.getElementById("inputCameraFile");
+const inputToolStatus = document.getElementById("inputToolStatus");
+const inputThumb      = document.getElementById("inputThumb");
+const inputThumbImg   = document.getElementById("inputThumbImg");
+
+// The preview lives only in this <img>: nothing is uploaded to storage or
+// saved. Removing it drops the image data from the page entirely.
+function showInputThumb(dataUrl) {
+  inputThumbImg.src = dataUrl;
+  inputThumb.hidden = false;
+}
+function removeInputThumb() {
+  inputThumbImg.removeAttribute("src");
+  inputThumb.hidden = true;
+}
+document.getElementById("inputThumbDel").addEventListener("click", removeInputThumb);
+// Emptying the box by hand removes the image too.
+inputEl.addEventListener("input", () => { if (!inputEl.value.trim()) removeInputThumb(); });
+let inputStatusTimer = null;
+
+function setInputStatus(msg, isError, holdMs) {
+  clearTimeout(inputStatusTimer);
+  inputToolStatus.textContent = msg || "";
+  inputToolStatus.classList.toggle("error", !!isError);
+  if (msg && holdMs) inputStatusTimer = setTimeout(() => setInputStatus(""), holdMs);
+}
+
+// Set the box's text the way typing would, so the word counter, Submit button
+// and language auto-detection all react to it.
+function setInputText(text) {
+  inputEl.value = text;
+  inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function flashToolDone(btn) {
+  btn.classList.add("done");
+  setTimeout(() => btn.classList.remove("done"), 1200);
+}
+
+inputClearBtn.addEventListener("click", () => {
+  setInputText("");
+  removeInputThumb();
+  setInputStatus("");
+  inputEl.focus();
+});
+
+inputCopyBtn.addEventListener("click", async () => {
+  const text = inputEl.value;
+  if (!text.trim()) { setInputStatus("Nothing to copy", false, 1500); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_) {
+    // Older browsers / some web views: fall back to selecting and copying.
+    inputEl.select();
+    const ok = document.execCommand && document.execCommand("copy");
+    inputEl.setSelectionRange(text.length, text.length);
+    if (!ok) { setInputStatus("Couldn't copy", true, 2500); return; }
+  }
+  flashToolDone(inputCopyBtn);
+  setInputStatus("Copied", false, 1500);
+});
+
+inputImageBtn.addEventListener("click", () => inputImageFile.click());
+inputCameraBtn.addEventListener("click", () => inputCameraFile.click());
+inputImageFile.addEventListener("change", onInputImagePicked);
+inputCameraFile.addEventListener("change", onInputImagePicked);
+
+// Shrink a photo to a JPEG the Claude worker accepts. Phone photos are several
+// MB; 1568px on the long side is the most Claude looks at anyway, so this
+// loses no reading accuracy. Returns the base64 data (no "data:" prefix).
+async function imageFileToJpegBase64(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("That file couldn't be opened as an image."));
+      el.src = url;
+    });
+    const attempts = [[1568, 0.85], [1280, 0.75], [1024, 0.7], [800, 0.6]];
+    for (const [maxSide, quality] of attempts) {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";          // transparent PNGs → white, not black
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const b64 = canvas.toDataURL("image/jpeg", quality).split(",")[1] || "";
+      // The worker refuses bodies over 400k characters; leave headroom.
+      if (b64.length < 350000) return b64;
+    }
+    throw new Error("That image is too large to read.");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Claude Sonnet reads text in any script well, including handwriting, signs
+// and menus, and our Claude worker already accepts images.
+async function extractTextFromImage(base64) {
+  const res = await workerFetch(CLAUDE_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      system:
+        "You transcribe text from images. Output ONLY the text that appears in the image, " +
+        "exactly as written, in its original language and script. Do not translate, explain, " +
+        "describe the image or add quotes. Keep the reading order and line breaks. Skip " +
+        "decorative or irrelevant fragments such as watermarks or UI chrome only when they are " +
+        "clearly not part of the main text. If the image contains no readable text, output exactly: NO_TEXT",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+          { type: "text", text: "Transcribe the text in this image." }
+        ]
+      }]
+    })
+  });
+  const data = await readClaudeJson("Claude", res);
+  return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim();
+}
+
+async function onInputImagePicked(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";                 // let the same photo be picked again
+  if (!file) return;
+  const tools = [inputImageBtn, inputCameraBtn];
+  tools.forEach(b => { b.disabled = true; });
+  inputImageBtn.classList.add("busy");
+  removeInputThumb();
+  setInputStatus("Reading text from image…");
+  try {
+    const b64 = await imageFileToJpegBase64(file);
+    const text = await extractTextFromImage(b64);
+    if (!text || text === "NO_TEXT") {
+      setInputStatus("No text found in that image", true, 3500);
+      return;
+    }
+    setInputText(text);
+    showInputThumb("data:image/jpeg;base64," + b64);
+    const n = countWords(text);
+    if (n > 80) setInputStatus(`${n} words found; trim to 80 to submit`, true, 6000);
+    else setInputStatus("Text extracted", false, 2000);
+    inputEl.focus();
+  } catch (err) {
+    console.warn("Image text extraction failed:", err);
+    setInputStatus(err && err.message ? err.message : "Couldn't read that image", true, 5000);
+  } finally {
+    tools.forEach(b => { b.disabled = false; });
+    inputImageBtn.classList.remove("busy");
+  }
+}
 
 // ── Automatic source-language detection ──
 // Guessing the source language from the text the user just typed saves a trip
