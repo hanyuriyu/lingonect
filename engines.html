@@ -278,20 +278,28 @@ body{
   align-items:flex-start;
 }
 
+/* The blue frame is drawn by .text-box so the tool strip sits inside it,
+   below the textarea, where typed text can never run underneath the icons. */
 .text-box{
   flex:1;
-  position:relative;
   display:flex;
   flex-direction:column;
   min-width:0;
+  border:2px solid var(--cobalt);
+  border-radius:6px;
+  background:#fff;
+  box-sizing:border-box;
+}
+.text-box:focus-within{
+  box-shadow:0 0 0 3px rgba(0,71,255,.15);
 }
 
 .text-input{
   width:100%;
   font-family:"Special Elite","Courier New",monospace;
   font-size:15px;
-  padding:12px 14px;
-  border:2px solid var(--cobalt);
+  padding:12px 14px 4px;
+  border:none;
   border-radius:6px;
   outline:none;
   resize:vertical;
@@ -300,16 +308,20 @@ body{
   background:#fff;
   box-sizing:border-box;
   line-height:1.5;
-  padding-bottom:38px;   /* room for the tool icons in the bottom corner */
 }
 
-/* Clear / copy / image tools, tucked into the text box's bottom-right corner. */
+/* Status text (left) and clear / copy / image tools (right) on one strip. */
+.input-toolbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 6px 4px 14px;
+}
 .input-tools{
-  position:absolute;
-  right:16px;
-  bottom:6px;
   display:flex;
   gap:2px;
+  margin-left:auto;
+  flex-shrink:0;
 }
 .input-tool{
   width:30px;
@@ -343,52 +355,18 @@ body{
 .input-tool.busy svg{ animation:inputToolPulse 1s ease-in-out infinite; }
 @keyframes inputToolPulse{ 50%{ opacity:.3; } }
 .input-tool-status{
-  position:absolute;
-  left:14px;
-  bottom:12px;
+  flex:1;
+  min-width:0;
   font-size:12px;
   color:#888;
-  pointer-events:none;
-  max-width:calc(100% - 160px);
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 .input-tool-status.error{ color:#c62828; }
-.input-thumb{
-  position:absolute;
-  left:8px;
-  bottom:6px;
-  height:30px;
-}
-.input-thumb[hidden]{ display:none; }
-.input-thumb img{
-  display:block;
-  height:30px;
-  max-width:60px;
-  object-fit:cover;
-  border-radius:4px;
-  border:1px solid #ddd;
-}
-.input-thumb-del{
-  position:absolute;
-  top:-6px;
-  right:-6px;
-  width:16px;
-  height:16px;
-  padding:0;
-  border:none;
-  border-radius:50%;
-  background:#555;
-  color:#fff;
-  font-size:12px;
-  line-height:16px;
-  cursor:pointer;
-}
-.input-thumb:not([hidden]) ~ .input-tool-status{ left:78px; max-width:calc(100% - 230px); }
 
 .text-input:focus{
-  box-shadow:0 0 0 3px rgba(0,71,255,.15);
+  box-shadow:none;
 }
 
 .text-input::placeholder{
@@ -1730,8 +1708,10 @@ a.tri-chip{ text-decoration:none; }
           rows="3"
           spellcheck="false"
         ></textarea>
-        <!-- Quick tools in the box's corner: read text from a photo, copy the
-             text, clear the box. -->
+        <!-- Strip under the text: status on the left; read text from a photo,
+             copy the text and clear the box on the right. -->
+        <div class="input-toolbar">
+        <div class="input-tool-status" id="inputToolStatus" role="status" aria-live="polite"></div>
         <div class="input-tools">
           <button class="input-tool" id="inputCameraBtn" type="button" title="Take a photo of text" aria-label="Take a photo of text">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
@@ -1746,15 +1726,9 @@ a.tri-chip{ text-decoration:none; }
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
+        </div>
         <input type="file" id="inputImageFile" accept="image/*" hidden>
         <input type="file" id="inputCameraFile" accept="image/*" capture="environment" hidden>
-        <!-- Small preview of the photo the text came from. Held only in memory
-             and removed when the box is cleared or another image is read. -->
-        <div class="input-thumb" id="inputThumb" hidden>
-          <img id="inputThumbImg" alt="Image the text was read from">
-          <button class="input-thumb-del" id="inputThumbDel" type="button" title="Remove image" aria-label="Remove image">×</button>
-        </div>
-        <div class="input-tool-status" id="inputToolStatus" role="status" aria-live="polite"></div>
       </div>
 
       <div class="input-actions">
@@ -2515,7 +2489,7 @@ inputEl.addEventListener("input", () => {
 // ── Input tools: clear, copy, text from an image ──
 // Clear and copy save highlighting the box by hand. The image tools read the
 // text out of a photo or screenshot (handy for a script you can't type) and
-// put ONLY that text in the box; the image itself isn't kept or shown.
+// put ONLY that text in the box; the image itself is never shown or kept.
 const inputClearBtn   = document.getElementById("inputClearBtn");
 const inputCopyBtn    = document.getElementById("inputCopyBtn");
 const inputImageBtn   = document.getElementById("inputImageBtn");
@@ -2523,22 +2497,6 @@ const inputCameraBtn  = document.getElementById("inputCameraBtn");
 const inputImageFile  = document.getElementById("inputImageFile");
 const inputCameraFile = document.getElementById("inputCameraFile");
 const inputToolStatus = document.getElementById("inputToolStatus");
-const inputThumb      = document.getElementById("inputThumb");
-const inputThumbImg   = document.getElementById("inputThumbImg");
-
-// The preview lives only in this <img>: nothing is uploaded to storage or
-// saved. Removing it drops the image data from the page entirely.
-function showInputThumb(dataUrl) {
-  inputThumbImg.src = dataUrl;
-  inputThumb.hidden = false;
-}
-function removeInputThumb() {
-  inputThumbImg.removeAttribute("src");
-  inputThumb.hidden = true;
-}
-document.getElementById("inputThumbDel").addEventListener("click", removeInputThumb);
-// Emptying the box by hand removes the image too.
-inputEl.addEventListener("input", () => { if (!inputEl.value.trim()) removeInputThumb(); });
 let inputStatusTimer = null;
 
 function setInputStatus(msg, isError, holdMs) {
@@ -2562,7 +2520,6 @@ function flashToolDone(btn) {
 
 inputClearBtn.addEventListener("click", () => {
   setInputText("");
-  removeInputThumb();
   setInputStatus("");
   inputEl.focus();
 });
@@ -2657,7 +2614,6 @@ async function onInputImagePicked(e) {
   const tools = [inputImageBtn, inputCameraBtn];
   tools.forEach(b => { b.disabled = true; });
   inputImageBtn.classList.add("busy");
-  removeInputThumb();
   setInputStatus("Reading text from image…");
   try {
     const b64 = await imageFileToJpegBase64(file);
@@ -2667,7 +2623,6 @@ async function onInputImagePicked(e) {
       return;
     }
     setInputText(text);
-    showInputThumb("data:image/jpeg;base64," + b64);
     const n = countWords(text);
     if (n > 80) setInputStatus(`${n} words found; trim to 80 to submit`, true, 6000);
     else setInputStatus("Text extracted", false, 2000);
