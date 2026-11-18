@@ -2,4 +2,11 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
+    <!-- Capacitor writes a camera capture to getExternalFilesDir(PICTURES),
+         which is only covered by external-path when it happens to sit under
+         primary external storage. On a device where it does not (adoptable or
+         SD-card storage) FileProvider throws, the capture intent is never
+         launched, and the camera button falls back to the gallery. Map it
+         explicitly so the photo URI always resolves. -->
+    <external-files-path name="my_capture_images" path="." />
 </paths>
