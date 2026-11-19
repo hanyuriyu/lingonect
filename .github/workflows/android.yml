@@ -203,3 +203,110 @@ jobs:
           fi
 
           echo "::notice::Install link: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/lingonect.apk"
+
+  # Signed Android App Bundle for Google Play. Play takes an .aab, not an .apk,
+  # and rejects anything signed with the debug key. This job stays inert until
+  # ANDROID_KEYSTORE_BASE64 exists, so it costs nothing before the Play account
+  # is set up and turns itself on the moment the secret is added.
+  release-aab:
+    name: Signed AAB (Play)
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: write
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+    steps:
+      - name: Check whether release signing is configured
+        id: gate
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No ANDROID_KEYSTORE_BASE64 secret, so no Play bundle was built. See ANDROID.md."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.configured == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.configured == 'true'
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - uses: actions/setup-java@v4
+        if: steps.gate.outputs.configured == 'true'
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.gate.outputs.configured == 'true'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.configured == 'true'
+        run: npm ci
+
+      - name: Build web bundle and sync Capacitor
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          npm run copy-web
+          npx cap sync android
+
+      - name: Write google-services.json (if configured)
+        if: ${{ steps.gate.outputs.configured == 'true' && env.GOOGLE_SERVICES_JSON != '' }}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
+      # Written outside the repo so it cannot be committed by accident, and
+      # removed again in an always() step below.
+      - name: Write the upload keystore
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+          echo "keystore written ($(wc -c < "$RUNNER_TEMP/upload.keystore") bytes)"
+
+      # Play requires versionCode to increase on every upload, and never accepts
+      # the same one twice. The run number is monotonic, so it works as-is.
+      - name: Build the signed bundle
+        if: steps.gate.outputs.configured == 'true'
+        working-directory: android
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease
+
+      # A debug-signed bundle is accepted by Gradle but rejected by Play with an
+      # unhelpful message, so fail here instead, where the cause is obvious.
+      - name: Check the bundle is not debug-signed
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          set -uo pipefail
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$AAB" ] || { echo "::error::No bundle produced at $AAB"; exit 1; }
+          SIGNER=$(keytool -printcert -jarfile "$AAB" 2>/dev/null | grep -m1 "Owner:" || true)
+          echo "signed by: ${SIGNER:-unknown}"
+          case "$SIGNER" in
+            *"Lingonect Debug"*)
+              echo "::error::Bundle is signed with the committed DEBUG key. Play will reject it. Check the ANDROID_KEYSTORE_* secrets."
+              exit 1 ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.configured == 'true'
+        with:
+          name: lingonect-play-${{ github.run_number }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.keystore"

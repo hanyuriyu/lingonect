@@ -227,45 +227,61 @@ D-U-N-S number for the business, which takes its own time to obtain. If
 Lingonect is a registered business, the organisation route is usually faster
 overall despite the extra paperwork.
 
-### 4b. Create the release keystore
+### 4b. Create the upload key
 
-This key is what proves an update genuinely comes from you.
+With **Play App Signing** (on by default for new apps) Google holds the real app
+signing key and you sign uploads with a separate *upload key*. That matters: if
+an upload key is lost or leaked, Google can reset it. Losing the app signing key
+used to mean never updating the app again; Play App Signing removes that cliff.
+
+Create the upload key:
 
 ```bash
-keytool -genkey -v -keystore ~/lingonect-release.jks \
+keytool -genkey -v -keystore lingonect-upload.keystore \
   -keyalg RSA -keysize 2048 -validity 10000 -alias lingonect
 ```
 
-> **Back this file up somewhere you will not lose it** — a password manager and
-> an offline copy. If you lose it you can never update the published app under
-> the same listing again; you would have to publish a new one and lose your
-> installs and reviews. Do **not** put it in the repo: `android/.gitignore`
-> deliberately blocks `*.jks`, `*.keystore` and `keystore.properties`.
+Keep it in a password manager and an offline copy anyway — resetting is a
+support round-trip, not a button. Never commit it: `android/.gitignore` blocks
+`*.jks`, `*.keystore` and `keystore.properties`.
 
-Then create `android/keystore.properties` (also gitignored):
+### 4c. Build the signed bundle
+
+Play takes an `.aab`, not an `.apk`, and rejects a debug-signed upload. The
+release signing config reads from **environment variables first, then
+`android/keystore.properties`**, so the same build works in CI and locally.
+
+**In CI (release from your phone).** Add four repository secrets under
+Settings → Secrets and variables → Actions:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 lingonect-upload.keystore` |
+| `ANDROID_KEYSTORE_PASSWORD` | the keystore password |
+| `ANDROID_KEY_ALIAS` | `lingonect` |
+| `ANDROID_KEY_PASSWORD` | the key password |
+
+The `release-aab` job stays inert until `ANDROID_KEYSTORE_BASE64` exists, so it
+costs nothing before then and switches itself on once the secret is added. It
+writes the keystore outside the repo, builds, checks the bundle is not
+debug-signed, uploads the `.aab` as a build artifact, and deletes the keystore
+again. Download the artifact and upload it to Play Console.
+
+**Locally.** Create `android/keystore.properties` (gitignored):
 
 ```properties
-storeFile=/absolute/path/to/lingonect-release.jks
+storeFile=/absolute/path/to/lingonect-upload.keystore
 storePassword=...
 keyAlias=lingonect
 keyPassword=...
 ```
 
-`android/app/build.gradle` picks that file up automatically when it exists, and
-skips release signing entirely when it does not — so nothing breaks for anyone
-who just wants a debug build.
+then `npm run android:bundle`.
 
-### 4c. Build the upload bundle
-
-Play takes an `.aab`, not an `.apk`:
-
-```bash
-npm run android:bundle
-# → android/app/build/outputs/bundle/release/app-release.aab
-```
-
-Bump `versionCode` (an integer, must increase on every single upload) and
-`versionName` in `android/app/build.gradle` before each release.
+**versionCode must increase on every upload** and Play never accepts the same
+one twice. CI uses the workflow run number, which is monotonic. Building locally
+uses 1 unless you set `ANDROID_VERSION_CODE`, so prefer CI for anything you
+actually upload.
 
 ### 4d. Store listing requirements
 
@@ -280,16 +296,25 @@ Have these ready — Play will not let you submit without them:
   screenshots. Your Pixel and Flip can produce the screenshots directly.
 - **Target audience and ads declaration.**
 
-### 4e. Known blocker before submitting
+### 4e. Target API level
 
-`android/variables.gradle` currently targets **API 35** (Android 15). Play
-requires new apps and updates to target the API level that became mandatory in
-the most recent August cutoff, so **check the current requirement in Play
-Console before your first upload**. Raising the target to API 36 also needs an
-Android Gradle Plugin upgrade (`android/build.gradle` pins AGP 8.7.2, which
-supports up to API 35), and API 36 tightens edge-to-edge enforcement further —
-so it needs a real on-device pass, not just a green build. Worth doing as its
-own change once you have the phones in hand.
+Google Play requires **new apps and updates to target Android 16 (API 36)** as
+of 31 August 2026; the extension window closed on 1 November 2026. An upload
+targeting a lower level is rejected.
+
+`android/variables.gradle` therefore sets `compileSdkVersion` and
+`targetSdkVersion` to 36, which also required moving `android/build.gradle` from
+Android Gradle Plugin 8.7.2 (capped at API 35) to 8.10.1. The Gradle wrapper
+stays at 8.11.1, which is the minimum AGP 8.10 accepts.
+
+API 36 enforces edge-to-edge display with no opt-out, so the top navigation and
+safe-area handling are worth re-checking on a device after any change here — a
+green build does not prove the layout is right. Capacitor's
+`adjustMarginsForEdgeToEdge` setting in `capacitor.config.json` is what insets
+the WebView.
+
+Check the current requirement in Play Console before each release; the cutoff
+moves every August.
 
 ---
 

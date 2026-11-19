@@ -1,15 +1,41 @@
 apply plugin: 'com.android.application'
 
-// Release signing is read from android/keystore.properties, which is gitignored
-// and holds the passwords for the upload keystore. When that file is absent
-// (fresh clone, CI debug build, anyone who only wants to sideload) the release
-// signing config is simply not created and `assembleDebug` still works — only
+// Release signing comes from one of two places, so the same build works on a
+// machine with the keystore on disk and in CI with it in secrets:
+//
+//   1. Environment variables (ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD,
+//      ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD) — how CI passes them, after
+//      writing the keystore out from a secret.
+//   2. android/keystore.properties, gitignored — for building a release
+//      locally.
+//
+// Environment wins where both exist. When neither is present the release
+// signing config is simply not created and `assembleDebug` still works; only
 // `bundleRelease` / `assembleRelease` need it. See ANDROID.md.
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
-def hasReleaseKeystore = keystorePropertiesFile.exists()
-if (hasReleaseKeystore) {
+if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def signingSetting = { String envName, String propName ->
+    def fromEnv = System.getenv(envName)
+    return (fromEnv != null && !fromEnv.isEmpty()) ? fromEnv : keystoreProperties[propName]
+}
+
+def releaseStoreFile = signingSetting("ANDROID_KEYSTORE_FILE", "storeFile")
+def releaseStorePassword = signingSetting("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+def releaseKeyAlias = signingSetting("ANDROID_KEY_ALIAS", "keyAlias")
+def releaseKeyPassword = signingSetting("ANDROID_KEY_PASSWORD", "keyPassword")
+def hasReleaseKeystore = releaseStoreFile != null && !releaseStoreFile.toString().isEmpty()
+
+// Absolute paths are used as-is so CI can write the keystore outside the
+// project tree; relative ones resolve against android/, where
+// keystore.properties lives.
+def resolvedReleaseStoreFile = null
+if (hasReleaseKeystore) {
+    def candidate = new File(releaseStoreFile.toString())
+    resolvedReleaseStoreFile = candidate.isAbsolute() ? candidate : rootProject.file(releaseStoreFile)
 }
 
 android {
@@ -50,10 +76,10 @@ android {
 
         if (hasReleaseKeystore) {
             release {
-                storeFile rootProject.file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
+                storeFile resolvedReleaseStoreFile
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
         }
     }
