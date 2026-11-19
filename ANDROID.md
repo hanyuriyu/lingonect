@@ -227,45 +227,61 @@ D-U-N-S number for the business, which takes its own time to obtain. If
 Lingonect is a registered business, the organisation route is usually faster
 overall despite the extra paperwork.
 
-### 4b. Create the release keystore
+### 4b. Create the upload key
 
-This key is what proves an update genuinely comes from you.
+With **Play App Signing** (on by default for new apps) Google holds the real app
+signing key and you sign uploads with a separate *upload key*. That matters: if
+an upload key is lost or leaked, Google can reset it. Losing the app signing key
+used to mean never updating the app again; Play App Signing removes that cliff.
+
+Create the upload key:
 
 ```bash
-keytool -genkey -v -keystore ~/lingonect-release.jks \
+keytool -genkey -v -keystore lingonect-upload.keystore \
   -keyalg RSA -keysize 2048 -validity 10000 -alias lingonect
 ```
 
-> **Back this file up somewhere you will not lose it** — a password manager and
-> an offline copy. If you lose it you can never update the published app under
-> the same listing again; you would have to publish a new one and lose your
-> installs and reviews. Do **not** put it in the repo: `android/.gitignore`
-> deliberately blocks `*.jks`, `*.keystore` and `keystore.properties`.
+Keep it in a password manager and an offline copy anyway — resetting is a
+support round-trip, not a button. Never commit it: `android/.gitignore` blocks
+`*.jks`, `*.keystore` and `keystore.properties`.
 
-Then create `android/keystore.properties` (also gitignored):
+### 4c. Build the signed bundle
+
+Play takes an `.aab`, not an `.apk`, and rejects a debug-signed upload. The
+release signing config reads from **environment variables first, then
+`android/keystore.properties`**, so the same build works in CI and locally.
+
+**In CI (release from your phone).** Add four repository secrets under
+Settings → Secrets and variables → Actions:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 lingonect-upload.keystore` |
+| `ANDROID_KEYSTORE_PASSWORD` | the keystore password |
+| `ANDROID_KEY_ALIAS` | `lingonect` |
+| `ANDROID_KEY_PASSWORD` | the key password |
+
+The `release-aab` job stays inert until `ANDROID_KEYSTORE_BASE64` exists, so it
+costs nothing before then and switches itself on once the secret is added. It
+writes the keystore outside the repo, builds, checks the bundle is not
+debug-signed, uploads the `.aab` as a build artifact, and deletes the keystore
+again. Download the artifact and upload it to Play Console.
+
+**Locally.** Create `android/keystore.properties` (gitignored):
 
 ```properties
-storeFile=/absolute/path/to/lingonect-release.jks
+storeFile=/absolute/path/to/lingonect-upload.keystore
 storePassword=...
 keyAlias=lingonect
 keyPassword=...
 ```
 
-`android/app/build.gradle` picks that file up automatically when it exists, and
-skips release signing entirely when it does not — so nothing breaks for anyone
-who just wants a debug build.
+then `npm run android:bundle`.
 
-### 4c. Build the upload bundle
-
-Play takes an `.aab`, not an `.apk`:
-
-```bash
-npm run android:bundle
-# → android/app/build/outputs/bundle/release/app-release.aab
-```
-
-Bump `versionCode` (an integer, must increase on every single upload) and
-`versionName` in `android/app/build.gradle` before each release.
+**versionCode must increase on every upload** and Play never accepts the same
+one twice. CI uses the workflow run number, which is monotonic. Building locally
+uses 1 unless you set `ANDROID_VERSION_CODE`, so prefer CI for anything you
+actually upload.
 
 ### 4d. Store listing requirements
 
