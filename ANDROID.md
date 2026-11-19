@@ -280,16 +280,25 @@ Have these ready — Play will not let you submit without them:
   screenshots. Your Pixel and Flip can produce the screenshots directly.
 - **Target audience and ads declaration.**
 
-### 4e. Known blocker before submitting
+### 4e. Target API level
 
-`android/variables.gradle` currently targets **API 35** (Android 15). Play
-requires new apps and updates to target the API level that became mandatory in
-the most recent August cutoff, so **check the current requirement in Play
-Console before your first upload**. Raising the target to API 36 also needs an
-Android Gradle Plugin upgrade (`android/build.gradle` pins AGP 8.7.2, which
-supports up to API 35), and API 36 tightens edge-to-edge enforcement further —
-so it needs a real on-device pass, not just a green build. Worth doing as its
-own change once you have the phones in hand.
+Google Play requires **new apps and updates to target Android 16 (API 36)** as
+of 31 August 2026; the extension window closed on 1 November 2026. An upload
+targeting a lower level is rejected.
+
+`android/variables.gradle` therefore sets `compileSdkVersion` and
+`targetSdkVersion` to 36, which also required moving `android/build.gradle` from
+Android Gradle Plugin 8.7.2 (capped at API 35) to 8.10.1. The Gradle wrapper
+stays at 8.11.1, which is the minimum AGP 8.10 accepts.
+
+API 36 enforces edge-to-edge display with no opt-out, so the top navigation and
+safe-area handling are worth re-checking on a device after any change here — a
+green build does not prove the layout is right. Capacitor's
+`adjustMarginsForEdgeToEdge` setting in `capacitor.config.json` is what insets
+the WebView.
+
+Check the current requirement in Play Console before each release; the cutoff
+moves every August.
 
 ---
 
