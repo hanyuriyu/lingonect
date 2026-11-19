@@ -293,6 +293,38 @@ own change once you have the phones in hand.
 
 ---
 
+## Camera capture
+
+The camera button in the engines page input box uses a plain file input with
+`capture="environment"`. On iOS that is enough. On Android it is not: Capacitor
+resolves `ACTION_IMAGE_CAPTURE` before launching the camera, and since Android
+11 package visibility filtering hides every other app from `resolveActivity()`
+unless the manifest declares a `<queries>` element for that intent. Without it
+Capacitor concludes the device has no camera app and quietly falls back to the
+gallery picker — the button appears to work, it just opens the wrong thing.
+
+So `AndroidManifest.xml` declares:
+
+```xml
+<queries>
+    <intent>
+        <action android:name="android.media.action.IMAGE_CAPTURE" />
+    </intent>
+</queries>
+```
+
+Note there is deliberately **no** `CAMERA` permission. `ACTION_IMAGE_CAPTURE`
+hands off to the camera app, which holds its own permission. Declaring `CAMERA`
+here would flip Capacitor's `isMediaCaptureSupported()` check and make it demand
+a runtime grant the app does not otherwise need.
+
+Capacitor writes the photo to `getExternalFilesDir(PICTURES)`, so
+`res/xml/file_paths.xml` maps `external-files-path` as well. If FileProvider
+cannot resolve that path the capture intent is never launched and you land back
+in the gallery, which makes the two failures look identical from the phone.
+
+---
+
 ## Store payment rules
 
 `app-native.js` hides the subscription page, every Subscribe button and every

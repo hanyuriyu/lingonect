@@ -37,4 +37,20 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Since Android 11, package visibility filtering hides other apps from
+         resolveActivity() unless they are declared here. Capacitor resolves
+         ACTION_IMAGE_CAPTURE before launching the camera for a file input with
+         capture="environment" (the camera button in the engines page input
+         box); without this it finds nothing, assumes the device has no camera
+         app and silently falls back to the gallery picker.
+
+         Deliberately no CAMERA permission: ACTION_IMAGE_CAPTURE hands off to
+         the camera app, which holds its own permission. Declaring it here would
+         make Capacitor demand a runtime grant we do not otherwise need. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
 </manifest>
