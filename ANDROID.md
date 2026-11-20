@@ -318,6 +318,90 @@ moves every August.
 
 ---
 
+## Going live: closed testing checklist
+
+Follow in order. Steps 1 and 2 are gated on Google, so start them first; the
+rest can be done while you wait.
+
+### 1. Register — <https://play.google.com/console/signup>
+
+$25, one time, non-refundable. Watch out for:
+
+- **Identity verification is now required.** Expect to supply a government ID
+  and have it checked. This takes days, so it is the first thing to start.
+- **Use an account you will still control in five years.** The signup Google
+  account becomes the owner and moving it later is painful. Not a throwaway.
+- **The developer name is public.** Pick "Lingonect", not your own name. For
+  personal accounts Google may also publish your contact address on the
+  listing — if that is not acceptable, it is an argument for an organisation
+  account later.
+- **$25 buys the account, not the app.** There is no per-app fee.
+
+### 2. Create the app, keep Play App Signing on
+
+- App name, default language, free, and a handful of declarations.
+- **Leave Play App Signing enabled** (the default). Google then holds the real
+  signing key and you sign uploads with a resettable upload key. Opting out
+  re-creates the old "lose the key, never update the app again" cliff.
+- **`com.lingonect.app` is permanent.** A package name can never be changed
+  once published, and it is already baked into Firebase and the signing setup.
+
+### 3. App content declarations
+
+Required before a closed-track release reaches anyone. Privacy policy URL is
+already live at <https://www.lingonect.com/privacy.html>.
+
+Answers below are derived from the code, not guessed. Play audits this and
+mismatches get apps pulled, so change them if the app changes.
+
+**Does the app collect or share user data?** Yes.
+
+| Data type | Collected | Shared | Why |
+|---|---|---|---|
+| Email address | Yes | No | Firebase Auth account |
+| Name / username | Yes | No | `profiles`, `usernames` |
+| User IDs | Yes | No | Firebase UID |
+| Messages | Yes | No | in-app chat, `chats/{room}/messages` |
+| Photos | Yes | **Yes** | camera text capture is sent to the AI workers |
+| Other user content | Yes | **Yes** | flashcards, `history`, text sent for translation |
+| App activity | Yes | No | `ratings`, `triangulationWins`, study history |
+
+- **"Shared" is the one people get wrong.** Under Play's definition, data is
+  shared when it is transferred to a third party. Text and photos sent to the
+  Cloudflare Workers reach Anthropic, OpenAI, Google, DeepSeek and the other
+  engines, so those rows are shared, even though Lingonect runs the proxy.
+- **Photos count as collected even though none are stored.** Play counts data
+  as collected once it leaves the device; the capture is held in memory and
+  dropped, but it is transmitted, so it is declared.
+- **No analytics, advertising or tracking SDKs**, so no advertising ID, no
+  location, no contacts, no financial data. Answer "No" to ads.
+- Data is encrypted in transit (HTTPS throughout) and users can delete their
+  account, so answer yes to both.
+
+Also complete: content rating questionnaire, target audience, app access (give
+Google test credentials, since the app is behind a login — otherwise review
+cannot see past the sign-in screen and will reject it).
+
+### 4. Add the signing secrets
+
+Create the upload key and add the four secrets per §4b–4c. CI then builds the
+signed `.aab` on every push to `main` and attaches it as a build artifact.
+
+### 5. Closed testing track
+
+- Upload the `.aab`, add testers by email or Google Group, share the opt-in
+  link. No minimum to start.
+- **The first review on a new account can take several days.** Internal testing
+  skips review entirely, so add an internal track too if you want a fast lane
+  while iterating.
+- For production later: **12 testers opted in continuously for 14 days**, then
+  apply. Run 14–15 for slack; one dropping out restarts the clock.
+- **Do not put those 12 in the internal track as well.** A tester in several
+  tracks is served the highest-priority one (internal beats closed), so their
+  activity would land on the wrong track.
+
+---
+
 ## Camera capture
 
 The camera button in the engines page input box uses a plain file input with
