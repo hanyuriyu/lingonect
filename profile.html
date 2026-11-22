@@ -681,7 +681,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 
 const ALL_LANGUAGES = [
   "English","Spanish","French","German","Italian","Portuguese (Brazil)","Portuguese (Portugal)",
@@ -716,7 +716,7 @@ auth.onAuthStateChanged(async user => {
     return;
   }
   currentUser = user;
-  isAdmin = (user.email === ADMIN_EMAIL);
+  isAdmin = (ADMIN_EMAILS.includes(user.email));
 
   if (isAdmin) {
     document.getElementById("subNavLink").style.display = "";

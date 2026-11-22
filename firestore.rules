@@ -18,7 +18,7 @@ service cloud.firestore {
     // set by a trusted backend; email is used here to match the existing app.
     function isAdmin() {
       return isSignedIn()
-        && request.auth.token.email == 'linguisticsconsulting@gmail.com'
+        && request.auth.token.email in ['linguisticsconsulting@gmail.com', 'contact@lingonect.com']
         && request.auth.token.email_verified == true;
     }
 

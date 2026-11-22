@@ -344,7 +344,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 
 // Profiles created on/after this instant are new free users; earlier ones are
 // grandfathered ("full" access). Keep in sync with the Cloudflare workers.
@@ -370,7 +370,7 @@ auth.onAuthStateChanged(async user => {
     window.location.href = "login.html";
     return;
   }
-  if (user.email !== ADMIN_EMAIL) {
+  if (!ADMIN_EMAILS.includes(user.email)) {
     window.location.href = "engines.html";
     return;
   }
