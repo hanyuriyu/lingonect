@@ -235,6 +235,12 @@ body{
   letter-spacing:.3px;
   flex-shrink:0;
 }
+.access-btn{
+  font:inherit;font-size:13px;padding:5px 10px;border-radius:5px;cursor:pointer;
+  border:1px solid #0047FF;background:#fff;color:#0047FF;
+}
+.access-btn.approve{background:#0047FF;color:#fff;}
+.access-btn:disabled{opacity:.5;cursor:default;}
 .badge.certified{
   background:#d0f0d0;
   color:#1a7a1a;
@@ -317,6 +323,7 @@ body{
       <button class="tab-btn active" data-tab="all" id="tabAll">All<span class="tab-count" id="countAll"></span></button>
       <button class="tab-btn" data-tab="uncertified" id="tabUncert">Uncertified<span class="tab-count" id="countUncert"></span></button>
       <button class="tab-btn" data-tab="certified" id="tabCert">Certified<span class="tab-count" id="countCert"></span></button>
+      <button class="tab-btn" data-tab="access" id="tabAccess">Access requests<span class="tab-count" id="countAccess"></span></button>
     </div>
 
     <div class="user-list" id="userList"></div>
@@ -375,7 +382,7 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
-  await loadUsers();
+  await Promise.all([loadUsers(), loadAccessRequests()]);
   document.body.style.visibility = "visible";
 });
 
@@ -430,8 +437,77 @@ function updateCounts() {
   document.getElementById("countCert").textContent = " (" + cert + ")";
 }
 
+// ── Access requests (invite-only, see access.js) ──
+// accessRequests/{uid}: { status: "waiting" | "approved" | "revoked", email,
+// name, provider, createdAt }. An account records itself as "waiting" the
+// first time it signs in without access; approving or revoking here is what
+// lets it in or keeps it out (accounts created before the go-live keep access
+// unless revoked).
+let accessRequests = [];
+
+async function loadAccessRequests() {
+  try {
+    const snap = await db.collection("accessRequests").get();
+    accessRequests = snap.docs.map(d => Object.assign({ uid: d.id }, d.data()));
+  } catch (e) {
+    console.warn("Could not load access requests (are the Firestore rules deployed?)", e);
+    accessRequests = [];
+  }
+  // Waiting first, then newest first.
+  const rank = { waiting: 0, revoked: 1, approved: 2 };
+  accessRequests.sort((a, b) => (rank[a.status] ?? 3) - (rank[b.status] ?? 3)
+    || ((b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0)
+      - (a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0)));
+  const waiting = accessRequests.filter(r => r.status === "waiting").length;
+  document.getElementById("countAccess").textContent = " (" + waiting + " waiting)";
+}
+
+async function setAccess(uid, status, btn) {
+  btn.disabled = true;
+  try {
+    await db.collection("accessRequests").doc(uid).set({
+      status,
+      decidedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    await loadAccessRequests();
+    renderList();
+  } catch (e) {
+    btn.disabled = false;
+    alert("Could not update access: " + e.message);
+  }
+}
+
+function renderAccessRequests(container) {
+  if (accessRequests.length === 0) {
+    container.innerHTML = '<div class="empty-msg">No access requests yet</div>';
+    return;
+  }
+  const labels = { waiting: "Waiting", approved: "Approved", revoked: "Revoked" };
+  container.innerHTML = accessRequests.map((r, i) => {
+    const st = r.status || "waiting";
+    const buttons = (st !== "approved"
+        ? `<button class="access-btn approve" data-uid="${escHtml(r.uid)}" data-status="approved">Approve</button>` : "")
+      + (st !== "revoked"
+        ? ` <button class="access-btn" data-uid="${escHtml(r.uid)}" data-status="revoked">${st === "approved" ? "Revoke" : "Decline"}</button>` : "");
+    return `
+      <div class="user-row">
+        <span class="user-num">${i + 1}.</span>
+        <div class="user-info">
+          <div class="user-name">${escHtml(r.name || "") || "—"} <span style="color:#999;font-size:12px;">${escHtml((r.provider || "").replace(".com", ""))}</span></div>
+          <div class="user-email">${r.email ? escHtml(r.email) : '<em style="color:#bbb;">No email</em>'}</div>
+        </div>
+        <span class="badge ${st === "approved" ? "certified" : "uncertified"}">${labels[st] || st}</span>
+        <span class="user-date">${r.createdAt ? formatDate(r.createdAt) : "—"}</span>
+        <span>${buttons}</span>
+      </div>`;
+  }).join("");
+  container.querySelectorAll(".access-btn").forEach(b =>
+    b.addEventListener("click", () => setAccess(b.dataset.uid, b.dataset.status, b)));
+}
+
 function renderList() {
   const container = document.getElementById("userList");
+  if (activeTab === "access") { renderAccessRequests(container); return; }
   let filtered = allUsers;
 
   if (activeTab === "certified") {

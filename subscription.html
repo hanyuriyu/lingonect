@@ -448,15 +448,19 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 
 async function loadSubscription(user) {
   const doc = await db.collection("profiles").doc(user.uid).get();
-  const status = classifyPlan(doc.exists ? doc.data() : null, user.email);
+  const status = classifyPlan(doc.exists ? doc.data() : null, user.email, user);
   renderStatus(status);
 }
 
 // "admin" and "legacy" (grandfathered) members have unlimited full access;
 // "pro" subscribers get 800 requests/day; "free" users get 500 requests total.
-function classifyPlan(data, email) {
+function classifyPlan(data, email, user) {
   if (ADMIN_EMAILS.includes(email)) return "admin";
-  if (!data) return "legacy";
+  if (!data) {
+    // No profile: decide from the account's creation time, like the workers.
+    const created = user && user.metadata && Date.parse(user.metadata.creationTime);
+    return created && created < NEW_LIMITS_CUTOFF_MS ? "legacy" : "free";
+  }
   if (data.plan === "pro" || data.subscribed === true) return "pro";
   if (data.plan === "free") return "free";
   const created = data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0;

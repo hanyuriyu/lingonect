@@ -1973,6 +1973,7 @@ a.tri-chip{ text-decoration:none; }
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="/access.js"></script>
 
 <script>
 // ── Firebase auth ──
@@ -2051,8 +2052,14 @@ function isEngineLocked(engineId) {
 }
 
 // Mirror of the worker's classifier: who gets every engine (and no 500 cap)?
-function computeFullAccess(data) {
-  if (!data) return true;               // no profile yet → treat as grandfathered
+// With no profile document, decide from the account's own creation time, as
+// the workers do: a brand-new Google/Apple sign-in must not get full access
+// just because it never saved a profile.
+function computeFullAccess(data, user) {
+  if (!data) {
+    const created = user && user.metadata && Date.parse(user.metadata.creationTime);
+    return !!created && created < NEW_LIMITS_CUTOFF_MS;  // old account → grandfathered
+  }
   if (data.plan === "pro" || data.subscribed === true) return true;
   if (data.plan === "free") return false;
   const created = data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0;
@@ -2108,7 +2115,8 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
-  // Signed-in, verified account (login already restricts to approved members).
+  // Signed-in, verified account. Sign-up is open (Google/Apple), so what it
+  // can reach is decided below from its profile / account age.
   if (["linguisticsconsulting@gmail.com", "contact@lingonect.com"].includes(user.email)) {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
@@ -2119,7 +2127,27 @@ auth.onAuthStateChanged(async user => {
     userHasFullAccess = true;
   } else {
     const profileDoc = await db.collection("profiles").doc(user.uid).get();
-    userHasFullAccess = computeFullAccess(profileDoc.exists ? profileDoc.data() : null);
+    const profileData = profileDoc.exists ? profileDoc.data() : null;
+    // Invite-only: an account must be approved (see access.js).
+    const access = await LingonectAccess.check(user, db, profileData);
+    if (!access.approved) {
+      if (!isNativeApp) {
+        LingonectAccess.showInviteOnly(user, auth);
+        return;
+      }
+      // App: same free tier as anonymous use, so signing in is never a dead
+      // end for App Store / Play review, plus a note on how to get full access.
+      userHasFullAccess = false;
+      document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = "none"; });
+      applyFreeMethodRestrictions();
+      applyPlanMethodRestrictions(false);
+      LingonectAccess.showAppNote();
+      document.body.style.visibility = "visible";
+      return;
+    }
+    // Approved accounts get every engine; otherwise plan / account age decide.
+    userHasFullAccess = (access.request && access.request.status === "approved")
+      || computeFullAccess(profileData, user);
     // Signed-in members on the free plan don't get Triangulate either.
     if (!userHasFullAccess) applyPlanMethodRestrictions(true);
   }
