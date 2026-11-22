@@ -60,6 +60,22 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---- accessRequests (invite-only approval, see access.js) ----
+    // One doc per account. The account may read its own doc and record itself
+    // once as "waiting" (with its own auth email); only the admin can approve,
+    // revoke or delete. Emails here are never readable by other users.
+    match /accessRequests/{uid} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+
+      allow create: if isAdmin()
+        || (isSignedIn()
+            && request.auth.uid == uid
+            && request.resource.data.status == 'waiting'
+            && request.resource.data.email == request.auth.token.get('email', ''));
+
+      allow update, delete: if isAdmin();
+    }
+
     // ---- usernames (lowercased username -> { uid } index) ----
     // A username may only point at your own uid, so nobody can hijack or
     // squat another account's name. Admin may assign on a user's behalf.
