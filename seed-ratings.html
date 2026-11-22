@@ -337,14 +337,14 @@ async function workerFetch(url, options = {}) {
 }
 const db   = firebase.firestore();
 
-const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 
 auth.onAuthStateChanged(user => {
   if (!user || !user.emailVerified) {
     window.location.href = "login.html";
     return;
   }
-  if (user.email !== ADMIN_EMAIL) {
+  if (!ADMIN_EMAILS.includes(user.email)) {
     window.location.href = "engines.html";
     return;
   }

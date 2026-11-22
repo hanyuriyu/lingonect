@@ -352,7 +352,7 @@ export default {
     //   • Subscribers (plan "pro") get 800 requests/UTC-day.
     //   • New free users (plan "free", or a profile created on/after the
     //     cutoff) get 500 requests total, ever. After that they must subscribe.
-    if (env.QUOTA_KV && __authPayload.email !== "linguisticsconsulting@gmail.com") {
+    if (env.QUOTA_KV && !["linguisticsconsulting@gmail.com", "contact@lingonect.com"].includes(__authPayload.email)) {
       try {
         const __uid = __authPayload.sub;
         // Per-IP ceiling across all accounts. Accounts are free to create, so

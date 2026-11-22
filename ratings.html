@@ -410,7 +410,7 @@ auth.onAuthStateChanged(user => {
     window.location.href = "login.html";
     return;
   }
-  if (user.email === "linguisticsconsulting@gmail.com") {
+  if (["linguisticsconsulting@gmail.com", "contact@lingonect.com"].includes(user.email)) {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";

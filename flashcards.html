@@ -1001,7 +1001,7 @@ async function workerFetch(url, options = {}) {
 }
 const db   = firebase.firestore();
 
-const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 const CLAUDE_WORKER   = "https://claudetranslate.hanyuriyu.workers.dev";
 const OPENAI_WORKER   = "https://openai.hanyuriyu.workers.dev";
 const DEEPSEEK_WORKER = "https://deepseek.hanyuriyu.workers.dev";
@@ -1383,7 +1383,7 @@ auth.onAuthStateChanged(async user => {
     return;
   }
   currentUser = user;
-  if (user.email === ADMIN_EMAIL) {
+  if (ADMIN_EMAILS.includes(user.email)) {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
@@ -1448,7 +1448,7 @@ document.getElementById("createBtn").addEventListener("click", async () => {
   if (lines.length > MAX_LINES) return alert("Maximum " + MAX_LINES + " lines per stack.");
 
   // Enforce per-user stack limit (admin is exempt)
-  if (currentUser.email !== ADMIN_EMAIL && savedStacks.length >= MAX_STACKS) {
+  if (!ADMIN_EMAILS.includes(currentUser.email) && savedStacks.length >= MAX_STACKS) {
     return alert("You have reached the limit of " + MAX_STACKS + " card stacks. Please delete an existing stack before creating a new one.");
   }
 
@@ -1475,7 +1475,7 @@ document.getElementById("createBtn").addEventListener("click", async () => {
     // other ID, which atomically caps non-admin users at 5 stacks.
     const stacksCol = db.collection("flashcards").doc(currentUser.uid).collection("stacks");
     let ref;
-    if (currentUser.email === ADMIN_EMAIL) {
+    if (ADMIN_EMAILS.includes(currentUser.email)) {
       ref = await stacksCol.add(stackDoc);
     } else {
       const usedIds = new Set(savedStacks.map(s => s.id));
@@ -2110,7 +2110,7 @@ async function loadStacks() {
 function updateStackLimitStatus() {
   const el = document.getElementById("stackLimitStatus");
   if (!el || !currentUser) return;
-  if (currentUser.email === ADMIN_EMAIL) {
+  if (ADMIN_EMAILS.includes(currentUser.email)) {
     el.textContent = "Admin account: this limit does not apply to you.";
   } else {
     el.textContent = "You are using " + savedStacks.length + " of " + MAX_STACKS + " stacks.";
