@@ -108,3 +108,22 @@ Quota changes:
 The anonymous-origin check can still be faked by a script (it only stops
 browsers); the per-IP and the shared `ANON_DAILY_TOTAL` ceilings bound it.
 Firebase App Check would be the full fix.
+
+## Invite-only gate and quota failures
+
+`access.js` only hides pages, so every worker now repeats its decision
+(`__resolveApproval`) before spending anything: Pro subscribers,
+`accessRequests/{uid}.status == "approved"`, and accounts created before
+`ACCESS_CUTOFF_MS` (2026-11-22 20:00 UTC) are served; `"revoked"` accounts
+and newer unapproved ones get `403 approval_required`. Unapproved accounts
+keep the native-app free tier: on the three free engines (`google`,
+`mistral`, `openai`, `__FREE_TIER_ENGINE = true`) they are still served from
+the app origins. The decision is cached in KV (`ap:<uid>`) for 10 minutes, so
+an approval on the Admin page can take that long to reach the engines. If
+Firestore or Auth cannot be reached the account is let through (its quota
+still applies). Keep `ACCESS_CUTOFF_MS` equal to `APPROVAL_CUTOFF_MS` in
+`access.js`.
+
+When KV or Firestore fails during the quota check, registered users are still
+let through, but anonymous requests are refused with `503 quota_unavailable`:
+anonymous ids are free to mint, so an unchecked quota would be unbounded.

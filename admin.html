@@ -405,12 +405,35 @@ async function loadUsers() {
   const snap = await db.collection("profiles").get();
   allUsers = [];
 
+  // Emails live in profiles/{uid}/private/info (owner + admin only), because
+  // every member can read the public profile. Older profiles still carry the
+  // email publicly: move it into the private doc and strip it from the
+  // public one. Runs on every admin load; once migrated there is nothing to do.
+  const emails = {};
+  await Promise.all(snap.docs.map(async doc => {
+    const d = doc.data();
+    const privateRef = doc.ref.collection("private").doc("info");
+    try {
+      if (d.email) {
+        await privateRef.set({ email: d.email }, { merge: true });
+        await doc.ref.update({ email: firebase.firestore.FieldValue.delete() });
+        emails[doc.id] = d.email;
+      } else if (d.emailConsent) {
+        const p = await privateRef.get();
+        if (p.exists && p.data().email) emails[doc.id] = p.data().email;
+      }
+    } catch (e) {
+      console.warn("Email migration/read failed for", doc.id, e);
+      if (d.email) emails[doc.id] = d.email;
+    }
+  }));
+
   snap.forEach(doc => {
     const d = doc.data();
     allUsers.push({
       uid: doc.id,
       username: d.username || "",
-      email: d.emailConsent ? (d.email || "") : "",
+      email: d.emailConsent ? (emails[doc.id] || "") : "",
       emailConsent: !!d.emailConsent,
       certification: d.certification || "Uncertified",
       plan: classifyPlanData(d),
