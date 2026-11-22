@@ -443,7 +443,7 @@ auth.onAuthStateChanged(user => {
     document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = "none"; });
     document.getElementById("loginNavLink").style.display = "";
   }
-  if (isMember && user.email === "linguisticsconsulting@gmail.com") {
+  if (isMember && ["linguisticsconsulting@gmail.com", "contact@lingonect.com"].includes(user.email)) {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";

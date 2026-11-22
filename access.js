@@ -7,7 +7,7 @@
 // firestore.rules), so emails never land in the public profiles directory.
 //
 // Who is approved:
-//   - the admin account
+//   - the admin accounts
 //   - accessRequests/{uid}.status == "approved"  (set on the Admin page)
 //   - Pro subscribers (profile plan "pro" / subscribed)
 //   - every account that existed before APPROVAL_CUTOFF_MS, unless the admin
@@ -17,7 +17,7 @@
 // Native apps: an unapproved account keeps the free tier (the same three
 // engines as anonymous use), so signing in is never a dead end for review.
 (function () {
-  const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+  const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
   const CONTACT_EMAIL = "contact@lingonect.com";
   // Accounts created before this instant keep their access (go-live of the
   // invite-only gate). Everyone created later needs approval.
@@ -31,7 +31,7 @@
 
   function decide(user, request, profile) {
     if (!user || user.isAnonymous) return false;
-    if (user.email === ADMIN_EMAIL) return true;
+    if (ADMIN_EMAILS.includes(user.email)) return true;
     const status = request && request.status;
     if (status === "approved") return true;
     if (status === "revoked") return false;
@@ -55,7 +55,7 @@
       request = reqSnap.exists ? reqSnap.data() : null;
       if (profSnap) profile = profSnap.exists ? profSnap.data() : null;
       const approved = decide(user, request, profile);
-      if (!approved && !request && user.email !== ADMIN_EMAIL) {
+      if (!approved && !request && !ADMIN_EMAILS.includes(user.email)) {
         request = {
           status: "waiting",
           email: user.email || "",

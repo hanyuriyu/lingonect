@@ -412,7 +412,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 
 // Profiles created on/after this instant are new free users; earlier ones are
 // grandfathered. Keep in sync with the Cloudflare workers.
@@ -431,7 +431,7 @@ auth.onAuthStateChanged(async user => {
     window.location.href = "login.html";
     return;
   }
-  if (user.email !== ADMIN_EMAIL) {
+  if (!ADMIN_EMAILS.includes(user.email)) {
     window.location.href = "engines.html";
     return;
   }
@@ -455,7 +455,7 @@ async function loadSubscription(user) {
 // "admin" and "legacy" (grandfathered) members have unlimited full access;
 // "pro" subscribers get 800 requests/day; "free" users get 500 requests total.
 function classifyPlan(data, email, user) {
-  if (email === ADMIN_EMAIL) return "admin";
+  if (ADMIN_EMAILS.includes(email)) return "admin";
   if (!data) {
     // No profile: decide from the account's creation time, like the workers.
     const created = user && user.metadata && Date.parse(user.metadata.creationTime);

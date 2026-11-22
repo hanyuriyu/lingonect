@@ -2117,7 +2117,7 @@ auth.onAuthStateChanged(async user => {
 
   // Signed-in, verified account. Sign-up is open (Google/Apple), so what it
   // can reach is decided below from its profile / account age.
-  if (user.email === "linguisticsconsulting@gmail.com") {
+  if (["linguisticsconsulting@gmail.com", "contact@lingonect.com"].includes(user.email)) {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";

@@ -729,7 +729,7 @@ const auth = firebase.auth();
 const db   = firebase.firestore();
 const rtdb = firebase.database();
 
-const ADMIN_EMAIL = "linguisticsconsulting@gmail.com";
+const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 
 let currentUser  = null;
 let myProfile    = null;
@@ -746,7 +746,7 @@ auth.onAuthStateChanged(async user => {
   }
   if (!(await LingonectAccess.guardPage(user, db, auth))) return;  // invite-only
   currentUser = user;
-  if (user.email === ADMIN_EMAIL) {
+  if (ADMIN_EMAILS.includes(user.email)) {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
     document.getElementById("adminNavLink").style.display = "";
