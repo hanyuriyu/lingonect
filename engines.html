@@ -2051,8 +2051,14 @@ function isEngineLocked(engineId) {
 }
 
 // Mirror of the worker's classifier: who gets every engine (and no 500 cap)?
-function computeFullAccess(data) {
-  if (!data) return true;               // no profile yet → treat as grandfathered
+// With no profile document, decide from the account's own creation time, as
+// the workers do: a brand-new Google/Apple sign-in must not get full access
+// just because it never saved a profile.
+function computeFullAccess(data, user) {
+  if (!data) {
+    const created = user && user.metadata && Date.parse(user.metadata.creationTime);
+    return !!created && created < NEW_LIMITS_CUTOFF_MS;  // old account → grandfathered
+  }
   if (data.plan === "pro" || data.subscribed === true) return true;
   if (data.plan === "free") return false;
   const created = data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0;
@@ -2108,7 +2114,8 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
-  // Signed-in, verified account (login already restricts to approved members).
+  // Signed-in, verified account. Sign-up is open (Google/Apple), so what it
+  // can reach is decided below from its profile / account age.
   if (user.email === "linguisticsconsulting@gmail.com") {
     document.getElementById("subNavLink").style.display = "";
     document.getElementById("seedNavLink").style.display = "";
@@ -2119,7 +2126,7 @@ auth.onAuthStateChanged(async user => {
     userHasFullAccess = true;
   } else {
     const profileDoc = await db.collection("profiles").doc(user.uid).get();
-    userHasFullAccess = computeFullAccess(profileDoc.exists ? profileDoc.data() : null);
+    userHasFullAccess = computeFullAccess(profileDoc.exists ? profileDoc.data() : null, user);
     // Signed-in members on the free plan don't get Triangulate either.
     if (!userHasFullAccess) applyPlanMethodRestrictions(true);
   }
