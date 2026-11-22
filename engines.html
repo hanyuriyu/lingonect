@@ -2673,7 +2673,8 @@ async function onInputImagePicked(e) {
 }
 
 // ── Speak instead of typing ──
-// Tap the mic, talk, tap again (or wait for the 60 s cap). The recording goes
+// Tap the mic and talk. Recording stops by itself 3 s after you stop
+// speaking (or tap again; 60 s at most). The recording goes
 // to OpenAI's transcription model through our OpenAI worker's /stt route, which
 // works the same on the website and inside the iOS / Android apps (the
 // browser's own SpeechRecognition is missing from their web views). The
@@ -2681,6 +2682,11 @@ async function onInputImagePicked(e) {
 // replaces the box's text, cut to the 80-word limit.
 const INPUT_WORD_LIMIT = 80;
 const MIC_MAX_SECONDS  = 60;
+// Stop on its own once the speaker has gone quiet for this long, so a single
+// word doesn't mean waiting out the full minute.
+const MIC_SILENCE_MS   = 3000;
+// If nothing that sounds like speech arrives at all, give up after this long.
+const MIC_NO_SPEECH_MS = 8000;
 const inputMicBtn = document.getElementById("inputMicBtn");
 let micRecorder = null;
 let micTimer = null;
@@ -2734,7 +2740,63 @@ async function transcribeSpeech(blob, mime) {
   return String((data && data.text) || "").trim();
 }
 
-async function startMicRecording() {
+// Watches the microphone level with Web Audio so the recording can end after
+// a pause. Returns null where Web Audio isn't available; the recording then
+// simply runs until it is tapped off or hits the 60 s cap.
+function createSilenceWatcher(audioCtx, stream) {
+  if (!audioCtx) return null;
+  try {
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    let floor = null;          // background-noise level, learned as we go
+    let smoothed = 0;
+    let live = false;          // has the analyser ever produced real signal?
+    let heardSpeech = false;
+    let lastVoiceAt = 0;
+    return {
+      // Call ~10×/s. Returns "silence" (spoke, then went quiet), "nothing"
+      // (never spoke) or null (keep recording).
+      check(now, startedAt) {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
+        const level = Math.sqrt(sum / buf.length);
+        if (level > 0.0005) live = true;
+        // A suspended or broken audio graph reads as pure zeros. Never cut a
+        // recording short on that; fall back to the tap / 60 s cap.
+        if (!live) return null;
+        smoothed = smoothed * 0.5 + level * 0.5;
+        if (floor === null) floor = smoothed;
+        const threshold = Math.max(0.015, floor * 3);
+        if (smoothed > threshold) {
+          heardSpeech = true;
+          lastVoiceAt = now;
+        } else {
+          // Track the noise floor: drop straight to quieter readings, creep up
+          // slowly so a noisy room doesn't count as speech forever.
+          floor = smoothed < floor ? smoothed : floor + (smoothed - floor) * 0.02;
+        }
+        if (heardSpeech && now - lastVoiceAt > MIC_SILENCE_MS) return "silence";
+        if (!heardSpeech && now - startedAt > MIC_NO_SPEECH_MS) return "nothing";
+        return null;
+      },
+      close() {
+        try { source.disconnect(); } catch (_) {}
+        audioCtx.close().catch(() => {});
+      }
+    };
+  } catch (err) {
+    console.warn("Silence detection unavailable:", err);
+    try { audioCtx.close(); } catch (_) {}
+    return null;
+  }
+}
+
+async function startMicRecording(audioCtx) {
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -2742,6 +2804,7 @@ async function startMicRecording() {
     console.warn("Microphone unavailable:", err);
     const denied = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
     setInputStatus(denied ? "Microphone access is blocked" : "No microphone found", true, 4000);
+    if (audioCtx) audioCtx.close().catch(() => {});
     return;
   }
   const mimeType = pickRecorderMime();
@@ -2753,12 +2816,20 @@ async function startMicRecording() {
   }
   const chunks = [];
   const startedAt = Date.now();
+  const watcher = createSilenceWatcher(audioCtx, stream);
+  let heardNothing = false;
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   rec.onstop = async () => {
     clearInterval(micTimer);
+    if (watcher) watcher.close();
     stream.getTracks().forEach(t => t.stop());
     micRecorder = null;
     setMicRecording(false);
+    if (heardNothing) {
+      // No point spending a request on silence.
+      setInputStatus("Didn't hear anything. Tap the mic and speak", true, 3500);
+      return;
+    }
     const mime = rec.mimeType || mimeType || (chunks[0] && chunks[0].type) || "audio/webm";
     const blob = new Blob(chunks, { type: mime });
     if (Date.now() - startedAt < 600 || blob.size < 1000) {
@@ -2788,13 +2859,20 @@ async function startMicRecording() {
   rec.start();
   setMicRecording(true);
   const tick = () => {
-    const secs = Math.floor((Date.now() - startedAt) / 1000);
+    const now = Date.now();
+    const secs = Math.floor((now - startedAt) / 1000);
     if (secs >= MIC_MAX_SECONDS) { stopMicRecording(); return; }
+    const verdict = watcher ? watcher.check(now, startedAt) : null;
+    if (verdict) {
+      heardNothing = verdict === "nothing";
+      stopMicRecording();
+      return;
+    }
     const left = MIC_MAX_SECONDS - secs;
     setInputStatus(`Listening… ${left}s`);
   };
   tick();
-  micTimer = setInterval(tick, 500);
+  micTimer = setInterval(tick, 100);
 }
 
 function stopMicRecording() {
@@ -2803,8 +2881,15 @@ function stopMicRecording() {
 }
 
 inputMicBtn.addEventListener("click", () => {
-  if (micRecorder) stopMicRecording();
-  else startMicRecording();
+  if (micRecorder) { stopMicRecording(); return; }
+  // Create the AudioContext here, inside the tap: iOS only lets audio start
+  // from a user gesture, and the await in startMicRecording would lose it.
+  let audioCtx = null;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  } catch (_) { audioCtx = null; }
+  startMicRecording(audioCtx);
 });
 
 // ── Automatic source-language detection ──
