@@ -37,6 +37,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Microphone button on the engines page (speech to text). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Since Android 11, package visibility filtering hides other apps from
          resolveActivity() unless they are declared here. Capacitor resolves

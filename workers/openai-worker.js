@@ -4,6 +4,9 @@
  * Routes:
  *   POST /       -> https://api.openai.com/v1/chat/completions  (JSON in, JSON out)
  *   POST /tts    -> https://api.openai.com/v1/audio/speech      (JSON in, audio/mpeg out)
+ *   POST /stt    -> https://api.openai.com/v1/audio/transcriptions
+ *                   (JSON in: { model, audio: <base64>, mime, language?, prompt? };
+ *                    JSON out: { text })
  *
  * Environment secrets required:
  *   Settings > Variables and Secrets > Add:
@@ -199,7 +202,18 @@ const __t = (v) => (v == null ? "" : String(v).trim());
 //   • defaultOutputTokens  set when the caller sends none
 //   • maxBodyChars     a larger request body is refused (413)
 //   • keys        top-level fields passed on; anything else is dropped
-const __LIMITS = (request) => new URL(request.url).pathname === "/tts"
+const __LIMITS = (request) => new URL(request.url).pathname === "/stt"
+  ? {
+      // Speech-to-text for the engines page's microphone button. The page
+      // stops recording after 60 s at ~32 kbps, i.e. ~240 KB of audio,
+      // ~320k characters once base64-encoded; this leaves room for devices
+      // that ignore the requested bitrate.
+      models: ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"],
+      defaultModel: "gpt-4o-mini-transcribe",
+      maxBodyChars: 1500000,
+      keys: ["model", "audio", "mime", "language", "prompt"],
+    }
+  : new URL(request.url).pathname === "/tts"
   ? {
       models: ["gpt-4o-mini-tts", "tts-1"],
       defaultModel: "tts-1",
@@ -531,9 +545,44 @@ export default {
 
     const url = new URL(request.url);
     const isTTS = url.pathname === "/tts";
+    const isSTT = url.pathname === "/stt";
 
     try {
       const body = await request.json();
+
+      if (isSTT) {
+        // The browser sends base64 JSON (so the cost guard above can size and
+        // filter it like every other request); OpenAI wants multipart form data.
+        if (typeof body.audio !== "string" || !body.audio) {
+          return new Response(JSON.stringify({ error: { message: "No audio was sent." } }), { status: 400, headers: jsonHeaders });
+        }
+        const mime = /^audio\/[\w.+-]+$/.test(String(body.mime || "").split(";")[0])
+          ? String(body.mime).split(";")[0]
+          : "audio/webm";
+        const ext = { "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "m4a", "audio/mpeg": "mp3",
+                      "audio/ogg": "ogg", "audio/wav": "wav", "audio/x-wav": "wav" }[mime] || "webm";
+        let bytes;
+        try {
+          const bin = atob(body.audio);
+          bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        } catch (_) {
+          return new Response(JSON.stringify({ error: { message: "The audio was not valid base64." } }), { status: 400, headers: jsonHeaders });
+        }
+        const form = new FormData();
+        form.append("file", new Blob([bytes], { type: mime }), "speech." + ext);
+        form.append("model", body.model || "gpt-4o-mini-transcribe");
+        form.append("response_format", "json");
+        if (typeof body.language === "string" && /^[a-z]{2}$/.test(body.language)) form.append("language", body.language);
+        if (typeof body.prompt === "string" && body.prompt) form.append("prompt", body.prompt.slice(0, 500));
+        const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${__t(env.OPENAI_KEY)}` },
+          body: form
+        });
+        const text = await res.text();
+        return new Response(text, { status: res.status, headers: jsonHeaders });
+      }
 
       if (isTTS) {
         const res = await fetch("https://api.openai.com/v1/audio/speech", {
