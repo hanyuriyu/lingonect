@@ -352,6 +352,11 @@ body{
    directly. On a desktop it would just open the same file picker. */
 .input-tool#inputCameraBtn{ display:none; }
 @media (pointer:coarse){ .input-tool#inputCameraBtn{ display:flex; } }
+/* Hidden where the browser can't record audio at all. */
+.input-tool#inputMicBtn.unsupported{ display:none; }
+.input-tool.recording,
+.input-tool.recording:hover{ color:#d32f2f; background:rgba(211,47,47,.1); }
+.input-tool.recording svg{ animation:inputToolPulse 1s ease-in-out infinite; }
 .input-tool.busy svg{ animation:inputToolPulse 1s ease-in-out infinite; }
 @keyframes inputToolPulse{ 50%{ opacity:.3; } }
 .input-tool-status{
@@ -1713,6 +1718,9 @@ a.tri-chip{ text-decoration:none; }
         <div class="input-toolbar">
         <div class="input-tool-status" id="inputToolStatus" role="status" aria-live="polite"></div>
         <div class="input-tools">
+          <button class="input-tool" id="inputMicBtn" type="button" title="Speak instead of typing" aria-label="Speak instead of typing" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          </button>
           <button class="input-tool" id="inputCameraBtn" type="button" title="Take a photo of text" aria-label="Take a photo of text">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
           </button>
@@ -2635,6 +2643,141 @@ async function onInputImagePicked(e) {
     inputImageBtn.classList.remove("busy");
   }
 }
+
+// ── Speak instead of typing ──
+// Tap the mic, talk, tap again (or wait for the 60 s cap). The recording goes
+// to OpenAI's transcription model through our OpenAI worker's /stt route, which
+// works the same on the website and inside the iOS / Android apps (the
+// browser's own SpeechRecognition is missing from their web views). The
+// language is detected from the speech itself. Like an image, the result
+// replaces the box's text, cut to the 80-word limit.
+const INPUT_WORD_LIMIT = 80;
+const MIC_MAX_SECONDS  = 60;
+const inputMicBtn = document.getElementById("inputMicBtn");
+let micRecorder = null;
+let micTimer = null;
+
+if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
+  inputMicBtn.classList.add("unsupported");
+}
+
+// Keep the first `limit` words, using the same whitespace rule as the counter.
+function cutToWordLimit(text, limit) {
+  const words = text.trim().split(/(\s+)/);   // keeps the original spacing
+  let kept = 0, out = "";
+  for (const part of words) {
+    if (/^\s+$/.test(part)) { out += part; continue; }
+    if (kept === limit) break;
+    out += part;
+    kept++;
+  }
+  return out.trim();
+}
+
+function pickRecorderMime() {
+  const options = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  return options.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = () => reject(new Error("Couldn't read the recording."));
+    r.readAsDataURL(blob);
+  });
+}
+
+function setMicRecording(on) {
+  inputMicBtn.classList.toggle("recording", on);
+  inputMicBtn.setAttribute("aria-pressed", on ? "true" : "false");
+  inputMicBtn.title = on ? "Stop and insert the text" : "Speak instead of typing";
+}
+
+async function transcribeSpeech(blob, mime) {
+  const audio = await blobToBase64(blob);
+  const res = await workerFetch(OPENAI_PROXY + "/stt", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gpt-4o-mini-transcribe", audio, mime })
+  });
+  if (!res.ok) throw await engineError("Speech", res);
+  const data = await res.json();
+  return String((data && data.text) || "").trim();
+}
+
+async function startMicRecording() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    console.warn("Microphone unavailable:", err);
+    const denied = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
+    setInputStatus(denied ? "Microphone access is blocked" : "No microphone found", true, 4000);
+    return;
+  }
+  const mimeType = pickRecorderMime();
+  let rec;
+  try {
+    rec = new MediaRecorder(stream, Object.assign({ audioBitsPerSecond: 32000 }, mimeType ? { mimeType } : {}));
+  } catch (_) {
+    rec = new MediaRecorder(stream);
+  }
+  const chunks = [];
+  const startedAt = Date.now();
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = async () => {
+    clearInterval(micTimer);
+    stream.getTracks().forEach(t => t.stop());
+    micRecorder = null;
+    setMicRecording(false);
+    const mime = rec.mimeType || mimeType || (chunks[0] && chunks[0].type) || "audio/webm";
+    const blob = new Blob(chunks, { type: mime });
+    if (Date.now() - startedAt < 600 || blob.size < 1000) {
+      setInputStatus("Too short. Tap the mic and speak", true, 3000);
+      return;
+    }
+    inputMicBtn.disabled = true;
+    inputMicBtn.classList.add("busy");
+    setInputStatus("Turning speech into text…");
+    try {
+      const said = await transcribeSpeech(blob, mime);
+      if (!said) { setInputStatus("Didn't catch any words", true, 3500); return; }
+      const cut = cutToWordLimit(said, INPUT_WORD_LIMIT);
+      setInputText(cut);
+      if (cut.length < said.length) setInputStatus(`Cut off at the ${INPUT_WORD_LIMIT}-word limit`, false, 5000);
+      else setInputStatus("Speech inserted", false, 2000);
+      inputEl.focus();
+    } catch (err) {
+      console.warn("Speech transcription failed:", err);
+      setInputStatus(err && err.message ? err.message : "Couldn't turn that into text", true, 5000);
+    } finally {
+      inputMicBtn.disabled = false;
+      inputMicBtn.classList.remove("busy");
+    }
+  };
+  micRecorder = rec;
+  rec.start();
+  setMicRecording(true);
+  const tick = () => {
+    const secs = Math.floor((Date.now() - startedAt) / 1000);
+    if (secs >= MIC_MAX_SECONDS) { stopMicRecording(); return; }
+    const left = MIC_MAX_SECONDS - secs;
+    setInputStatus(`Listening… ${left}s`);
+  };
+  tick();
+  micTimer = setInterval(tick, 500);
+}
+
+function stopMicRecording() {
+  clearInterval(micTimer);
+  if (micRecorder && micRecorder.state !== "inactive") micRecorder.stop();
+}
+
+inputMicBtn.addEventListener("click", () => {
+  if (micRecorder) stopMicRecording();
+  else startMicRecording();
+});
 
 // ── Automatic source-language detection ──
 // Guessing the source language from the text the user just typed saves a trip
