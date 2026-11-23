@@ -244,6 +244,24 @@ body{
 .mail-line{font-size:12px;color:#1a7a1a;margin-top:4px;}
 .mail-line a{color:#0047FF;}
 .mail-err{color:#c00;margin-top:2px;}
+.del-btn{
+  font:inherit;font-size:12px;padding:3px 8px;border-radius:5px;cursor:pointer;
+  border:1px solid #c0392b;background:#fff;color:#c0392b;flex-shrink:0;
+}
+.del-btn:hover{background:#c0392b;color:#fff;}
+#deleteDialog{border:none;border-radius:10px;padding:24px;max-width:440px;width:calc(100% - 32px);box-shadow:0 10px 40px rgba(0,0,0,.25);}
+#deleteDialog::backdrop{background:rgba(0,0,0,.35);}
+#deleteDialog h3{margin:0 0 8px;font-size:18px;}
+#deleteDialog p{font-size:13px;color:#555;margin:0 0 14px;line-height:1.5;}
+#deleteDialog label{display:block;font-size:13px;margin:10px 0 4px;}
+#deleteDialog select,#deleteDialog textarea{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:6px;border:1px solid #ccc;border-radius:5px;}
+#deleteDialog textarea{min-height:64px;resize:vertical;}
+#deleteDialog .dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+#deleteDialog .dlg-actions button{font:inherit;font-size:13px;padding:6px 12px;border-radius:5px;cursor:pointer;border:1px solid #999;background:#fff;}
+#deleteDialog .dlg-actions .confirm{border-color:#c0392b;background:#c0392b;color:#fff;}
+#deleteDialog .dlg-actions button:disabled{opacity:.5;cursor:default;}
+#deleteDialog .dlg-msg{font-size:13px;margin-top:10px;}
+#deleteDialog .dlg-msg.err{color:#c00;}
 .badge.certified{
   background:#d0f0d0;
   color:#1a7a1a;
@@ -336,6 +354,27 @@ body{
     <div class="user-list" id="userList"></div>
   </main>
 </div>
+
+<!-- Delete-user dialog. The reasons match the Terms of Use, "Removing Accounts". -->
+<dialog id="deleteDialog">
+  <h3>Delete <span id="delName"></span>?</h3>
+  <p>This permanently deletes the account and all its data (profile, username, flashcards, search history, chats, access request) and emails the person the reason. It cannot be undone.</p>
+  <label for="delReason">Reason (shown to the person)</label>
+  <select id="delReason">
+    <option value="">Choose a reason…</option>
+    <option value="abuse">Abuse of the service</option>
+    <option value="terms">Breach of the Terms of Use</option>
+    <option value="inactivity">No sign-in for 12 months</option>
+    <option value="request">At the user's request</option>
+  </select>
+  <label for="delNote">Note to include in the email (optional)</label>
+  <textarea id="delNote" maxlength="500" placeholder="e.g. Repeated spam messages in chat"></textarea>
+  <div class="dlg-msg" id="delMsg"></div>
+  <div class="dlg-actions">
+    <button type="button" id="delCancel">Cancel</button>
+    <button type="button" class="confirm" id="delConfirm">Delete user</button>
+  </div>
+</dialog>
 
 <footer style="text-align:center;padding:1rem 0 0.5rem;font-size:0.75rem;color:#888;">&copy; 2026 Lingonect<sup class="tm">®</sup> &nbsp;|&nbsp; <a href="terms.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.html" style="color:#888;text-decoration:none;border-bottom:1px solid #ccc;">Privacy Policy</a></footer>
 
@@ -538,6 +577,67 @@ async function mailApproved(uid, btn, resend) {
   renderList();
 }
 
+// ── Delete user (approval-mail worker, POST /delete-user) ──
+// The worker deletes the account and all its data with admin rights the page
+// does not have, then emails the person the reason (Terms of Use, "Removing
+// Accounts"). Admin accounts get no Delete button and are refused anyway.
+const deleteDialog = document.getElementById("deleteDialog");
+let deleteUid = null;
+
+document.getElementById("userList").addEventListener("click", ev => {
+  const btn = ev.target.closest(".del-btn");
+  if (!btn) return;
+  ev.preventDefault();      // user rows are links to the profile page
+  ev.stopPropagation();
+  deleteUid = btn.dataset.uid;
+  document.getElementById("delName").textContent = btn.dataset.name;
+  document.getElementById("delReason").value = "";
+  document.getElementById("delNote").value = "";
+  const msg = document.getElementById("delMsg");
+  msg.textContent = ""; msg.className = "dlg-msg";
+  document.getElementById("delConfirm").disabled = false;
+  document.getElementById("delCancel").disabled = false;
+  deleteDialog.showModal();
+});
+
+document.getElementById("delCancel").addEventListener("click", () => deleteDialog.close());
+
+document.getElementById("delConfirm").addEventListener("click", async () => {
+  const reason = document.getElementById("delReason").value;
+  const note = document.getElementById("delNote").value.trim();
+  const msg = document.getElementById("delMsg");
+  if (!reason) { msg.textContent = "Choose a reason first."; msg.className = "dlg-msg err"; return; }
+  const confirmBtn = document.getElementById("delConfirm");
+  const cancelBtn = document.getElementById("delCancel");
+  confirmBtn.disabled = true; cancelBtn.disabled = true;
+  msg.className = "dlg-msg"; msg.textContent = "Deleting…";
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(APPROVAL_MAIL_WORKER + "/delete-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ uid: deleteUid, reason, note })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+    msg.textContent = data.emailed
+      ? "✓ Deleted. Email sent to " + data.email + "."
+      : "✓ Deleted, but no email was sent (" + (data.emailError || "unknown reason") + "). Please tell the person yourself.";
+    cancelBtn.textContent = "Close";
+    cancelBtn.disabled = false;
+    await Promise.all([loadUsers(), loadAccessRequests()]);
+    renderList();
+  } catch (e) {
+    msg.className = "dlg-msg err";
+    msg.textContent = "Not deleted: " + e.message;
+    confirmBtn.disabled = false; cancelBtn.disabled = false;
+  }
+});
+
+deleteDialog.addEventListener("close", () => {
+  document.getElementById("delCancel").textContent = "Cancel";
+});
+
 async function setAccess(uid, status, btn) {
   btn.disabled = true;
   try {
@@ -588,7 +688,7 @@ function renderAccessRequests(container) {
         </div>
         <span class="badge ${st === "approved" ? "certified" : "uncertified"}">${labels[st] || st}</span>
         <span class="user-date">${r.createdAt ? formatDate(r.createdAt) : "—"}</span>
-        <span>${buttons}</span>
+        <span>${buttons} <button type="button" class="del-btn" data-uid="${escHtml(r.uid)}" data-name="${escHtml(r.name || r.email || "this user")}">Delete</button></span>
       </div>`;
   }).join("");
   container.querySelectorAll(".access-btn[data-status]").forEach(b =>
@@ -639,6 +739,7 @@ function renderList() {
         <span class="badge ${subBadgeClass}">${subBadgeText}</span>
         <span class="badge ${badgeClass}">${badgeText}</span>
         <span class="user-date">${dateStr}</span>
+        ${u.isAdmin ? "" : `<button type="button" class="del-btn" data-uid="${escHtml(u.uid)}" data-name="${escHtml(u.username || "this user")}">Delete</button>`}
       </a>
     `;
   }).join("");

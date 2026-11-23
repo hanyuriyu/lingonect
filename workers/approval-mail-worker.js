@@ -1,23 +1,33 @@
 /**
- * Cloudflare Worker: approval emails
+ * Cloudflare Worker: admin account actions (approval emails, user deletion)
  *
- * When the admin approves an access request on admin.html, the page calls
- *   POST /   { uid, resend? }   (Authorization: Bearer <admin's Firebase ID token>)
- * and this worker emails the approved person from contact@lingonect.com.
+ * Called only from admin.html, with the admin's Firebase ID token
+ * (Authorization: Bearer <idToken>):
  *
- * - Only the admin accounts may call it (verified Firebase token + email).
- * - The recipient is never taken from the request: the worker reads
- *   accessRequests/{uid} from Firestore (with the admin's own token, so the
- *   Firestore rules still apply) and only mails a request that is "approved".
- * - It records approvalEmailSentAt on that request and refuses a second send
- *   unless the page asks for a resend explicitly.
+ *   POST /              { uid, resend? }
+ *     Emails the approved person from contact@lingonect.com. The recipient is
+ *     never taken from the request: the worker reads accessRequests/{uid}
+ *     (with the admin's own token, so the Firestore rules still apply) and only
+ *     mails a request that is "approved". It records approvalEmailSentAt and
+ *     refuses a second send unless the page asks for a resend explicitly.
+ *
+ *   POST /delete-user   { uid, reason, note? }
+ *     Deletes the account and all its data (Firebase Auth account, profile and
+ *     its private info, username, flashcards, search history, chat messages,
+ *     chat presence/invites, access request), then emails the person the
+ *     reason, as the Terms of Use ("Removing Accounts") promise. reason is one
+ *     of: abuse, terms, inactivity (only after 12 months without a sign-in),
+ *     request. Admin accounts and the caller's own account are refused.
  *
  * Sending goes through the Gmail API as contact@lingonect.com, using a Google
  * service account with Workspace domain-wide delegation limited to the
- * gmail.send scope. Emails therefore appear in that mailbox's Sent folder.
+ * gmail.send scope, so emails appear in that mailbox's Sent folder.
  *
- * Environment secret required (Settings > Variables and Secrets):
- *   GMAIL_SA_KEY   the whole service-account JSON key file, pasted as-is
+ * Environment secrets required (Settings > Variables and Secrets):
+ *   GMAIL_SA_KEY           service-account JSON key for sending email
+ *   FIREBASE_ADMIN_SA_KEY  service-account JSON key with the roles
+ *                          Firebase Authentication Admin, Cloud Datastore User
+ *                          and Firebase Realtime Database Admin (deletion only)
  *
  * The worker will be available at:
  *   https://approval-mail.hanyuriyu.workers.dev
@@ -123,7 +133,7 @@ async function verifyFirebaseToken(authHeader) {
 }
 
 // ---------------------------------------------------------------------------
-// Approval email
+// Shared helpers
 // ---------------------------------------------------------------------------
 const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 const SENDER = "contact@lingonect.com";
@@ -135,9 +145,13 @@ const ALLOWED_ORIGINS = [
   "https://hanyuriyu.github.io",
   "http://localhost",
 ];
-const ACCESS_BASE =
-  "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID +
-  "/databases/(default)/documents/accessRequests/";
+const DOCS_PATH = "projects/" + FIREBASE_PROJECT_ID + "/databases/(default)/documents";
+const FIRESTORE = "https://firestore.googleapis.com/v1/" + DOCS_PATH;
+const ACCESS_BASE = FIRESTORE + "/accessRequests/";
+const RTDB_URL = "https://lingonect-4db51-default-rtdb.firebaseio.com";
+const IDENTITY = "https://identitytoolkit.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID;
+const EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/;
+const INACTIVE_MS = 365 * 24 * 60 * 60 * 1000;
 
 function corsOrigin(request) {
   const o = request.headers.get("Origin");
@@ -158,10 +172,12 @@ function __bytesToB64(bytes) {
 }
 const __b64url = (b64) => b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const __utf8B64 = (s) => __bytesToB64(new TextEncoder().encode(s));
+const __firstName = (name) =>
+  String(name || "").trim().split(/\s+/)[0].replace(/[^\p{L}\p{M}'-]/gu, "").slice(0, 40);
 
-// Exchange the service account for a Gmail access token that acts as SENDER
-// (RFC 7523 JWT bearer grant; the Workspace delegation allows only gmail.send).
-async function __gmailAccessToken(saJson) {
+// Google access token for a service account (RFC 7523 JWT bearer grant).
+// With `sub`, the token acts as that Workspace user (domain-wide delegation).
+async function __saAccessToken(saJson, scope, sub) {
   const sa = JSON.parse(saJson);
   const pem = String(sa.private_key || "")
     .replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "")
@@ -171,15 +187,16 @@ async function __gmailAccessToken(saJson) {
     "pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]
   );
   const now = Math.floor(Date.now() / 1000);
-  const header = __b64url(__utf8B64(JSON.stringify({ alg: "RS256", typ: "JWT" })));
-  const claims = __b64url(__utf8B64(JSON.stringify({
+  const claimSet = {
     iss: sa.client_email,
-    sub: SENDER,
-    scope: "https://www.googleapis.com/auth/gmail.send",
+    scope,
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
-  })));
+  };
+  if (sub) claimSet.sub = sub;
+  const header = __b64url(__utf8B64(JSON.stringify({ alg: "RS256", typ: "JWT" })));
+  const claims = __b64url(__utf8B64(JSON.stringify(claimSet)));
   const sig = await crypto.subtle.sign(
     "RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(header + "." + claims)
   );
@@ -192,20 +209,15 @@ async function __gmailAccessToken(saJson) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.access_token) {
-    throw new Error("Google sign-in for the mail account failed: " +
+    throw new Error("Google sign-in for the service account failed: " +
       (data.error_description || data.error || res.status));
   }
   return data.access_token;
 }
 
-// The raw RFC 5322 message, base64url-encoded as the Gmail API expects.
-function __buildMessage(to, firstName) {
-  const subject = "Your Lingonect access has been approved";
-  const text =
-    "Hi " + (firstName || "there") + ",\n\n" +
-    "Good news: your Lingonect account has been approved.\n\n" +
-    "Sign in at " + SITE_URL + " with the same account you registered with (" + to + ").\n\n" +
-    "Lingonect\n" + SENDER + "\n";
+// Send a plain-text email from SENDER through the Gmail API.
+async function __sendMail(env, to, subject, text) {
+  const token = await __saAccessToken(env.GMAIL_SA_KEY, "https://www.googleapis.com/auth/gmail.send", SENDER);
   const mime = [
     "From: " + SENDER_NAME + " <" + SENDER + ">",
     "To: " + to,
@@ -216,9 +228,252 @@ function __buildMessage(to, firstName) {
     "",
     __utf8B64(text).replace(/.{76}/g, "$&\r\n"),
   ].join("\r\n");
-  return __b64url(__utf8B64(mime));
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw: __b64url(__utf8B64(mime)) }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error("Gmail refused the email: " + ((err.error && err.error.message) || res.status));
+  }
 }
 
+// ---------------------------------------------------------------------------
+// POST /  — approval email
+// ---------------------------------------------------------------------------
+function __approvalText(to, firstName) {
+  return "Hi " + (firstName || "there") + ",\n\n" +
+    "Good news: your Lingonect account has been approved.\n\n" +
+    "Sign in at " + SITE_URL + " with the same account you registered with (" + to + ").\n\n" +
+    "Lingonect\n" + SENDER + "\n";
+}
+
+async function handleApproval(request, env, authHeader, caller, body) {
+  if (!env.GMAIL_SA_KEY) {
+    return json(request, 503, { error: "Email sending is not set up yet (GMAIL_SA_KEY is missing).", code: "not_configured" });
+  }
+  const uid = String(body.uid || "");
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return json(request, 400, { error: "Bad uid" });
+
+  // The approved request, read with the admin's own token.
+  const docRes = await fetch(ACCESS_BASE + uid, { headers: { Authorization: authHeader } });
+  if (!docRes.ok) return json(request, 404, { error: "Access request not found" });
+  const f = ((await docRes.json()) || {}).fields || {};
+  const status = f.status && f.status.stringValue;
+  const to = (f.email && f.email.stringValue || "").trim();
+  const name = (f.name && f.name.stringValue || "").trim();
+  if (status !== "approved") return json(request, 409, { error: "This request is not approved", code: "not_approved" });
+  if (!EMAIL_RE.test(to)) {
+    return json(request, 422, { error: "This request has no usable email address", code: "no_email" });
+  }
+  if (f.approvalEmailSentAt && body.resend !== true) {
+    return json(request, 409, { error: "The approval email was already sent", code: "already_sent" });
+  }
+
+  try {
+    await __sendMail(env, to, "Your Lingonect access has been approved", __approvalText(to, __firstName(name)));
+  } catch (e) {
+    console.log(JSON.stringify({ lingonect: "approval_mail", uid, outcome: "failed", error: String(e.message || e) }));
+    return json(request, 502, { error: String(e.message || e), code: "send_failed" });
+  }
+
+  // Record the send so the Admin page shows it and a repeat click is caught.
+  const sentAt = new Date().toISOString();
+  await fetch(ACCESS_BASE + uid + "?updateMask.fieldPaths=approvalEmailSentAt", {
+    method: "PATCH",
+    headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: { approvalEmailSentAt: { timestampValue: sentAt } } }),
+  }).catch(() => {});
+
+  console.log(JSON.stringify({ lingonect: "approval_mail", uid, admin: caller.email, outcome: "sent" }));
+  return json(request, 200, { ok: true, sentAt });
+}
+
+// ---------------------------------------------------------------------------
+// POST /delete-user  — remove an account and everything linked to it
+// ---------------------------------------------------------------------------
+const DELETE_REASONS = {
+  abuse: "because it was used to abuse the service",
+  terms: "because it did not comply with our Terms of Use",
+  inactivity: "because it had not been used for more than 12 months",
+  request: "at your request",
+};
+
+function __deletionText(email, firstName, reason, note) {
+  return "Hi " + (firstName || "there") + ",\n\n" +
+    "Your Lingonect account (" + email + ") has been deleted " + DELETE_REASONS[reason] + ".\n\n" +
+    (note ? "Note: " + note + "\n\n" : "") +
+    "All personal data linked to the account has been deleted, as described in our Privacy Policy (" +
+    SITE_URL + "/privacy.html).\n\n" +
+    (reason === "request"
+      ? "If you have any questions, just reply to this email.\n\n"
+      : "If you think this decision is wrong, reply to this email and we will review it.\n\n") +
+    "Lingonect\n" + SENDER + "\n";
+}
+
+async function __fsGet(token, path) {
+  const res = await fetch(FIRESTORE + path, { headers: { Authorization: "Bearer " + token } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Firestore read failed (" + res.status + ") for " + path);
+  return res.json();
+}
+
+// Names of every document in a collection (paginated).
+async function __fsListNames(token, collectionPath) {
+  const names = [];
+  let pageToken = "";
+  do {
+    const data = await __fsGet(token, collectionPath + "?pageSize=300&mask.fieldPaths=__none__" +
+      (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""));
+    for (const d of (data && data.documents) || []) names.push(d.name);
+    pageToken = (data && data.nextPageToken) || "";
+  } while (pageToken);
+  return names;
+}
+
+// Chat messages in any room this uid is part of. Rooms are "<uidA>_<uidB>",
+// and the TTL policy keeps only ~24h of messages, so one collection-group
+// scan is small and costs a single request.
+async function __chatMessageNames(token, uid) {
+  const res = await fetch(FIRESTORE + ":runQuery", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "messages", allDescendants: true }],
+        select: { fields: [{ fieldPath: "__name__" }] },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error("Chat lookup failed (" + res.status + ")");
+  const rows = await res.json();
+  const names = [];
+  for (const r of rows) {
+    const name = r.document && r.document.name;
+    const m = name && name.match(/\/chats\/([^/]+)\/messages\//);
+    if (m && m[1].split("_").includes(uid)) names.push(name);
+  }
+  return names;
+}
+
+async function __fsDeleteAll(token, names) {
+  for (let i = 0; i < names.length; i += 400) {
+    const res = await fetch(FIRESTORE + ":commit", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ writes: names.slice(i, i + 400).map((n) => ({ delete: n })) }),
+    });
+    if (!res.ok) throw new Error("Firestore delete failed (" + res.status + ")");
+  }
+}
+
+async function handleDelete(request, env, caller, body) {
+  if (!env.FIREBASE_ADMIN_SA_KEY) {
+    return json(request, 503, { error: "User deletion is not set up yet (FIREBASE_ADMIN_SA_KEY is missing).", code: "not_configured" });
+  }
+  const uid = String(body.uid || "");
+  const reason = String(body.reason || "");
+  const note = String(body.note || "").replace(/[\r\n\t]+/g, " ").trim().slice(0, 500);
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return json(request, 400, { error: "Bad uid" });
+  if (!DELETE_REASONS[reason]) return json(request, 400, { error: "Pick a reason", code: "bad_reason" });
+  if (uid === caller.sub) return json(request, 400, { error: "You cannot delete your own account here", code: "self" });
+
+  let token;
+  try {
+    token = await __saAccessToken(env.FIREBASE_ADMIN_SA_KEY, [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/firebase.database",
+      "https://www.googleapis.com/auth/userinfo.email",
+    ].join(" "));
+  } catch (e) {
+    return json(request, 502, { error: String(e.message || e), code: "admin_auth_failed" });
+  }
+
+  // Who is it? (email, name, last sign-in) from Firebase Auth.
+  const lookRes = await fetch(IDENTITY + "/accounts:lookup", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ localId: [uid] }),
+  });
+  if (!lookRes.ok) return json(request, 502, { error: "Could not look the account up (" + lookRes.status + ")", code: "lookup_failed" });
+  const user = (((await lookRes.json()) || {}).users || [])[0] || null;
+  if (user && ADMIN_EMAILS.includes(user.email)) {
+    return json(request, 403, { error: "Admin accounts cannot be deleted here", code: "is_admin" });
+  }
+  if (reason === "inactivity") {
+    const last = Number((user && (user.lastLoginAt || user.createdAt)) || 0);
+    if (last && Date.now() - last < INACTIVE_MS) {
+      return json(request, 409, { error: "This account signed in within the last 12 months, so inactivity does not apply", code: "not_inactive" });
+    }
+  }
+
+  try {
+    // Fallback recipient for an account whose Auth record is already gone.
+    const access = await __fsGet(token, "/accessRequests/" + uid);
+    const af = (access && access.fields) || {};
+    const email = (user && user.email) || (af.email && af.email.stringValue) || "";
+    const name = (user && user.displayName) || (af.name && af.name.stringValue) || "";
+
+    // Everything stored under this uid.
+    const profile = await __fsGet(token, "/profiles/" + uid);
+    const username = profile && profile.fields && profile.fields.username && profile.fields.username.stringValue;
+    const names = [
+      ...(await __fsListNames(token, "/flashcards/" + uid + "/stacks")),
+      ...(await __fsListNames(token, "/history/" + uid + "/entries")),
+      ...(await __chatMessageNames(token, uid)),
+      DOCS_PATH + "/profiles/" + uid + "/private/info",
+      DOCS_PATH + "/profiles/" + uid,
+      DOCS_PATH + "/accessRequests/" + uid,
+    ];
+    if (username) {
+      const nameDoc = await __fsGet(token, "/usernames/" + encodeURIComponent(username.toLowerCase()));
+      const owner = nameDoc && nameDoc.fields && nameDoc.fields.uid && nameDoc.fields.uid.stringValue;
+      if (owner === uid) names.push(DOCS_PATH + "/usernames/" + username.toLowerCase());
+    }
+    await __fsDeleteAll(token, names);
+
+    // Chat presence, open chats and invites (Realtime Database).
+    for (const path of ["presence", "activeChats", "invites"]) {
+      const r = await fetch(RTDB_URL + "/" + path + "/" + uid + ".json?access_token=" + encodeURIComponent(token), {
+        method: "DELETE",
+      });
+      if (!r.ok) throw new Error("Realtime Database delete failed (" + r.status + ") for " + path);
+    }
+
+    // Finally the sign-in account itself.
+    if (user) {
+      const delRes = await fetch(IDENTITY + "/accounts:delete", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ localId: uid }),
+      });
+      if (!delRes.ok) throw new Error("Deleting the sign-in account failed (" + delRes.status + ")");
+    }
+
+    // Tell the person why (Terms of Use, "Removing Accounts").
+    let emailed = false, emailError = "";
+    if (EMAIL_RE.test(email) && env.GMAIL_SA_KEY) {
+      try {
+        await __sendMail(env, email, "Your Lingonect account has been deleted",
+          __deletionText(email, __firstName(name), reason, note));
+        emailed = true;
+      } catch (e) {
+        emailError = String(e.message || e);
+      }
+    } else {
+      emailError = email ? "Email sending is not set up" : "No email address on file";
+    }
+
+    console.log(JSON.stringify({ lingonect: "user_deleted", uid, reason, admin: caller.email, emailed, deletedDocs: names.length }));
+    return json(request, 200, { ok: true, emailed, emailError, email });
+  } catch (e) {
+    console.log(JSON.stringify({ lingonect: "user_delete_failed", uid, error: String(e.message || e) }));
+    return json(request, 502, { error: String(e.message || e) + ". Nothing was emailed; running the deletion again is safe.", code: "delete_failed" });
+  }
+}
+
+// ---------------------------------------------------------------------------
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -237,56 +492,11 @@ export default {
     if (!caller) return json(request, 401, { error: "Unauthorized" });
     if (!ADMIN_EMAILS.includes(caller.email)) return json(request, 403, { error: "Admins only" });
 
-    if (!env.GMAIL_SA_KEY) {
-      return json(request, 503, { error: "Email sending is not set up yet (GMAIL_SA_KEY is missing).", code: "not_configured" });
-    }
-
     let body;
     try { body = await request.json(); } catch (_) { body = {}; }
-    const uid = String(body.uid || "");
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return json(request, 400, { error: "Bad uid" });
 
-    // The approved request, read with the admin's own token.
-    const docRes = await fetch(ACCESS_BASE + uid, { headers: { Authorization: authHeader } });
-    if (!docRes.ok) return json(request, 404, { error: "Access request not found" });
-    const f = ((await docRes.json()) || {}).fields || {};
-    const status = f.status && f.status.stringValue;
-    const to = (f.email && f.email.stringValue || "").trim();
-    const name = (f.name && f.name.stringValue || "").trim();
-    if (status !== "approved") return json(request, 409, { error: "This request is not approved", code: "not_approved" });
-    if (!/^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(to)) {
-      return json(request, 422, { error: "This request has no usable email address", code: "no_email" });
-    }
-    if (f.approvalEmailSentAt && body.resend !== true) {
-      return json(request, 409, { error: "The approval email was already sent", code: "already_sent" });
-    }
-    const firstName = name.split(/\s+/)[0].replace(/[^\p{L}\p{M}'-]/gu, "").slice(0, 40);
-
-    try {
-      const token = await __gmailAccessToken(env.GMAIL_SA_KEY);
-      const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ raw: __buildMessage(to, firstName) }),
-      });
-      if (!sendRes.ok) {
-        const err = await sendRes.json().catch(() => ({}));
-        throw new Error("Gmail refused the email: " + ((err.error && err.error.message) || sendRes.status));
-      }
-    } catch (e) {
-      console.log(JSON.stringify({ lingonect: "approval_mail", uid, outcome: "failed", error: String(e.message || e) }));
-      return json(request, 502, { error: String(e.message || e), code: "send_failed" });
-    }
-
-    // Record the send so the Admin page shows it and a repeat click is caught.
-    const sentAt = new Date().toISOString();
-    await fetch(ACCESS_BASE + uid + "?updateMask.fieldPaths=approvalEmailSentAt", {
-      method: "PATCH",
-      headers: { Authorization: authHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: { approvalEmailSentAt: { timestampValue: sentAt } } }),
-    }).catch(() => {});
-
-    console.log(JSON.stringify({ lingonect: "approval_mail", uid, admin: caller.email, outcome: "sent" }));
-    return json(request, 200, { ok: true, sentAt });
+    const path = new URL(request.url).pathname;
+    if (path === "/delete-user") return handleDelete(request, env, caller, body);
+    return handleApproval(request, env, authHeader, caller, body);
   },
 };
