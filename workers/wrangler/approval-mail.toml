@@ -1,7 +1,10 @@
 # Deploys to https://approval-mail.hanyuriyu.workers.dev
-# Sends the "your access is approved" email from contact@lingonect.com when the
-# admin approves a request on admin.html. Needs the GMAIL_SA_KEY secret (the
-# service-account JSON key), set in the Cloudflare dashboard, never here.
+# Admin account actions for admin.html: the "your access is approved" email
+# (POST /) and deleting a user with a reason email (POST /delete-user).
+# Secrets, set in the Cloudflare dashboard, never here:
+#   GMAIL_SA_KEY           service-account key that sends as contact@lingonect.com
+#   FIREBASE_ADMIN_SA_KEY  service-account key with Firebase Authentication Admin,
+#                          Cloud Datastore User and Firebase Realtime Database Admin
 name = "approval-mail"
 main = "../approval-mail-worker.js"
 compatibility_date = "2026-03-24"
