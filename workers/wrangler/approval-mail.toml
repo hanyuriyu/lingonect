@@ -1,0 +1,12 @@
+# Deploys to https://approval-mail.hanyuriyu.workers.dev
+# Sends the "your access is approved" email from contact@lingonect.com when the
+# admin approves a request on admin.html. Needs the GMAIL_SA_KEY secret (the
+# service-account JSON key), set in the Cloudflare dashboard, never here.
+name = "approval-mail"
+main = "../approval-mail-worker.js"
+compatibility_date = "2026-03-24"
+workers_dev = true
+preview_urls = false
+
+[observability]
+enabled = true
