@@ -319,12 +319,14 @@ async function __fsGet(token, path) {
   return res.json();
 }
 
-// Names of every document in a collection (paginated).
+// Names of every document in a collection (paginated). The mask names a field
+// no document has, so only document names come back, not the (possibly large)
+// contents. Field names like __x__ are reserved, hence a plain one.
 async function __fsListNames(token, collectionPath) {
   const names = [];
   let pageToken = "";
   do {
-    const data = await __fsGet(token, collectionPath + "?pageSize=300&mask.fieldPaths=__none__" +
+    const data = await __fsGet(token, collectionPath + "?pageSize=300&mask.fieldPaths=nameOnly" +
       (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""));
     for (const d of (data && data.documents) || []) names.push(d.name);
     pageToken = (data && data.nextPageToken) || "";
