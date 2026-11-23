@@ -241,6 +241,9 @@ body{
 }
 .access-btn.approve{background:#0047FF;color:#fff;}
 .access-btn:disabled{opacity:.5;cursor:default;}
+.mail-line{font-size:12px;color:#1a7a1a;margin-top:4px;}
+.mail-line a{color:#0047FF;}
+.mail-err{color:#c00;margin-top:2px;}
 .badge.certified{
   background:#d0f0d0;
   color:#1a7a1a;
@@ -505,6 +508,36 @@ async function loadAccessRequests() {
   document.getElementById("countAccess").textContent = " (" + waiting + " waiting)";
 }
 
+// Approval emails go out from contact@lingonect.com through this worker
+// (workers/approval-mail-worker.js). It reads the recipient from the approved
+// request itself and records approvalEmailSentAt on it.
+const APPROVAL_MAIL_WORKER = "https://approval-mail.hanyuriyu.workers.dev";
+const mailNotes = {};   // uid -> error text from the last failed send
+
+async function sendApprovalEmail(uid, resend) {
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(APPROVAL_MAIL_WORKER, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+    body: JSON.stringify({ uid, resend: !!resend })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+}
+
+async function mailApproved(uid, btn, resend) {
+  if (btn) btn.disabled = true;
+  try {
+    await sendApprovalEmail(uid, resend);
+    delete mailNotes[uid];
+  } catch (e) {
+    console.warn("Approval email failed:", e);
+    mailNotes[uid] = "Email not sent: " + e.message;
+  }
+  await loadAccessRequests();
+  renderList();
+}
+
 async function setAccess(uid, status, btn) {
   btn.disabled = true;
   try {
@@ -512,11 +545,16 @@ async function setAccess(uid, status, btn) {
       status,
       decidedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    await loadAccessRequests();
-    renderList();
   } catch (e) {
     btn.disabled = false;
     alert("Could not update access: " + e.message);
+    return;
+  }
+  if (status === "approved") {
+    await mailApproved(uid, null, false);
+  } else {
+    await loadAccessRequests();
+    renderList();
   }
 }
 
@@ -532,20 +570,37 @@ function renderAccessRequests(container) {
         ? `<button class="access-btn approve" data-uid="${escHtml(r.uid)}" data-status="approved">Approve</button>` : "")
       + (st !== "revoked"
         ? ` <button class="access-btn" data-uid="${escHtml(r.uid)}" data-status="revoked">${st === "approved" ? "Revoke" : "Decline"}</button>` : "");
+    const sent = r.approvalEmailSentAt && r.approvalEmailSentAt.toDate;
+    const mailLine = st !== "approved" ? ""
+      : `<div class="mail-line">`
+        + (sent
+          ? `✉ Approval email sent ${formatDate(r.approvalEmailSentAt)} · <a href="#" class="mail-btn" data-uid="${escHtml(r.uid)}" data-resend="1">Resend</a>`
+          : `<a href="#" class="mail-btn" data-uid="${escHtml(r.uid)}">✉ Send approval email</a>`)
+        + (mailNotes[r.uid] ? `<div class="mail-err">${escHtml(mailNotes[r.uid])}</div>` : "")
+        + `</div>`;
     return `
       <div class="user-row">
         <span class="user-num">${i + 1}.</span>
         <div class="user-info">
           <div class="user-name">${escHtml(r.name || "") || "—"} <span style="color:#999;font-size:12px;">${escHtml((r.provider || "").replace(".com", ""))}</span></div>
           <div class="user-email">${r.email ? escHtml(r.email) : '<em style="color:#bbb;">No email</em>'}</div>
+          ${mailLine}
         </div>
         <span class="badge ${st === "approved" ? "certified" : "uncertified"}">${labels[st] || st}</span>
         <span class="user-date">${r.createdAt ? formatDate(r.createdAt) : "—"}</span>
         <span>${buttons}</span>
       </div>`;
   }).join("");
-  container.querySelectorAll(".access-btn").forEach(b =>
+  container.querySelectorAll(".access-btn[data-status]").forEach(b =>
     b.addEventListener("click", () => setAccess(b.dataset.uid, b.dataset.status, b)));
+  container.querySelectorAll(".mail-btn").forEach(a =>
+    a.addEventListener("click", ev => {
+      ev.preventDefault();
+      if (a.dataset.resend && !confirm("Send the approval email again?")) return;
+      a.style.pointerEvents = "none";
+      a.textContent = "Sending…";
+      mailApproved(a.dataset.uid, null, !!a.dataset.resend);
+    }));
 }
 
 function renderList() {
