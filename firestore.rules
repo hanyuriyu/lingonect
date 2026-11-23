@@ -55,6 +55,8 @@ service cloud.firestore {
         // subscription state is set out-of-band (payment webhook / admin) only
         && unchanged('plan')
         && unchanged('subscribed')
+        // role ("admin") marks admin profiles on the Admin page; admin-set only
+        && unchanged('role')
         // createdAt decides the worker quota tier, so it is the server time of
         // the first save and never moves after that
         && (unchanged('createdAt')

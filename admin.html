@@ -257,6 +257,10 @@ body{
   background:#f0f0f0;
   color:#888;
 }
+.badge.admin{
+  background:#111;
+  color:#fff;
+}
 
 .empty-msg{
   text-align:center;
@@ -361,6 +365,8 @@ const NEW_LIMITS_CUTOFF_MS = Date.parse("2026-07-19T00:00:00Z");
 // "legacy" (grandfathered) members keep unlimited full access.
 function classifyPlanData(d) {
   if (!d) return "legacy";
+  // Admins have no request caps anywhere (the workers skip their quota).
+  if (d.role === "admin") return "admin";
   if (d.plan === "pro" || d.subscribed === true) return "pro";
   if (d.plan === "free") return "free";
   const created = d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0;
@@ -380,6 +386,19 @@ auth.onAuthStateChanged(async user => {
   if (!ADMIN_EMAILS.includes(user.email)) {
     window.location.href = "engines.html";
     return;
+  }
+
+  // Profiles hold no email, so the user list cannot tell which profile is an
+  // admin's. Each admin account marks its own profile when it opens this page
+  // (the rules let only an admin set `role`).
+  try {
+    const ownRef = db.collection("profiles").doc(user.uid);
+    const own = await ownRef.get();
+    if (own.exists && own.data().role !== "admin") {
+      await ownRef.update({ role: "admin" });
+    }
+  } catch (e) {
+    console.warn("Could not mark admin profile:", e);
   }
 
   await Promise.all([loadUsers(), loadAccessRequests()]);
@@ -437,6 +456,7 @@ async function loadUsers() {
       emailConsent: !!d.emailConsent,
       certification: d.certification || "Uncertified",
       plan: classifyPlanData(d),
+      isAdmin: d.role === "admin",
       createdAt: d.createdAt || d.updatedAt || null
     });
   });
@@ -548,7 +568,7 @@ function renderList() {
     const isCert = u.certification === "Lingonect Certified";
     const badgeClass = isCert ? "certified" : "uncertified";
     const badgeText = isCert ? "Certified" : "Uncertified";
-    const planLabels = { pro: "Pro", free: "Free", legacy: "Full" };
+    const planLabels = { pro: "Pro", free: "Free", legacy: "Full", admin: "Full" };
     const subBadgeClass = u.plan === "free" ? "sub-free" : "sub-level";
     const subBadgeText = planLabels[u.plan] || "Full";
     const dateStr = u.createdAt ? formatDate(u.createdAt) : "—";
@@ -560,6 +580,7 @@ function renderList() {
           <div class="user-name">${escHtml(u.username) || "—"}</div>
           <div class="user-email">${u.email ? escHtml(u.email) : '<em style="color:#bbb;">Email withheld</em>'}</div>
         </div>
+        ${u.isAdmin ? '<span class="badge admin">Admin</span>' : ""}
         <span class="badge ${subBadgeClass}">${subBadgeText}</span>
         <span class="badge ${badgeClass}">${badgeText}</span>
         <span class="user-date">${dateStr}</span>
