@@ -39,8 +39,9 @@ service cloud.firestore {
 
     // ---- profiles ----
     // Any signed-in user can read the profile directory (chat user list,
-    // admin console, ratings surfaces). Owners may write their own profile
-    // but may not grant themselves certification or a paid plan.
+    // admin console, ratings surfaces), so nothing private belongs here:
+    // emails live in profiles/{uid}/private/info below. Owners may write their
+    // own profile but may not grant themselves certification or a paid plan.
     match /profiles/{uid} {
       allow read: if isSignedIn();
 
@@ -54,16 +55,37 @@ service cloud.firestore {
         // subscription state is set out-of-band (payment webhook / admin) only
         && unchanged('plan')
         && unchanged('subscribed')
-        // a stored email may only ever be the writer's own auth email
-        && (newVal('email') == null || newVal('email') == request.auth.token.email);
+        // createdAt decides the worker quota tier, so it is the server time of
+        // the first save and never moves after that
+        && (unchanged('createdAt')
+            || (oldVal('createdAt') == null && newVal('createdAt') == request.time))
+        // no email in the public directory; an old one may only be left as is
+        // until the admin page migrates it into private/info
+        && (newVal('email') == null || unchanged('email'));
 
-      allow delete: if isAdmin();
+      // Owners delete their own profile when they delete their account.
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+
+      // ---- profiles/{uid}/private/info ----
+      // Data only the owner and the admin may see (the email address).
+      match /private/{docId} {
+        allow read, delete: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+
+        allow create, update: if isAdmin()
+          || (isSignedIn()
+              && request.auth.uid == uid
+              && docId == 'info'
+              && request.resource.data.keys().hasOnly(['email'])
+              && request.resource.data.email == request.auth.token.email);
+      }
     }
 
     // ---- accessRequests (invite-only approval, see access.js) ----
     // One doc per account. The account may read its own doc and record itself
-    // once as "waiting" (with its own auth email); only the admin can approve,
-    // revoke or delete. Emails here are never readable by other users.
+    // once as "waiting" (with its own auth email); only the admin can approve
+    // or revoke. The account may delete its own doc when it deletes itself,
+    // unless it was revoked (deleting that would undo the revocation).
+    // Emails here are never readable by other users.
     match /accessRequests/{uid} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
 
@@ -73,7 +95,12 @@ service cloud.firestore {
             && request.resource.data.status == 'waiting'
             && request.resource.data.email == request.auth.token.get('email', ''));
 
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin()
+        || (isSignedIn()
+            && request.auth.uid == uid
+            && resource.data.status != 'revoked');
     }
 
     // ---- usernames (lowercased username -> { uid } index) ----
@@ -141,7 +168,9 @@ service cloud.firestore {
     // ---- chat messages (1:1 rooms keyed "<uidA>_<uidB>", alphabetical) ----
     // Only the two participants encoded in the room id may read or post, and a
     // message's `from` must be the sender. Participants may delete (the client
-    // purges messages older than 24h); messages are never edited.
+    // purges messages older than 24h, and account deletion clears the user's
+    // rooms); messages are never edited. expiresAt drives the Firestore TTL
+    // policy (firestore.indexes.json), so it may be at most 24h ahead.
     match /chats/{roomId}/messages/{messageId} {
       function isParticipant() {
         return isSignedIn() && request.auth.uid in roomId.split('_');
@@ -152,7 +181,9 @@ service cloud.firestore {
       allow create: if isParticipant()
         && request.resource.data.from == request.auth.uid
         && request.resource.data.text is string
-        && request.resource.data.text.size() <= 5000;
+        && request.resource.data.text.size() <= 5000
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt <= request.time + duration.value(25, 'h');
 
       allow delete: if isParticipant();
       allow update: if false;

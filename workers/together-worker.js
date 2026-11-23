@@ -301,6 +301,52 @@ const FIREBASE_WEB_API_KEY = "AIzaSyAWxr3efpy-5Eo8fuXB5xxHHkvrbCcIIA0";
 
 // "free" for an account created on/after the cutoff, else "legacy". Fails safe
 // to "legacy", like __resolveUserStatus.
+// ── Invite-only approval (server side of access.js) ────────────
+// access.js only hides the pages; this is the check a script calling the
+// worker directly cannot skip. Same rules: Pro subscribers, accessRequests
+// status "approved", and accounts created before the go-live cutoff are let
+// in; status "revoked" or a newer unapproved account is not. Unapproved
+// accounts keep the native-app free tier, so on a free-tier engine they are
+// still served from the app origins. Fails open (the per-account quota still
+// applies) when Firestore or Auth cannot be reached.
+const __FREE_TIER_ENGINE = false;
+const ACCESS_CUTOFF_MS = Date.parse("2026-11-22T20:00:00Z");
+const FIRESTORE_ACCESS_BASE =
+  "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID +
+  "/databases/(default)/documents/accessRequests/";
+
+async function __resolveApproval(uid, authHeader, status) {
+  try {
+    const res = await fetch(FIRESTORE_ACCESS_BASE + uid, {
+      headers: { Authorization: authHeader },
+    });
+    if (res.ok) {
+      const doc = await res.json();
+      const s = doc && doc.fields && doc.fields.status && doc.fields.status.stringValue;
+      if (s === "approved") return "approved";
+      if (s === "revoked") return "denied";
+    } else if (res.status !== 404) {
+      return "approved";
+    }
+    if (status === "pro") return "approved";
+    const lookup = await fetch(
+      "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + FIREBASE_WEB_API_KEY,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Referer": "https://www.lingonect.com/" },
+        body: JSON.stringify({ idToken: authHeader.slice(7).trim() }),
+      }
+    );
+    if (!lookup.ok) return "approved";
+    const data = await lookup.json();
+    const createdMs = Number(data && data.users && data.users[0] && data.users[0].createdAt);
+    if (!createdMs) return "approved";
+    return createdMs < ACCESS_CUTOFF_MS ? "approved" : "denied";
+  } catch (_) {
+    return "approved";
+  }
+}
+
 async function __statusFromAccountAge(authHeader) {
   try {
     const res = await fetch(
@@ -475,6 +521,24 @@ export default {
           await env.QUOTA_KV.put("st:" + __uid, __status, { expirationTtl: 600 });
         }
 
+        // Invite-only gate. Cached for 10 minutes, so an approval made on the
+        // Admin page can take that long to reach the engines.
+        if (!(__authPayload.firebase && __authPayload.firebase.sign_in_provider === "anonymous")) {
+          let __access = await env.QUOTA_KV.get("ap:" + __uid);
+          if (!__access) {
+            __access = await __resolveApproval(__uid, request.headers.get("Authorization"), __status);
+            await env.QUOTA_KV.put("ap:" + __uid, __access, { expirationTtl: 600 });
+          }
+          if (__access === "denied"
+              && !(__FREE_TIER_ENGINE && ["capacitor://localhost", "https://localhost"].includes(request.headers.get("Origin")))) {
+            __logRequest(request, __authPayload, {}, "refused_not_approved");
+            return new Response(
+              JSON.stringify({ error: "Your account is waiting for approval. Contact contact@lingonect.com for access.", code: "approval_required" }),
+              { status: 403, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+            );
+          }
+        }
+
         if (__status === "free") {
           // Lifetime cap: 500 requests, ever.
           const __tKey = "t:" + __uid;
@@ -514,7 +578,16 @@ export default {
           await env.QUOTA_KV.put(__qKey, String(__used + 1), { expirationTtl: 172800 });
         }
       } catch (_) {
-        // KV/Firestore unavailable — allow the request rather than blocking the user.
+        // KV/Firestore unavailable. A registered user is let through rather
+        // than blocked (an account needs a verified email, which bounds it).
+        // Anonymous ids cost nothing to mint, so for them a quota that cannot
+        // be checked means no request: the shared ceiling must hold.
+        if (__authPayload.firebase && __authPayload.firebase.sign_in_provider === "anonymous") {
+          return new Response(
+            JSON.stringify({ error: "Free translations are briefly unavailable. Please try again in a minute.", code: "quota_unavailable" }),
+            { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin(request) } }
+          );
+        }
       }
     }
 

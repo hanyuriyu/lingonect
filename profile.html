@@ -665,6 +665,7 @@ body{
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <script>
 // ── Firebase ──
@@ -674,12 +675,16 @@ const firebaseConfig = {
   projectId:         "lingonect-4db51",
   storageBucket:     "lingonect-4db51.firebasestorage.app",
   messagingSenderId: "97117277218",
-  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b"
+  appId:             "1:97117277218:web:cf1321d3e76167e692ce7b",
+  databaseURL:       "https://lingonect-4db51-default-rtdb.firebaseio.com"
 };
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
+// Realtime Database holds chat presence, open chats and invites; only used
+// here to remove them when the account is deleted.
+const rtdb = firebase.database();
 
 const ADMIN_EMAILS = ["linguisticsconsulting@gmail.com", "contact@lingonect.com"];
 
@@ -988,7 +993,10 @@ async function reauthenticate(user) {
   return Promise.resolve();
 }
 
-// Delete all of the user's Firestore data, then the auth account itself.
+// Delete all of the user's data, then (in the caller) the auth account itself.
+// Any failure throws, so the account is never deleted — and the user never
+// told it was — while personal data is left behind. Every step is idempotent,
+// so a retry after a failure or a re-authentication picks up where it stopped.
 async function deleteAllUserData(uid) {
   // Flashcard stacks (each stack stores its cards as an array field, so there
   // is no cards subcollection to walk).
@@ -997,16 +1005,47 @@ async function deleteAllUserData(uid) {
     await d.ref.delete();
   }
   // Username reservation index.
+  // (Only when it is ours: the rules refuse deleting a missing or foreign one.)
   if (savedUsername) {
-    await db.collection("usernames").doc(savedUsername.toLowerCase()).delete().catch(() => {});
+    const nameRef = db.collection("usernames").doc(savedUsername.toLowerCase());
+    const nameSnap = await nameRef.get();
+    if (nameSnap.exists && nameSnap.data().uid === uid) {
+      await nameRef.delete();
+    }
   }
   // Search history entries.
   const historySnap = await db.collection("history").doc(uid).collection("entries").get();
   for (const d of historySnap.docs) {
     await d.ref.delete();
   }
-  // Profile document.
-  await db.collection("profiles").doc(uid).delete().catch(() => {});
+  // Chat messages. Rooms are keyed "<uidA>_<uidB>", so walk every member the
+  // user could have chatted with and clear the shared room (both sides — the
+  // other person's copy of the conversation goes too, as it would after 24h).
+  const profilesSnap = await db.collection("profiles").get();
+  for (const p of profilesSnap.docs) {
+    if (p.id === uid) continue;
+    const roomId = uid < p.id ? uid + "_" + p.id : p.id + "_" + uid;
+    const msgs = await db.collection("chats").doc(roomId).collection("messages").get();
+    for (const m of msgs.docs) {
+      await m.ref.delete();
+    }
+  }
+  // Chat presence, open-chat markers and pending invites (Realtime Database).
+  await Promise.all([
+    rtdb.ref("presence/" + uid).remove(),
+    rtdb.ref("activeChats/" + uid).remove(),
+    rtdb.ref("invites/" + uid).remove()
+  ]);
+  // Access request (holds the sign-up email). A revoked request stays: the
+  // rules keep it so a revocation cannot be undone by the account itself.
+  const reqRef = db.collection("accessRequests").doc(uid);
+  const reqSnap = await reqRef.get();
+  if (reqSnap.exists && reqSnap.data().status !== "revoked") {
+    await reqRef.delete();
+  }
+  // Private profile data (email), then the public profile.
+  await db.collection("profiles").doc(uid).collection("private").doc("info").delete();
+  await db.collection("profiles").doc(uid).delete();
 }
 
 const deleteBtn = document.getElementById("deleteAccountBtn");
@@ -1033,6 +1072,26 @@ if (deleteBtn) {
       await user.delete();
     }
 
+    // Firebase only deletes an account signed in within the last few
+    // minutes. Ask for that up front, before any data goes: otherwise the
+    // data could be wiped and the account then kept if the user cancels the
+    // re-authentication.
+    const lastSignIn = Date.parse(user.metadata && user.metadata.lastSignInTime);
+    if (!lastSignIn || Date.now() - lastSignIn > 4 * 60 * 1000) {
+      try {
+        deleteMsg.textContent = "Please confirm your identity to continue…";
+        await reauthenticate(user);
+        deleteMsg.textContent = "Deleting your account…";
+      } catch (reErr) {
+        deleteBtn.disabled = false;
+        deleteMsg.className = "delete-msg err";
+        deleteMsg.textContent = (reErr && reErr.message === "cancelled")
+          ? "Account deletion cancelled."
+          : "Could not verify your identity. Please try again.";
+        return;
+      }
+    }
+
     try {
       await performDelete();
     } catch (err) {
@@ -1052,6 +1111,7 @@ if (deleteBtn) {
           return;
         }
       } else {
+        console.error("Account deletion failed:", err);
         deleteBtn.disabled = false;
         deleteMsg.className = "delete-msg err";
         deleteMsg.textContent = "Something went wrong. Please try again or contact contact@lingonect.com.";
@@ -1442,15 +1502,18 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       profileData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     }
 
-    // Only store email if user gave consent at registration
+    const batch = db.batch();
+
+    // Only store email if user gave consent at registration, and then in the
+    // private sub-document (owner + admin only), never in the public profile
+    // every member can read.
     if (viewingUid === currentUser.uid) {
       const existing = await db.collection("profiles").doc(viewingUid).get();
       if (existing.exists && existing.data().emailConsent) {
-        profileData.email = currentUser.email;
+        batch.set(db.collection("profiles").doc(viewingUid).collection("private").doc("info"),
+          { email: currentUser.email });
       }
     }
-
-    const batch = db.batch();
 
     // Save profile
     batch.set(db.collection("profiles").doc(viewingUid), profileData, { merge: true });
