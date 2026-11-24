@@ -318,6 +318,21 @@ moves every August.
 
 ---
 
+## Share to Lingonect
+
+Highlight text in any app, tap **Share** and pick **Lingonect**, or tap
+**Lingonect** directly in the text-selection menu (next to Copy) where the app
+offers it. The app opens on Engines with the text already in the input box.
+
+- `AndroidManifest.xml` declares `ACTION_SEND` (text/plain) and
+  `ACTION_PROCESS_TEXT` intent filters on `MainActivity`.
+- `MainActivity.java` rewrites either into an internal
+  `com.lingonect.app://share?text=…&id=…` link; the Capacitor App plugin
+  delivers it to the page and `app-native.js` fills `#inputText`.
+- iOS does the same through a Share Extension — see `IOS.md`.
+
+---
+
 ## Camera capture
 
 The camera button in the engines page input box uses a plain file input with
