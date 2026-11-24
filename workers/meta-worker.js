@@ -340,6 +340,32 @@ async function __statusFromAccountAge(authHeader) {
   }
 }
 
+// NLLB-200 sometimes repeats its whole answer and prefixes each copy with a
+// dialogue dash ("Guten Morgen" -> "– Gute Morgen. – Gute Morgen."). Remove a
+// leading dash the source did not have, and drop a sentence that repeats the
+// one before it unless the source repeats itself too. Word choice is left
+// untouched: that is the engine's genuine output.
+function __cleanNllb(output, source) {
+  if (typeof output !== "string") return output;
+  const src = String(source || "").trim();
+  const dash = /^[\s\-\u2010-\u2015]+/;
+  const split = t => t.trim().split(/(?<=[.!?\u3002\uff01\uff1f])\s*/).filter(x => x.trim());
+  const srcCount = split(src).length || 1;
+  const sentences = split(output);
+  const kept = [];
+  for (let s of sentences) {
+    if (!dash.test(src)) s = s.replace(dash, "");
+    s = s.trim();
+    if (!s) continue;
+    const prev = kept[kept.length - 1];
+    // A repeat is only dropped when the output has more sentences than the source.
+    if (prev && prev.toLowerCase() === s.toLowerCase() && sentences.length > srcCount) continue;
+    kept.push(s);
+  }
+  const sep = /[\u3002\uff01\uff1f]$/.test(kept[0] || "") ? "" : " ";
+  return kept.length ? kept.join(sep) : output.trim();
+}
+
 export default {
   async fetch(request, env) {
     const CORS = {
@@ -545,6 +571,8 @@ export default {
         } else {
           result = raw.trim();
         }
+
+        result = __cleanNllb(result, text);
 
         return new Response(JSON.stringify({ result }), {
           status: 200,

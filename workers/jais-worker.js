@@ -471,6 +471,21 @@ async function __statusFromAccountAge(authHeader) {
 }
 
 export default {
+  // Keep-awake (cron, every 30 min — see wrangler/jais.toml). A ZeroGPU Space
+  // goes to sleep after a while without traffic, and the next visitor then gets
+  // "Jais is warming up". Reading the Space's /gradio_api/info touches only
+  // the free CPU container: no GPU is attached and no ZeroGPU quota is used.
+  async scheduled(event, env, ctx) {
+    const space = __t(env.JAIS_SPACE_URL).replace(/\/+$/, "");
+    const apiKey = __t(env.HF_TOKEN);
+    if (!space || !apiKey) return;
+    ctx.waitUntil(
+      fetch(`${space}/gradio_api/info`, { headers: { "Authorization": `Bearer ${apiKey}` } })
+        .then(res => console.log(`keep-awake: ${space} -> ${res.status}`))
+        .catch(err => console.log(`keep-awake failed: ${err.message}`))
+    );
+  },
+
   async fetch(request, env) {
     // Handle CORS preflight
     if (request.method === "OPTIONS") {

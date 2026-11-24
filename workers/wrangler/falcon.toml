@@ -21,5 +21,10 @@ FALCON_SPACE_URL = "https://hanyuriyu-falcon-arabic.hf.space"
 FALCON_ENDPOINT_URL = ""
 FALCON_MODEL = ""
 
+# Keep the ZeroGPU Space awake (see scheduled() in the worker): a free CPU-only
+# ping every 30 minutes, so visitors don't hit "warming up".
+[triggers]
+crons = ["*/30 * * * *"]
+
 [observability]
 enabled = true

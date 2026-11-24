@@ -22,5 +22,10 @@ JAIS_SPACE_URL = "https://hanyuriyu-jais-arabic.hf.space"
 JAIS_ENDPOINT_URL = ""
 JAIS_MODEL = ""
 
+# Keep the ZeroGPU Space awake (see scheduled() in the worker): a free CPU-only
+# ping every 30 minutes, so visitors don't hit "warming up".
+[triggers]
+crons = ["*/30 * * * *"]
+
 [observability]
 enabled = true
