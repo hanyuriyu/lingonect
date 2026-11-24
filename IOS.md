@@ -73,7 +73,10 @@ will overwrite edits made behind its back):
 grep -nE 'MARKETING_VERSION|CURRENT_PROJECT_VERSION' ios/App/App.xcodeproj/project.pbxproj
 ```
 
-Each appears twice — once for Debug, once for Release. Change both.
+Each appears **four** times — Debug and Release for the **App** target, and
+Debug and Release for the **ShareExtension** target. Change all four: App Store
+Connect warns when an extension's version or build differs from its app's.
+(In Xcode, set the same Version and Build on the ShareExtension target too.)
 
 The rules:
 
@@ -119,6 +122,29 @@ The ones that merely embarrass you:
   sensitive to browser chrome and safe-area insets.
 - **The free tier**: signed out, the nav should show only About, Engines and
   Login.
+
+---
+
+## Share to Lingonect
+
+Highlight text in any app (Safari, Chrome, the Google app, Notes…), tap
+**Share…** and pick **Lingonect**: the app opens on Engines with the text
+already in the input box.
+
+- `ios/App/ShareExtension/` is a Share Extension target with no UI. It reads
+  the shared text and opens the app with an internal link,
+  `com.lingonect.app://share?text=…&id=…` (that scheme is registered in
+  `App/Info.plist`), then closes.
+- The Capacitor App plugin delivers the link to the page, and `app-native.js`
+  puts the text into `#inputText` on `engines.html`.
+- Signing is automatic; the first build creates the
+  `com.lingonect.app.ShareExtension` App ID under the same team.
+- Lingonect may not appear in the share sheet's app row at first: tap
+  **More** at the end of that row and switch it on / drag it up.
+
+What to test on a device: highlight a sentence in Safari → Share… →
+Lingonect. Try it once with the app closed and once with it open in the
+background.
 
 ---
 

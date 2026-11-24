@@ -28,6 +28,16 @@
 				<string>com.googleusercontent.apps.97117277218-2qa4lg2ho7o58u0fceh5mlskvaks5ej0</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.lingonect.app.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.lingonect.app</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
