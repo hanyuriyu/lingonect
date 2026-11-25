@@ -1,6 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Orbi, the Lingonect mascot (correct)">
-  <defs><clipPath id="c-correct"><circle cx="100" cy="110" r="76"/></clipPath></defs>
-  <path d="M150 52 C165 38 182 30 196 30 C186 44 172 56 160 62 Z" fill="#0047FF"/>
+  <defs>
+    <clipPath id="c-correct"><circle cx="100" cy="110" r="76"/></clipPath>
+    <radialGradient id="c-correct-shade" gradientUnits="userSpaceOnUse" cx="72" cy="76" r="118">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".28"/><stop offset=".42" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".78" stop-color="#000014" stop-opacity=".16"/><stop offset="1" stop-color="#000014" stop-opacity=".55"/>
+    </radialGradient>
+    <linearGradient id="c-correct-tuft" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0036C4"/><stop offset="1" stop-color="#3D78FF"/></linearGradient>
+    <radialGradient id="c-correct-eye" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#3A3D48"/><stop offset="1" stop-color="#0B0C10"/></radialGradient>
+    <filter id="c-correct-b3" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="c-correct-b1" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.2"/></filter>
+  </defs>
+  <ellipse cx="100" cy="193" rx="52" ry="5.5" fill="#0A1A4A" opacity=".28" filter="url(#c-correct-b3)"/>
+  <path d="M150 52 C165 38 182 30 196 30 C186 44 172 56 160 62 Z" fill="url(#c-correct-tuft)"/>
   <g clip-path="url(#c-correct)"><g class="bands">
     <rect x="0" y="0" width="200" height="200" fill="#1F1F1F"/>
     <path d="M0 0 H200 V60 C150 88 80 106 0 104 Z" fill="#0047FF"/>
@@ -8,6 +19,13 @@
     <path d="M0 104 C80 106 150 88 200 60 V96 C150 132 80 150 0 146 Z" fill="#FFFFFF"/>
     <path d="M0 150 C40 150 70 154 96 160 C70 166 45 170 0 174 Z" fill="#16C60C"/>
     <path d="M0 190 C70 194 140 180 200 144 V149 C140 186 70 199 0 196 Z" fill="#FFFFFF"/>
-  </g></g>
+    <path d="M0 104 C80 106 150 88 200 60" transform="translate(0 5)" fill="none" stroke="#000014" stroke-width="9" opacity=".22" filter="url(#c-correct-b3)"/>
+    <path d="M0 102.5 C80 104.5 150 86.5 200 58.5" fill="none" stroke="#0030B0" stroke-width="3"/>
+    <path d="M0 146 C80 150 150 132 200 96" transform="translate(0 4)" fill="none" stroke="#000014" stroke-width="7" opacity=".35" filter="url(#c-correct-b3)"/>
+  </g>
+    <rect x="0" y="0" width="200" height="200" fill="url(#c-correct-shade)"/>
+    <ellipse cx="66" cy="62" rx="20" ry="9" transform="rotate(-32 66 62)" fill="#FFFFFF" opacity=".6" filter="url(#c-correct-b3)"/>
+    <path d="M169.5 135.3 A74 74 0 0 1 112.8 182.9" fill="none" stroke="#9DB8FF" stroke-width="3" opacity=".7" filter="url(#c-correct-b1)"/>
+  </g>
   <path d="M73 125 Q80 115 87 125 M115 118 Q122 108 129 118" fill="none" stroke="#1F1F1F" stroke-width="4.5" stroke-linecap="round"/><path d="M91 131 Q101 145 112 128 Z" fill="#1F1F1F"/><g fill="#16C60C"><path d="M30 46 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z"/><path d="M182 104 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"/><path d="M48 22 l1.6 5 5 1.6 -5 1.6 -1.6 5 -1.6 -5 -5 -1.6 5 -1.6z"/></g>
 </svg>
