@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Orbi, the Lingonect mascot (correct)">
+  <defs><clipPath id="c-correct"><circle cx="100" cy="110" r="76"/></clipPath></defs>
+  <path d="M150 52 C165 38 182 30 196 30 C186 44 172 56 160 62 Z" fill="#0047FF"/>
+  <g clip-path="url(#c-correct)"><g class="bands">
+    <rect x="0" y="0" width="200" height="200" fill="#1F1F1F"/>
+    <path d="M0 0 H200 V60 C150 88 80 106 0 104 Z" fill="#0047FF"/>
+    <path d="M118 66 C138 64 158 68 170 76 C162 80 154 84 148 88 C140 78 130 70 118 66 Z" fill="#FFFFFF"/>
+    <path d="M0 104 C80 106 150 88 200 60 V96 C150 132 80 150 0 146 Z" fill="#FFFFFF"/>
+    <path d="M0 150 C40 150 70 154 96 160 C70 166 45 170 0 174 Z" fill="#16C60C"/>
+    <path d="M0 190 C70 194 140 180 200 144 V149 C140 186 70 199 0 196 Z" fill="#FFFFFF"/>
+  </g></g>
+  <path d="M73 125 Q80 115 87 125 M115 118 Q122 108 129 118" fill="none" stroke="#1F1F1F" stroke-width="4.5" stroke-linecap="round"/><path d="M91 131 Q101 145 112 128 Z" fill="#1F1F1F"/><g fill="#16C60C"><path d="M30 46 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z"/><path d="M182 104 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"/><path d="M48 22 l1.6 5 5 1.6 -5 1.6 -1.6 5 -1.6 -5 -5 -1.6 5 -1.6z"/></g>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Orbi, the Lingonect mascot (talking)">
+  <defs><clipPath id="c-talking"><circle cx="100" cy="110" r="76"/></clipPath></defs>
+  <path d="M150 52 C156 44 160 40 164 38 L172 44 C168 50 164 56 160 62 Z" fill="#0047FF"/>
+    <rect x="138" y="6" width="60" height="38" rx="19" fill="#0047FF"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"><circle cx="154" cy="25" r="5"/><path d="M164 27 q4 -7 8 0 t8 0"/><path d="M186 18 v14 M183 18 h7"/></g>
+  <g clip-path="url(#c-talking)"><g class="bands">
+    <rect x="0" y="0" width="200" height="200" fill="#1F1F1F"/>
+    <path d="M0 0 H200 V60 C150 88 80 106 0 104 Z" fill="#0047FF"/>
+    <path d="M118 66 C138 64 158 68 170 76 C162 80 154 84 148 88 C140 78 130 70 118 66 Z" fill="#FFFFFF"/>
+    <path d="M0 104 C80 106 150 88 200 60 V96 C150 132 80 150 0 146 Z" fill="#FFFFFF"/>
+    <path d="M0 150 C40 150 70 154 96 160 C70 166 45 170 0 174 Z" fill="#CFCFCF"/>
+    <path d="M0 190 C70 194 140 180 200 144 V149 C140 186 70 199 0 196 Z" fill="#FFFFFF"/>
+  </g></g>
+  <ellipse cx="80" cy="124" rx="7" ry="9" fill="#1F1F1F"/><circle cx="82" cy="121" r="2.4" fill="#FFFFFF"/><ellipse cx="122" cy="116" rx="7" ry="9" fill="#1F1F1F"/><circle cx="124" cy="113" r="2.4" fill="#FFFFFF"/><ellipse cx="102" cy="136" rx="7" ry="6" fill="#1F1F1F"/><ellipse cx="102" cy="139" rx="4" ry="2.4" fill="#E3120B" opacity=".85"/>
+</svg>
