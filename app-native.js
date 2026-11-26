@@ -71,8 +71,14 @@
   // to choose what to do with it. On Android, the text-selection menu also
   // offers "Lingonect" directly (ACTION_PROCESS_TEXT).
   //
+  // A shared image (a screenshot, a photo) works the same way, except that
+  // the text is first read out of it: the native side saves a copy in the
+  // app's own storage and passes its location, the Engines page loads it and
+  // runs the same text extraction as its image button.
+  //
   // The native side turns every share into an internal link,
   //   com.lingonect.app://share?text=<text>&id=<unique id>
+  //   com.lingonect.app://share?image=<file path>&id=<unique id>
   // (iOS: ios/App/ShareExtension/ShareViewController.swift opens it;
   //  Android: MainActivity.java rewrites the share intent into it), so the
   // stock App plugin delivers it here as appUrlOpen / getLaunchUrl and no
@@ -82,6 +88,7 @@
   // getLaunchUrl keeps returning the same launch link for the life of the app,
   // so each share's id is remembered and handled only once.
   var SHARE_PENDING_KEY = "lingonect-shared-text";
+  var SHARE_IMAGE_KEY = "lingonect-shared-image";
   var SHARE_SEEN_KEY = "lingonect-shared-ids";
   var SHARE_MAX_CHARS = 5000;
 
@@ -115,8 +122,9 @@
     var params;
     try { params = new URLSearchParams(query.split("#")[0]); } catch (e) { return; }
     var text = cleanSharedText(params.get("text"));
+    var image = sharedImagePath(params.get("image"));
     var id = params.get("id") || "";
-    if (!text) return;
+    if (!text && !image) return;
 
     var seen = [];
     try { seen = JSON.parse(readStore(SHARE_SEEN_KEY) || "[]") || []; } catch (e) { seen = []; }
@@ -126,9 +134,23 @@
       writeStore(SHARE_SEEN_KEY, JSON.stringify(seen.slice(-20)));
     }
 
-    writeStore(SHARE_PENDING_KEY, text);
+    if (image) {
+      writeStore(SHARE_IMAGE_KEY, image);
+      writeStore(SHARE_PENDING_KEY, null);
+    } else {
+      writeStore(SHARE_PENDING_KEY, text);
+      writeStore(SHARE_IMAGE_KEY, null);
+    }
     if (/engines\.html$/i.test(location.pathname || "")) fillSharedText();
     else location.href = "engines.html";
+  }
+
+  // Only accept a file the native side itself wrote to its "shared-image"
+  // folder. The link is an ordinary URL that any app or web page could open,
+  // so it must not be able to point the app at some other file.
+  function sharedImagePath(path) {
+    if (typeof path !== "string" || path.indexOf("..") !== -1) return null;
+    return /^\/[^?#]*\/shared-image\/[A-Za-z0-9-]+\.(jpe?g|png)$/i.test(path) ? path : null;
   }
 
   // On the Engines page, move a pending share into the input box. Set it the
@@ -136,6 +158,14 @@
   // auto-detection react (same as setInputText() in engines.html).
   function fillSharedText() {
     var input = document.getElementById("inputText");
+    var image = readStore(SHARE_IMAGE_KEY);
+    if (input && image && typeof window.lingonectReadSharedImage === "function") {
+      writeStore(SHARE_IMAGE_KEY, null);
+      var src = cap.convertFileSrc ? cap.convertFileSrc(image) : image;
+      window.lingonectReadSharedImage(src);
+      try { input.scrollIntoView({ block: "center" }); } catch (e) { /* old WebView */ }
+      return;
+    }
     var text = readStore(SHARE_PENDING_KEY);
     if (!input || !text) return;
     writeStore(SHARE_PENDING_KEY, null);
