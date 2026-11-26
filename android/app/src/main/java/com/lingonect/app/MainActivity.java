@@ -11,6 +11,8 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends BridgeActivity {
 
@@ -28,25 +30,71 @@ public class MainActivity extends BridgeActivity {
   //   com.lingonect.app://share?image=<path>&id=<unique id>
   // The Engines page loads that copy and reads the text out of it. Only the
   // newest shared image is kept; each share clears the folder first.
+  //
+  // The copy runs on a background thread: a photo that is only in the cloud
+  // (Google Photos not yet downloaded) can take a while to arrive, and the
+  // main thread must not wait for it. The link is then handed to the bridge,
+  // whose App plugin keeps appUrlOpen until the page is listening, so this
+  // also works on a cold start.
   private static final String TAG = "LingonectShare";
   private static final int MAX_SHARED_CHARS = 5000;
   private static final long MAX_IMAGE_BYTES = 30L * 1024 * 1024;
+  // One thread, so two quick shares are copied in order.
+  private final ExecutorService imageCopier = Executors.newSingleThreadExecutor();
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     // A fresh launch only: after a process restart the original share was
     // already delivered, and re-inserting it would overwrite the user's edits.
+    boolean imageShare = false;
     if (savedInstanceState == null) {
-      Intent shared = toShareLinkIntent(getIntent());
-      if (shared != null) setIntent(shared);
+      Intent launch = getIntent();
+      if (isImageShare(launch)) {
+        imageShare = true;
+      } else {
+        Intent shared = toShareLinkIntent(launch);
+        if (shared != null) setIntent(shared);
+      }
     }
     super.onCreate(savedInstanceState);
+    if (imageShare) copySharedImageInBackground(getIntent());
   }
 
   @Override
   protected void onNewIntent(Intent intent) {
+    if (isImageShare(intent)) {
+      super.onNewIntent(intent);
+      copySharedImageInBackground(intent);
+      return;
+    }
     Intent shared = toShareLinkIntent(intent);
     super.onNewIntent(shared != null ? shared : intent);
+  }
+
+  @Override
+  public void onDestroy() {
+    imageCopier.shutdown();
+    super.onDestroy();
+  }
+
+  private static boolean isImageShare(Intent intent) {
+    if (intent == null) return false;
+    // Reopening the app from Recents replays the original intent.
+    if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return false;
+    String type = intent.getType();
+    return Intent.ACTION_SEND.equals(intent.getAction()) && type != null && type.startsWith("image/");
+  }
+
+  private void copySharedImageInBackground(Intent intent) {
+    imageCopier.execute(() -> {
+      String path = saveSharedImage(intent);
+      if (path == null) return;
+      Intent link = linkIntent("image", path);
+      runOnUiThread(() -> {
+        if (isFinishing() || isDestroyed() || getBridge() == null) return;
+        getBridge().onNewIntent(link);
+      });
+    });
   }
 
   private Intent toShareLinkIntent(Intent intent) {
@@ -56,13 +104,6 @@ public class MainActivity extends BridgeActivity {
     if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return null;
 
     String action = intent.getAction();
-    String type = intent.getType();
-    if (Intent.ACTION_SEND.equals(action) && type != null && type.startsWith("image/")) {
-      String path = saveSharedImage(intent);
-      if (path == null) return null;
-      return linkIntent("image", path);
-    }
-
     CharSequence text = null;
     if (Intent.ACTION_SEND.equals(action)) {
       text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);

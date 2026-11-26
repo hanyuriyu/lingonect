@@ -169,6 +169,9 @@
     var text = readStore(SHARE_PENDING_KEY);
     if (!input || !text) return;
     writeStore(SHARE_PENDING_KEY, null);
+    // An image shared just before may still be being read; its result must
+    // not overwrite this newer text when it arrives.
+    if (typeof window.lingonectCancelImageReads === "function") window.lingonectCancelImageReads();
     input.value = text;
     input.dispatchEvent(new Event("input", { bubbles: true }));
     try { input.scrollIntoView({ block: "center" }); } catch (e) { /* old WebView */ }
