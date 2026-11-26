@@ -142,9 +142,27 @@ already in the input box.
 - Lingonect may not appear in the share sheet's app row at first: tap
   **More** at the end of that row and switch it on / drag it up.
 
+### Sharing a screenshot or photo
+
+Share an image (a screenshot from its editor, or a photo from Photos) to
+Lingonect and the text in it is read out and put in the input box, the same
+as the image button on Engines.
+
+- The extension shrinks the image to 2048 px, saves it as a JPEG in the App
+  Group container `group.com.lingonect.app` under `shared-image/` (only the
+  newest is kept), and opens `com.lingonect.app://share?image=<path>&id=…`.
+- The App Group is declared in both `App/App.entitlements` and
+  `ShareExtension/ShareExtension.entitlements`. With automatic signing Xcode
+  registers it on the first build. If Xcode shows a red App Groups error under
+  **Signing & Capabilities**, select each target, tick
+  `group.com.lingonect.app` under App Groups (click ↻ if it isn't listed),
+  and build again.
+- Without the App Group the extension can't hand over the image and simply
+  closes; text sharing keeps working.
+
 What to test on a device: highlight a sentence in Safari → Share… →
-Lingonect. Try it once with the app closed and once with it open in the
-background.
+Lingonect. Take a screenshot → tap its thumbnail → Share → Lingonect. Try
+each once with the app closed and once with it open in the background.
 
 ---
 

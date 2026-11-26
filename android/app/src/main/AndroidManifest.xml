@@ -32,6 +32,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- "Share to Lingonect" with a screenshot or photo: the text is
+                 read out of the image and lands in the same input box. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
             <!-- Puts "Lingonect" straight into the text-selection menu
                  (next to Copy / Share) in apps that support it. -->
             <intent-filter>

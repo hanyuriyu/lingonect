@@ -2647,13 +2647,35 @@ async function onInputImagePicked(e) {
   const file = e.target.files && e.target.files[0];
   e.target.value = "";                 // let the same photo be picked again
   if (!file) return;
-  const tools = [inputImageBtn, inputCameraBtn];
-  tools.forEach(b => { b.disabled = true; });
-  inputImageBtn.classList.add("busy");
+  await readTextFromImage(file);
+}
+
+// Each image read gets a number. A newer read, or text shared into the box
+// while one is running, makes the older read's result stale: it is dropped
+// instead of overwriting what the user now has in the box.
+let imageReadGen = 0;
+
+function setImageToolsBusy(busy) {
+  [inputImageBtn, inputCameraBtn].forEach(b => { b.disabled = busy; });
+  inputImageBtn.classList.toggle("busy", busy);
+}
+
+// Called by app-native.js when shared text is put in the box.
+window.lingonectCancelImageReads = function () {
+  imageReadGen++;
+  setImageToolsBusy(false);
+  setInputStatus("");
+};
+
+// Shared by the image / camera buttons and "Share to Lingonect" with an image.
+async function readTextFromImage(file, gen = ++imageReadGen) {
+  const current = () => gen === imageReadGen;
+  setImageToolsBusy(true);
   setInputStatus("Reading text from image…");
   try {
     const b64 = await imageFileToJpegBase64(file);
     const text = await extractTextFromImage(b64);
+    if (!current()) return;
     if (!text || text === "NO_TEXT") {
       setInputStatus("No text found in that image", true, 3500);
       return;
@@ -2665,12 +2687,45 @@ async function onInputImagePicked(e) {
     inputEl.focus();
   } catch (err) {
     console.warn("Image text extraction failed:", err);
-    setInputStatus(err && err.message ? err.message : "Couldn't read that image", true, 5000);
+    if (current()) setInputStatus(err && err.message ? err.message : "Couldn't read that image", true, 5000);
   } finally {
-    tools.forEach(b => { b.disabled = false; });
-    inputImageBtn.classList.remove("busy");
+    if (current()) setImageToolsBusy(false);
   }
 }
+
+// "Share to Lingonect" with an image (apps only): app-native.js hands over a
+// URL for the copy the native side saved. Wait for Firebase to restore the
+// session first: on a cold start the worker would otherwise get no token.
+function whenSignedIn() {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  return new Promise(resolve => {
+    const stop = auth.onAuthStateChanged(user => {
+      if (user) { stop(); resolve(user); }
+    });
+  });
+}
+
+window.lingonectReadSharedImage = async function (src) {
+  // Claim a number now, so a share that arrives while this one is still
+  // loading also makes it stale.
+  const gen = ++imageReadGen;
+  setImageToolsBusy(true);
+  setInputStatus("Reading text from image…");
+  try {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error("The shared image couldn't be opened.");
+    const blob = await res.blob();
+    await whenSignedIn();
+    if (gen !== imageReadGen) return;
+    await readTextFromImage(blob, gen);
+  } catch (err) {
+    console.warn("Shared image failed:", err);
+    if (gen === imageReadGen) {
+      setImageToolsBusy(false);
+      setInputStatus(err && err.message ? err.message : "Couldn't read the shared image", true, 5000);
+    }
+  }
+};
 
 // ── Speak instead of typing ──
 // Tap the mic and talk. Recording stops by itself 3 s after you stop

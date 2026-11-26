@@ -329,6 +329,12 @@ offers it. The app opens on Engines with the text already in the input box.
 - `MainActivity.java` rewrites either into an internal
   `com.lingonect.app://share?text=…&id=…` link; the Capacitor App plugin
   delivers it to the page and `app-native.js` fills `#inputText`.
+- Sharing an **image** (a screenshot, a photo) uses a third filter,
+  `ACTION_SEND` with `image/*`. `MainActivity.java` copies the image to
+  `cache/shared-image/` (clearing older ones first) and passes
+  `com.lingonect.app://share?image=<path>&id=…`; the Engines page loads it via
+  `Capacitor.convertFileSrc` and reads the text out with the same Claude call
+  as its image button.
 - iOS does the same through a Share Extension — see `IOS.md`.
 
 ---

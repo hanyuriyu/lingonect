@@ -26,10 +26,13 @@
 		<dict>
 			<key>NSExtensionActivationRule</key>
 			<dict>
-				<!-- Only offer Lingonect when text is being shared
-				     (a highlighted selection), not for bare links or photos. -->
+				<!-- Offer Lingonect for shared text (a highlighted selection)
+				     and for a single image (a screenshot or photo, whose text
+				     is read out of it), but not for bare links. -->
 				<key>NSExtensionActivationSupportsText</key>
 				<true/>
+				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
+				<integer>1</integer>
 			</dict>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
